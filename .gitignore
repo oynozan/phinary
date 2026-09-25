@@ -15,3 +15,6 @@ __pycache__/
 interface/
 # OS
 .DS_Store
+
+# Claude Code worktrees
+/.claude/

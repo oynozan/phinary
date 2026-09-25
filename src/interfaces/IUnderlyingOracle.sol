@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 /// @title IUnderlyingOracle
 /// @notice What the PredictionHook reads about the underlying ETH/USD price, sourced from a Uniswap pool.
-/// @dev Ticks are NORMALISED so that "ETH up" == "tick up": normTick = sign * rawTick.
+/// @dev Ticks are NORMALISED so that "ETH up" == "tick up": normTick = floor(sign * L_raw): rawTick if sign = +1, -rawTick - 1 if sign = -1.
 ///      Human USD per ETH = 1.0001^normTick * 10^decimalsShift.
 ///      No value returned here can be moved by swaps executed earlier in the current block.
 interface IUnderlyingOracle {

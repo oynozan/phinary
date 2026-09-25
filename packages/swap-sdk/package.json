@@ -1,0 +1,28 @@
+{
+  "name": "@prediction/swap-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Quote and swap PredictionHook YES/NO markets on Unichain Sepolia through V4Quoter and UniversalRouter 2.0.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "scripts": {
+    "gen:abi": "node scripts/gen-abi.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "test:fork": "SWAP_SDK_FORK=1 node --test test/fork.e2e.test.ts",
+    "test:hook": "node --test test/hook.e2e.test.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "viem": "2.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}

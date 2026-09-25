@@ -6,13 +6,18 @@ import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 /// @title NormalCdf
 /// @notice Standard normal CDF and PDF in WAD fixed point.
 /// @dev Hart (1968) / West (2005) rational approximation with 36-decimal Horner accumulators ("HartX36").
-///      Monotonicity of the tail on [0, inf) is certified in docs/research/gaps/formal-verification-integer-proofs.md.
-///      Measured max abs error vs mpmath ~4.2e-17. Symmetric by construction: cdf(x) + cdf(-x) == 1e18.
+///      Monotonicity of the tail on [0, inf) is certified in formal/hart36 (docs/research/gaps/formal-verification-integer-proofs.md).
+///      Measured max abs error vs mpmath 4.23e-17. Symmetric by construction: cdf(x) + cdf(-x) == 1e18.
+///      The upper tail is e(z) * R(z) with e = expWad(-z^2/2) and R = num/den (or 1/(f*sqrt(2pi)) past SPLIT); both
+///      factors are non-increasing in z, which `band` uses to keep Phi +/- k*phi monotone with a single rounding.
 library NormalCdf {
     int256 internal constant WAD = 1e18;
     int256 internal constant SPLIT = 7071067811865470000; // 10/sqrt(2)
     int256 internal constant SQRT_2PI_WAD = 2506628274631000502;
     int256 internal constant SATURATE = 37 * WAD;
+    uint256 internal constant KAPPA_SCALE = 1e27;
+    /// @dev kappa above 1e7 saturates `band` to (1e18, 0); keeps kappa * den inside 256 bits
+    uint256 internal constant KAPPA_MAX = 1e34;
 
     function _num(int256 z) private pure returns (int256 n) {
         unchecked {
@@ -39,20 +44,35 @@ library NormalCdf {
         }
     }
 
+    /// @dev Continued fraction for z >= SPLIT: f = z + 1/(z + 2/(z + 3/(z + 4/(z + 0.65)))), WAD
+    function _cf(int256 z) private pure returns (int256) {
+        unchecked {
+            return z
+                + WAD * WAD / (z + 2 * WAD * WAD / (z + 3 * WAD * WAD / (z + 4 * WAD * WAD / (z + 65 * WAD / 100))));
+        }
+    }
+
+    /// @dev (e, a, b) with upper tail = e * a / b before rounding, for 0 <= z <= SATURATE
+    function _parts(int256 z) private pure returns (uint256 e, uint256 a, uint256 b) {
+        unchecked {
+            e = uint256(F.expWad(-(z * z / WAD / 2)));
+            if (z < SPLIT) {
+                a = uint256(_num(z));
+                b = uint256(_den(z));
+            } else {
+                a = uint256(WAD);
+                b = uint256(_cf(z) * SQRT_2PI_WAD / WAD);
+            }
+        }
+    }
+
     /// @notice Upper tail 1 - Phi(z) for z >= 0, WAD. Clamped to <= 0.5.
     function tail(int256 z) internal pure returns (int256 c) {
         if (z < 0) z = 0; // callers pass |x|; defensive
         if (z > SATURATE) return 0;
+        (uint256 e, uint256 a, uint256 b) = _parts(z);
         unchecked {
-            int256 e = F.expWad(-(z * z / WAD / 2));
-            if (z < SPLIT) {
-                c = e * _num(z) / _den(z);
-            } else {
-                int256 f = z
-                    + WAD * WAD
-                        / (z + 2 * WAD * WAD / (z + 3 * WAD * WAD / (z + 4 * WAD * WAD / (z + 65 * WAD / 100))));
-                c = e * WAD / (f * SQRT_2PI_WAD / WAD);
-            }
+            c = int256(e * a / b);
         }
         if (c > WAD / 2) c = WAD / 2;
     }
@@ -73,5 +93,26 @@ library NormalCdf {
         if (x > SATURATE || x < -SATURATE) return 0;
         int256 e = F.expWad(-(x * x / WAD / 2));
         return uint256(e * WAD / SQRT_2PI_WAD);
+    }
+
+    /// @notice up = min(1, ceil(Phi(x) + k*phi(x))), dn = max(0, floor(Phi(x) - k*phi(x))), kappaE27 = k/sqrt(2pi) * 1e27
+    function band(int256 x, uint256 kappaE27) internal pure returns (uint256 up, uint256 dn) {
+        if (kappaE27 > KAPPA_MAX) return (uint256(WAD), 0);
+        if (x > SATURATE) return (uint256(WAD), uint256(WAD));
+        if (x < -SATURATE) return (0, 0);
+        (uint256 e, uint256 a, uint256 b) = _parts(x < 0 ? -x : x);
+        uint256 p = a * KAPPA_SCALE;
+        uint256 q = kappaE27 * b;
+        uint256 den = b * KAPPA_SCALE;
+        // e*(R + kappa) rounded up, e*(R - kappa) rounded down (signed)
+        uint256 plusUp = F.fullMulDivUp(e, p + q, den);
+        int256 minusDn = p >= q ? int256(F.fullMulDiv(e, p - q, den)) : -int256(F.fullMulDivUp(e, q - p, den));
+        if (x > 0) {
+            up = minusDn <= 0 ? uint256(WAD) : uint256(WAD - minusDn);
+            dn = plusUp >= uint256(WAD) ? 0 : uint256(WAD) - plusUp;
+        } else {
+            up = plusUp > uint256(WAD) ? uint256(WAD) : plusUp;
+            dn = minusDn <= 0 ? 0 : uint256(minusDn);
+        }
     }
 }

@@ -1,0 +1,24 @@
+{
+  "name": "uniswap-prediction-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo bots for the Unichain Sepolia deployment: ETH price mirror and 1-minute market keeper",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "mirror": "node src/mirror.ts",
+    "keeper": "node src/keeper.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "viem": "2.56.9"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "5.9.3"
+  }
+}

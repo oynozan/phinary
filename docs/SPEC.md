@@ -32,7 +32,8 @@ This is the normative spec for the code. The plan lives in [PLAN.md](PLAN.md). T
 ## 2. Underlying oracle (`UnderlyingOracleHook`)
 
 - Serves one ETH/USDC v4 pool. On testnet this is **mintable demo WETH (18 dec) and demo USDC (6 dec)**. Either token ordering must work.
-- Ticks are **normalised** so that "ETH up" means "tick up": `normTick = sign × rawTick`. `sign = -1` when USDC is currency0.
+- Ticks are **normalised** so that "ETH up" means "tick up", using floor semantics in both orientations: `normTick = rawTick` when `sign = +1`, and `normTick = -rawTick - 1` when `sign = -1` (USDC is currency0). This is `floor(sign × L_raw)` except exactly on a tick boundary.
+- The constructor takes the underlying (ETH-side) `Currency` explicitly. Only the owner may initialise the single bound pool, and that pool must pair `underlying` with USDC.
 - The human USD/ETH price is `1.0001^normTick × 10^decimalsShift`.
 - Writes follow v3 `Oracle.sol` semantics. On the **first swap of each `block.timestamp`**, `beforeSwap` records the pre-swap state:
   - the SoB `sqrtPriceX96` and tick;
@@ -93,6 +94,8 @@ Asian discrete (n = nSamples ≥ 1, Δ = window/n; n == 0 → continuous):
   d = μ/√v ; mid = Φ(d) ; pdf = φ(d)
 k   = gammaSWad / √v
 ask = ceil( Φ(d) + k·φ(d) ) + h0Wad    bid = floor( Φ(d) − k·φ(d) ) − h0Wad    (clamp bid at ≥ 0 before the band check)
+      kernel 0: Φ ± k·φ is evaluated with ONE final rounding (NormalCdf.band, factored form), ceil capped at 1e18 → provably monotone in x
+      QuoteMath domain: amounts and |I| ≤ 1e24; out-of-domain inputs revert Band
 NO: askNo = 1e18 − bid ; bidNo = 1e18 − ask
 ```
 
