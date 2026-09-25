@@ -16,6 +16,7 @@ import {
   buildSwap,
   erc20ApproveTx,
   estimateSwapGas,
+  gasWithHeadroom,
   type Market,
   minOutWithSlippage,
   type PermitSingle,
@@ -186,10 +187,6 @@ async function sendAndWait(
     throw new StepError(revertMessage, hash)
   }
   return { hash, receipt }
-}
-
-function gasWithHeadroom(estimate: bigint): bigint {
-  return (estimate * 13n) / 10n + 30_000n
 }
 
 /** Exact-in swap via UniversalRouter 2.0: approve Permit2 if needed, sign a PermitSingle if needed, re-quote, execute */

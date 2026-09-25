@@ -160,6 +160,14 @@ export function buildSwap(p: BuildSwapParams): SwapTx {
   return { to: router, data, value: 0n, commands, inputs, v4Actions }
 }
 
+/**
+ * Gas limit to send for an estimated hook swap: +30% plus 30k. The estimate runs in the latest block but the swap lands in a later
+ * one, where the hook resets its per-block flow state and may write fresh storage, so an unpadded estimate can run out of gas.
+ */
+export function gasWithHeadroom(estimate: bigint): bigint {
+  return (estimate * 13n) / 10n + 30_000n
+}
+
 /** `eth_estimateGas` for a swap; a revert becomes a `PredictionSwapError` so the UI never shows a doomed swap. */
 export async function estimateSwapGas(
   client: Client,

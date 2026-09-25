@@ -44,6 +44,7 @@ import {
   buildSwap,
   erc20ApproveTx,
   estimateSwapGas,
+  gasWithHeadroom,
   findPredictionRoute,
   listMarkets,
   type Market,
@@ -151,8 +152,8 @@ async function chainTime(): Promise<number> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function send(actor: Actor, tx: { to: Address; data: Hex; value?: bigint }): Promise<TransactionReceipt> {
-  const hash = await wallet.sendTransaction({ account: actor.account, chain, to: tx.to, data: tx.data, value: tx.value ?? 0n })
+async function send(actor: Actor, tx: { to: Address; data: Hex; value?: bigint; gas?: bigint }): Promise<TransactionReceipt> {
+  const hash = await wallet.sendTransaction({ account: actor.account, chain, to: tx.to, data: tx.data, value: tx.value ?? 0n, gas: tx.gas })
   const receipt = await pub.waitForTransactionReceipt({ hash })
   assert.equal(receipt.status, 'success', `${actor.name} transaction ${hash} reverted`)
   return receipt
@@ -340,9 +341,9 @@ async function swapExactIn(
     deadline: BigInt(now + 300),
     permit,
   })
-  await estimateSwapGas(pub, { tx, account: owner, extraErrors: hookErrors })
+  const gas = gasWithHeadroom(await estimateSwapGas(pub, { tx, account: owner, extraErrors: hookErrors }))
   const [in0, out0] = await Promise.all([balanceOf(p.tokenIn, owner), balanceOf(p.tokenOut, owner)])
-  const receipt = await send(actor, tx)
+  const receipt = await send(actor, { ...tx, gas })
   const [in1, out1] = await Promise.all([balanceOf(p.tokenIn, owner), balanceOf(p.tokenOut, owner)])
   await chainTime()
 
