@@ -1,0 +1,31 @@
+Solc 0.8.26 finished in 256.75s
+Compiler run successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Running 1 tests for test/HalmosE2E.t.sol:HalmosE2E
+WARNING  in setUp(), executing CALL failed with: Unsupported cheat code:        
+         deployCode(string)                                                     
+ERROR    setUp() failed: HalmosException: No successful path found in setUp()   
+Symbolic test result: 0 passed; 1 failed; time: 0.49s
+
+[time] total: 259.71s (build: 258.32s, load: 0.90s, tests: 0.49s)

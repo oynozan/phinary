@@ -1,0 +1,5 @@
+20207 swap blocks with l1BlockNumber
+  w~  300s: residual (dts - 12*dL1) median +2s, p1 -19s, p99 +28s, min -25s, max +191s
+  w~ 1800s: residual (dts - 12*dL1) median +13s, p1 -14s, p99 +65s, min -23s, max +192s
+  w~ 7200s: residual (dts - 12*dL1) median +59s, p1 +6s, p99 +217s, min -10s, max +229s
+  w~14400s: residual (dts - 12*dL1) median +132s, p1 +40s, p99 +336s, min +19s, max +350s

@@ -1,0 +1,24 @@
+Asian binary Phi(mu/sqrt v) (units of sqrt v)                  checked   116924 decreasing points | min(g+ - 1) +0.000e+00  min(0 - g-) +1.148e-16 | in-band decreasing points (monotonicity violations) 0  example None
+ramp h/sqrt(v) = 0.05                                          checked   116987 decreasing points | min(g+ - 1) -1.887e-14  min(0 - g-) +1.148e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=0.05: max second difference of log P' = +2.47e-01 (<= 0 => log-concave)
+ramp h/sqrt(v) = 0.2                                           checked   117492 decreasing points | min(g+ - 1) -6.661e-15  min(0 - g-) +1.154e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=0.2: max second difference of log P' = -6.17e-06 (<= 0 => log-concave)
+ramp h/sqrt(v) = 0.5                                           checked   119378 decreasing points | min(g+ - 1) -4.441e-16  min(0 - g-) +1.167e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=0.5: max second difference of log P' = -5.75e-06 (<= 0 => log-concave)
+ramp h/sqrt(v) = 1                                             checked   122424 decreasing points | min(g+ - 1) -2.220e-16  min(0 - g-) +1.176e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=1: max second difference of log P' = -4.43e-06 (<= 0 => log-concave)
+ramp h/sqrt(v) = 2                                             checked   125546 decreasing points | min(g+ - 1) -1.110e-16  min(0 - g-) +1.187e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=2: max second difference of log P' = -1.41e-06 (<= 0 => log-concave)
+ramp h/sqrt(v) = 5                                             checked   124193 decreasing points | min(g+ - 1) -1.110e-16  min(0 - g-) +1.203e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=5: max second difference of log P' = -9.29e-11 (<= 0 => log-concave)
+ramp h/sqrt(v) = 10                                            checked   122785 decreasing points | min(g+ - 1) -1.110e-16  min(0 - g-) +1.215e-16 | in-band decreasing points (monotonicity violations) 0  example None
+    ramp h/sqrt(v)=10: max second difference of log P' = +8.88e-16 (<= 0 => log-concave)
+Student-t nu=3.5 (variance-matched)                            checked   228068 decreasing points | min(g+ - 1) -5.222e-04  min(0 - g-) -5.222e-04 | in-band decreasing points (monotonicity violations) 0  example None
+    t nu=3.5: largest kap (units of sd) with no in-band decreasing point = 10.000; global monotone bound 2*sqrt(nu)*sc/(nu+1) = 0.544
+Student-t nu=3.8 (variance-matched)                            checked   232358 decreasing points | min(g+ - 1) -3.607e-04  min(0 - g-) -3.607e-04 | in-band decreasing points (monotonicity violations) 0  example None
+    t nu=3.8: largest kap (units of sd) with no in-band decreasing point = 10.000; global monotone bound 2*sqrt(nu)*sc/(nu+1) = 0.559
+Student-t nu=5.0 (variance-matched)                            checked   250048 decreasing points | min(g+ - 1) -6.936e-05  min(0 - g-) -6.936e-05 | in-band decreasing points (monotonicity violations) 0  example None
+    t nu=5.0: largest kap (units of sd) with no in-band decreasing point = 10.000; global monotone bound 2*sqrt(nu)*sc/(nu+1) = 0.577
+
+Asian mid martingale check (w=2h, cutoff w+5min, 1-min re-quotes): E[P_cut - P_0] = +0.00139 +- 0.00204; E[payoff - P_cut] = -0.00060 +- 0.00093
+  E[sum dP^2] = 0.16736  vs  E[P_cut^2]-E[P_0^2] = 0.16864  <=  E[P_0(1-P_0)] = 0.20151

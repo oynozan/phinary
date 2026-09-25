@@ -1,0 +1,37 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+libs = ["lib"]
+solc = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+bytecode_hash = "none"
+ffi = false
+fs_permissions = [{ access = "read", path = "./test/vectors" }, { access = "read-write", path = "./deployments" }]
+gas_limit = "18446744073709551615"
+allow_internal_expect_revert = true
+
+[profile.default.fuzz]
+runs = 1000
+
+[profile.default.invariant]
+runs = 64
+depth = 100
+fail_on_revert = false
+
+[profile.ci.fuzz]
+runs = 20000
+
+[profile.ci.invariant]
+runs = 512
+depth = 200
+
+[rpc_endpoints]
+unichain_sepolia = "https://sepolia.unichain.org"
+unichain_sepolia_drpc = "https://unichain-sepolia.drpc.org"
+
+[lint]
+lint_on_build = false

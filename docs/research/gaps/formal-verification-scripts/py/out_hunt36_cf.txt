@@ -1,0 +1,5 @@
+x36 drift-crossings 248 steps 1487752 violations 0
+x36 drift-crossings 277 steps 1661723 violations 0
+x36 drift-crossings 253 steps 1517747 violations 0
+x36 drift-crossings 230 steps 1379770 violations 0
+cf drift-crossings 76 steps 455924 violations 0

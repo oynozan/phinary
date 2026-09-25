@@ -1,0 +1,148 @@
+L1 normal w= 30 h0=0.005 cut=  35m lam=0.1: D=2 lat -0.0090±0.0054 (own -0.0074 crowd -0.0016, vol 2.04) noiseP&L +0.020 | D=5 lat -0.0053±0.0046 noiseP&L +0.015
+L1 normal w= 30 h0=0.005 cut=  35m lam=0.5: D=2 lat -0.0094±0.0043 (own -0.0083 crowd -0.0010, vol 1.26) noiseP&L +0.026 | D=5 lat -0.0084±0.0048 noiseP&L +0.021
+L1 normal w= 30 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0342±0.0190 (own -0.0404 crowd +0.0062, vol 10.12) noiseP&L +0.064 | D=5 lat -0.0318±0.0127 noiseP&L +0.064
+L1 normal w= 30 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0131±0.0120 (own -0.0201 crowd +0.0070, vol 4.61) noiseP&L +0.103 | D=5 lat -0.0240±0.0081 noiseP&L +0.107
+L1 normal w= 30 h0=0.010 cut=  35m lam=0.1: D=2 lat -0.0121±0.0073 (own -0.0122 crowd +0.0001, vol 1.71) noiseP&L +0.033 | D=5 lat -0.0082±0.0059 noiseP&L +0.033
+L1 normal w= 30 h0=0.010 cut=  35m lam=0.5: D=2 lat -0.0107±0.0049 (own -0.0061 crowd -0.0046, vol 1.12) noiseP&L +0.047 | D=5 lat -0.0030±0.0040 noiseP&L +0.047
+L1 normal w= 30 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0571±0.0405 (own -0.0455 crowd -0.0116, vol 8.44) noiseP&L +0.144 | D=5 lat +0.0161±0.0288 noiseP&L +0.134
+L1 normal w= 30 h0=0.010 cut= 144m lam=0.5: D=2 lat -0.0277±0.0182 (own -0.0218 crowd -0.0059, vol 3.75) noiseP&L +0.207 | D=5 lat +0.0104±0.0163 noiseP&L +0.215
+L1 normal w= 30 h0=0.010 cut= 338m lam=0.1: D=2 lat -0.0590±0.0578 (own -0.0449 crowd -0.0142, vol 9.77) noiseP&L +0.193 | D=5 lat -0.0341±0.0456 noiseP&L +0.232
+L1 normal w= 30 h0=0.010 cut= 338m lam=0.5: D=2 lat -0.0132±0.0216 (own +0.0001 crowd -0.0133, vol 4.37) noiseP&L +0.284 | D=5 lat -0.0451±0.0178 noiseP&L +0.359
+L1 normal w= 30 h0=0.020 cut=  35m lam=0.1: D=2 lat +0.0088±0.0095 (own +0.0032 crowd +0.0056, vol 1.03) noiseP&L +0.080 | D=5 lat -0.0055±0.0066 noiseP&L +0.093
+L1 normal w= 30 h0=0.020 cut=  35m lam=0.5: D=2 lat +0.0005±0.0060 (own +0.0012 crowd -0.0007, vol 0.43) noiseP&L +0.111 | D=5 lat +0.0039±0.0039 noiseP&L +0.122
+L1 normal w= 30 h0=0.020 cut= 100m lam=0.1: D=2 lat -0.0318±0.0408 (own +0.0091 crowd -0.0409, vol 4.08) noiseP&L +0.303 | D=5 lat -0.0140±0.0257 noiseP&L +0.388
+L1 normal w= 30 h0=0.020 cut= 100m lam=0.5: D=2 lat -0.0100±0.0195 (own +0.0139 crowd -0.0239, vol 1.42) noiseP&L +0.389 | D=5 lat -0.0109±0.0118 noiseP&L +0.502
+L1 normal w= 30 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0074±0.0468 (own +0.0360 crowd -0.0286, vol 4.44) noiseP&L +0.331 | D=5 lat -0.0041±0.0334 noiseP&L +0.415
+L1 normal w= 30 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0224±0.0207 (own +0.0358 crowd -0.0134, vol 1.53) noiseP&L +0.430 | D=5 lat -0.0019±0.0152 noiseP&L +0.558
+L1 normal w=120 h0=0.005 cut= 125m lam=0.1: D=2 lat -0.0938±0.0388 (own -0.0785 crowd -0.0154, vol 17.09) noiseP&L +0.107 | D=5 lat -0.0270±0.0249 noiseP&L +0.098
+L1 normal w=120 h0=0.005 cut= 125m lam=0.5: D=2 lat -0.0366±0.0197 (own -0.0299 crowd -0.0067, vol 6.85) noiseP&L +0.169 | D=5 lat -0.0299±0.0142 noiseP&L +0.175
+L1 normal w=120 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0762±0.0587 (own -0.0629 crowd -0.0132, vol 20.06) noiseP&L +0.129 | D=5 lat -0.0344±0.0338 noiseP&L +0.139
+L1 normal w=120 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0310±0.0265 (own -0.0325 crowd +0.0014, vol 7.92) noiseP&L +0.202 | D=5 lat -0.0422±0.0148 noiseP&L +0.242
+L1 normal w=120 h0=0.010 cut= 125m lam=0.1: D=2 lat -0.0483±0.0654 (own -0.0281 crowd -0.0202, vol 12.14) noiseP&L +0.219 | D=5 lat -0.0546±0.0403 noiseP&L +0.261
+L1 normal w=120 h0=0.010 cut= 125m lam=0.5: D=2 lat +0.0085±0.0281 (own +0.0290 crowd -0.0205, vol 4.96) noiseP&L +0.307 | D=5 lat -0.0215±0.0182 noiseP&L +0.402
+L1 normal w=120 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0074±0.0756 (own -0.0018 crowd -0.0057, vol 12.99) noiseP&L +0.229 | D=5 lat -0.0731±0.0587 noiseP&L +0.317
+L1 normal w=120 h0=0.010 cut= 144m lam=0.5: D=2 lat +0.0262±0.0307 (own +0.0302 crowd -0.0040, vol 5.22) noiseP&L +0.322 | D=5 lat -0.0306±0.0243 noiseP&L +0.486
+L1 normal w=120 h0=0.010 cut= 398m lam=0.1: D=2 lat +0.0390±0.0862 (own +0.0464 crowd -0.0074, vol 12.00) noiseP&L +0.229 | D=5 lat +0.0092±0.0765 noiseP&L +0.508
+L1 normal w=120 h0=0.010 cut= 398m lam=0.5: D=2 lat +0.0322±0.0322 (own +0.0378 crowd -0.0057, vol 5.17) noiseP&L +0.340 | D=5 lat +0.0060±0.0294 noiseP&L +0.761
+L1 normal w=120 h0=0.020 cut= 125m lam=0.1: D=2 lat +0.0369±0.0579 (own +0.0524 crowd -0.0155, vol 5.27) noiseP&L +0.383 | D=5 lat +0.0057±0.0475 noiseP&L +0.659
+L1 normal w=120 h0=0.020 cut= 125m lam=0.5: D=2 lat +0.0247±0.0251 (own +0.0359 crowd -0.0112, vol 1.84) noiseP&L +0.487 | D=5 lat +0.0243±0.0196 noiseP&L +0.860
+L1 normal w=120 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0393±0.0590 (own +0.0434 crowd -0.0041, vol 5.36) noiseP&L +0.369 | D=5 lat +0.0288±0.0518 noiseP&L +0.760
+L1 normal w=120 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0403±0.0239 (own +0.0401 crowd +0.0002, vol 1.83) noiseP&L +0.477 | D=5 lat +0.0252±0.0208 noiseP&L +0.983
+L1 normal w=120 h0=0.020 cut= 160m lam=0.1: D=2 lat +0.0323±0.0591 (own +0.0397 crowd -0.0074, vol 5.31) noiseP&L +0.337 | D=5 lat +0.0462±0.0539 noiseP&L +0.702
+L1 normal w=120 h0=0.020 cut= 160m lam=0.5: D=2 lat +0.0347±0.0249 (own +0.0389 crowd -0.0042, vol 1.82) noiseP&L +0.446 | D=5 lat +0.0323±0.0214 noiseP&L +0.918
+L1 normal w=240 h0=0.005 cut= 245m lam=0.1: D=2 lat -0.0482±0.0977 (own -0.0282 crowd -0.0200, vol 25.35) noiseP&L +0.161 | D=5 lat -0.0876±0.0775 noiseP&L +0.260
+L1 normal w=240 h0=0.005 cut= 245m lam=0.5: D=2 lat +0.0103±0.0401 (own +0.0169 crowd -0.0066, vol 9.56) noiseP&L +0.256 | D=5 lat -0.0255±0.0306 noiseP&L +0.445
+L1 normal w=240 h0=0.010 cut= 245m lam=0.1: D=2 lat +0.0272±0.0909 (own +0.0331 crowd -0.0059, vol 13.81) noiseP&L +0.225 | D=5 lat +0.0348±0.0825 noiseP&L +0.477
+L1 normal w=240 h0=0.010 cut= 245m lam=0.5: D=2 lat +0.0310±0.0339 (own +0.0308 crowd +0.0002, vol 5.45) noiseP&L +0.323 | D=5 lat +0.0372±0.0313 noiseP&L +0.706
+L1 normal w=240 h0=0.010 cut= 478m lam=0.1: D=2 lat +0.0451±0.0961 (own +0.0411 crowd +0.0040, vol 11.64) noiseP&L +0.276 | D=5 lat +0.0372±0.0926 noiseP&L +0.631
+L1 normal w=240 h0=0.010 cut= 478m lam=0.5: D=2 lat +0.0359±0.0346 (own +0.0328 crowd +0.0031, vol 5.02) noiseP&L +0.387 | D=5 lat +0.0142±0.0346 noiseP&L +0.897
+L1 normal w=240 h0=0.020 cut= 245m lam=0.1: D=2 lat +0.0372±0.0600 (own +0.0404 crowd -0.0032, vol 5.41) noiseP&L +0.360 | D=5 lat +0.0372±0.0522 noiseP&L +0.791
+L1 normal w=240 h0=0.020 cut= 245m lam=0.5: D=2 lat +0.0357±0.0244 (own +0.0335 crowd +0.0022, vol 1.87) noiseP&L +0.464 | D=5 lat +0.0337±0.0216 noiseP&L +1.022
+L1 t      w= 30 h0=0.005 cut=  35m lam=0.1: D=2 lat -0.0116±0.0065 (own -0.0090 crowd -0.0026, vol 2.47) noiseP&L +0.019 | D=5 lat -0.0054±0.0050 noiseP&L +0.014
+L1 t      w= 30 h0=0.005 cut=  35m lam=0.5: D=2 lat -0.0104±0.0045 (own -0.0086 crowd -0.0018, vol 1.39) noiseP&L +0.026 | D=5 lat -0.0101±0.0045 noiseP&L +0.021
+L1 t      w= 30 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0386±0.0196 (own -0.0457 crowd +0.0071, vol 10.86) noiseP&L +0.066 | D=5 lat -0.0370±0.0141 noiseP&L +0.065
+L1 t      w= 30 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0166±0.0124 (own -0.0183 crowd +0.0017, vol 4.89) noiseP&L +0.106 | D=5 lat -0.0341±0.0077 noiseP&L +0.109
+L1 t      w= 30 h0=0.010 cut=  35m lam=0.1: D=2 lat -0.0154±0.0079 (own -0.0127 crowd -0.0026, vol 1.89) noiseP&L +0.032 | D=5 lat -0.0102±0.0076 noiseP&L +0.032
+L1 t      w= 30 h0=0.010 cut=  35m lam=0.5: D=2 lat -0.0114±0.0052 (own -0.0098 crowd -0.0016, vol 1.24) noiseP&L +0.048 | D=5 lat -0.0029±0.0043 noiseP&L +0.047
+L1 t      w= 30 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0731±0.0393 (own -0.0552 crowd -0.0179, vol 9.36) noiseP&L +0.147 | D=5 lat +0.0072±0.0279 noiseP&L +0.141
+L1 t      w= 30 h0=0.010 cut= 144m lam=0.5: D=2 lat -0.0362±0.0200 (own -0.0218 crowd -0.0144, vol 4.15) noiseP&L +0.213 | D=5 lat +0.0088±0.0168 noiseP&L +0.222
+L1 t      w= 30 h0=0.010 cut= 338m lam=0.1: D=2 lat -0.0682±0.0602 (own -0.0557 crowd -0.0125, vol 10.86) noiseP&L +0.201 | D=5 lat -0.0233±0.0494 noiseP&L +0.238
+L1 t      w= 30 h0=0.010 cut= 338m lam=0.5: D=2 lat -0.0199±0.0241 (own -0.0057 crowd -0.0143, vol 4.82) noiseP&L +0.293 | D=5 lat -0.0536±0.0201 noiseP&L +0.362
+L1 t      w= 30 h0=0.020 cut=  35m lam=0.1: D=2 lat +0.0049±0.0104 (own +0.0008 crowd +0.0040, vol 1.25) noiseP&L +0.083 | D=5 lat -0.0049±0.0058 noiseP&L +0.093
+L1 t      w= 30 h0=0.020 cut=  35m lam=0.5: D=2 lat +0.0002±0.0070 (own +0.0022 crowd -0.0020, vol 0.52) noiseP&L +0.112 | D=5 lat +0.0029±0.0037 noiseP&L +0.125
+L1 t      w= 30 h0=0.020 cut= 100m lam=0.1: D=2 lat -0.0351±0.0397 (own +0.0089 crowd -0.0440, vol 4.59) noiseP&L +0.309 | D=5 lat -0.0213±0.0276 noiseP&L +0.393
+L1 t      w= 30 h0=0.020 cut= 100m lam=0.5: D=2 lat -0.0163±0.0214 (own +0.0077 crowd -0.0240, vol 1.68) noiseP&L +0.394 | D=5 lat -0.0042±0.0121 noiseP&L +0.498
+L1 t      w= 30 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0001±0.0483 (own +0.0270 crowd -0.0268, vol 5.04) noiseP&L +0.338 | D=5 lat -0.0078±0.0340 noiseP&L +0.422
+L1 t      w= 30 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0256±0.0227 (own +0.0365 crowd -0.0108, vol 1.79) noiseP&L +0.433 | D=5 lat -0.0055±0.0181 noiseP&L +0.557
+L1 t      w=120 h0=0.005 cut= 125m lam=0.1: D=2 lat -0.1026±0.0402 (own -0.0809 crowd -0.0216, vol 17.53) noiseP&L +0.107 | D=5 lat -0.0504±0.0240 noiseP&L +0.101
+L1 t      w=120 h0=0.005 cut= 125m lam=0.5: D=2 lat -0.0429±0.0195 (own -0.0376 crowd -0.0053, vol 7.36) noiseP&L +0.171 | D=5 lat -0.0352±0.0169 noiseP&L +0.181
+L1 t      w=120 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0974±0.0549 (own -0.0893 crowd -0.0081, vol 20.76) noiseP&L +0.131 | D=5 lat -0.0491±0.0341 noiseP&L +0.144
+L1 t      w=120 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0511±0.0282 (own -0.0414 crowd -0.0098, vol 8.42) noiseP&L +0.207 | D=5 lat -0.0539±0.0165 noiseP&L +0.250
+L1 t      w=120 h0=0.010 cut= 125m lam=0.1: D=2 lat -0.0815±0.0652 (own -0.0571 crowd -0.0245, vol 13.02) noiseP&L +0.226 | D=5 lat -0.0601±0.0425 noiseP&L +0.270
+L1 t      w=120 h0=0.010 cut= 125m lam=0.5: D=2 lat +0.0057±0.0306 (own +0.0259 crowd -0.0202, vol 5.49) noiseP&L +0.316 | D=5 lat -0.0227±0.0188 noiseP&L +0.411
+L1 t      w=120 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0431±0.0741 (own -0.0289 crowd -0.0141, vol 13.93) noiseP&L +0.238 | D=5 lat -0.0800±0.0540 noiseP&L +0.331
+L1 t      w=120 h0=0.010 cut= 144m lam=0.5: D=2 lat +0.0216±0.0329 (own +0.0261 crowd -0.0045, vol 5.76) noiseP&L +0.332 | D=5 lat -0.0445±0.0251 noiseP&L +0.502
+L1 t      w=120 h0=0.010 cut= 398m lam=0.1: D=2 lat +0.0272±0.0859 (own +0.0302 crowd -0.0030, vol 12.99) noiseP&L +0.239 | D=5 lat -0.0092±0.0768 noiseP&L +0.530
+L1 t      w=120 h0=0.010 cut= 398m lam=0.5: D=2 lat +0.0295±0.0345 (own +0.0342 crowd -0.0047, vol 5.68) noiseP&L +0.349 | D=5 lat +0.0023±0.0318 noiseP&L +0.776
+L1 t      w=120 h0=0.020 cut= 125m lam=0.1: D=2 lat +0.0343±0.0573 (own +0.0461 crowd -0.0118, vol 5.84) noiseP&L +0.388 | D=5 lat +0.0188±0.0484 noiseP&L +0.666
+L1 t      w=120 h0=0.020 cut= 125m lam=0.5: D=2 lat +0.0368±0.0248 (own +0.0419 crowd -0.0051, vol 2.11) noiseP&L +0.482 | D=5 lat +0.0229±0.0212 noiseP&L +0.850
+L1 t      w=120 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0253±0.0595 (own +0.0295 crowd -0.0042, vol 5.91) noiseP&L +0.376 | D=5 lat +0.0255±0.0525 noiseP&L +0.771
+L1 t      w=120 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0423±0.0259 (own +0.0409 crowd +0.0014, vol 2.13) noiseP&L +0.478 | D=5 lat +0.0250±0.0233 noiseP&L +0.974
+L1 t      w=120 h0=0.020 cut= 160m lam=0.1: D=2 lat +0.0345±0.0592 (own +0.0387 crowd -0.0043, vol 5.87) noiseP&L +0.341 | D=5 lat +0.0445±0.0554 noiseP&L +0.700
+L1 t      w=120 h0=0.020 cut= 160m lam=0.5: D=2 lat +0.0320±0.0272 (own +0.0368 crowd -0.0047, vol 2.11) noiseP&L +0.446 | D=5 lat +0.0388±0.0236 noiseP&L +0.906
+L1 t      w=240 h0=0.005 cut= 245m lam=0.1: D=2 lat -0.0846±0.0938 (own -0.0637 crowd -0.0209, vol 25.90) noiseP&L +0.167 | D=5 lat -0.1350±0.0733 noiseP&L +0.275
+L1 t      w=240 h0=0.005 cut= 245m lam=0.5: D=2 lat +0.0049±0.0421 (own +0.0136 crowd -0.0088, vol 10.20) noiseP&L +0.263 | D=5 lat -0.0381±0.0328 noiseP&L +0.458
+L1 t      w=240 h0=0.010 cut= 245m lam=0.1: D=2 lat +0.0009±0.0889 (own +0.0097 crowd -0.0089, vol 14.66) noiseP&L +0.236 | D=5 lat +0.0130±0.0799 noiseP&L +0.504
+L1 t      w=240 h0=0.010 cut= 245m lam=0.5: D=2 lat +0.0264±0.0358 (own +0.0273 crowd -0.0009, vol 6.01) noiseP&L +0.333 | D=5 lat +0.0379±0.0330 noiseP&L +0.723
+L1 t      w=240 h0=0.010 cut= 478m lam=0.1: D=2 lat +0.0279±0.0940 (own +0.0263 crowd +0.0016, vol 12.54) noiseP&L +0.289 | D=5 lat +0.0170±0.0896 noiseP&L +0.652
+L1 t      w=240 h0=0.010 cut= 478m lam=0.5: D=2 lat +0.0357±0.0363 (own +0.0324 crowd +0.0033, vol 5.51) noiseP&L +0.397 | D=5 lat +0.0191±0.0356 noiseP&L +0.906
+L1 t      w=240 h0=0.020 cut= 245m lam=0.1: D=2 lat +0.0299±0.0595 (own +0.0325 crowd -0.0027, vol 5.94) noiseP&L +0.365 | D=5 lat +0.0411±0.0531 noiseP&L +0.801
+L1 t      w=240 h0=0.020 cut= 245m lam=0.5: D=2 lat +0.0344±0.0258 (own +0.0325 crowd +0.0020, vol 2.16) noiseP&L +0.464 | D=5 lat +0.0325±0.0231 noiseP&L +1.012
+L2 normal w= 30 h0=0.005 cut=  35m lam=0.1: D=2 lat -0.0119±0.0039 (own -0.0028 crowd -0.0091, vol 0.52) noiseP&L +0.017 | D=5 lat -0.0068±0.0033 noiseP&L +0.010
+L2 normal w= 30 h0=0.005 cut=  35m lam=0.5: D=2 lat -0.0100±0.0030 (own -0.0037 crowd -0.0063, vol 0.46) noiseP&L +0.022 | D=5 lat -0.0057±0.0028 noiseP&L +0.014
+L2 normal w= 30 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0039±0.0128 (own -0.0176 crowd +0.0136, vol 3.41) noiseP&L +0.043 | D=5 lat -0.0089±0.0072 noiseP&L +0.042
+L2 normal w= 30 h0=0.005 cut= 144m lam=0.5: D=2 lat +0.0001±0.0086 (own -0.0098 crowd +0.0099, vol 1.97) noiseP&L +0.073 | D=5 lat -0.0117±0.0058 noiseP&L +0.072
+L2 normal w= 30 h0=0.010 cut=  35m lam=0.1: D=2 lat -0.0084±0.0040 (own -0.0056 crowd -0.0028, vol 0.36) noiseP&L +0.025 | D=5 lat -0.0043±0.0023 noiseP&L +0.027
+L2 normal w= 30 h0=0.010 cut=  35m lam=0.5: D=2 lat -0.0086±0.0036 (own -0.0070 crowd -0.0016, vol 0.42) noiseP&L +0.036 | D=5 lat -0.0041±0.0034 noiseP&L +0.037
+L2 normal w= 30 h0=0.010 cut=  73m lam=0.1: D=2 lat -0.0086±0.0167 (own -0.0084 crowd -0.0002, vol 1.45) noiseP&L +0.066 | D=5 lat -0.0040±0.0105 noiseP&L +0.044
+L2 normal w= 30 h0=0.010 cut=  73m lam=0.5: D=2 lat +0.0029±0.0094 (own +0.0019 crowd +0.0010, vol 1.06) noiseP&L +0.100 | D=5 lat +0.0044±0.0071 noiseP&L +0.081
+L2 normal w= 30 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0156±0.0223 (own -0.0150 crowd -0.0006, vol 2.59) noiseP&L +0.105 | D=5 lat -0.0021±0.0122 noiseP&L +0.109
+L2 normal w= 30 h0=0.010 cut= 144m lam=0.5: D=2 lat -0.0111±0.0110 (own -0.0079 crowd -0.0032, vol 1.60) noiseP&L +0.159 | D=5 lat -0.0022±0.0085 noiseP&L +0.170
+L2 normal w= 30 h0=0.020 cut=  35m lam=0.1: D=2 lat +0.0030±0.0068 (own +0.0001 crowd +0.0028, vol 0.24) noiseP&L +0.062 | D=5 lat -0.0029±0.0052 noiseP&L +0.071
+L2 normal w= 30 h0=0.020 cut=  35m lam=0.5: D=2 lat +0.0046±0.0044 (own +0.0028 crowd +0.0018, vol 0.15) noiseP&L +0.087 | D=5 lat +0.0015±0.0033 noiseP&L +0.093
+L2 normal w= 30 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0223±0.0191 (own +0.0360 crowd -0.0137, vol 1.27) noiseP&L +0.282 | D=5 lat +0.0040±0.0148 noiseP&L +0.334
+L2 normal w= 30 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0111±0.0112 (own +0.0189 crowd -0.0078, vol 0.56) noiseP&L +0.370 | D=5 lat +0.0008±0.0079 noiseP&L +0.446
+L2 normal w=120 h0=0.005 cut= 125m lam=0.1: D=2 lat -0.0270±0.0267 (own -0.0306 crowd +0.0036, vol 6.63) noiseP&L +0.068 | D=5 lat -0.0090±0.0165 noiseP&L +0.078
+L2 normal w=120 h0=0.005 cut= 125m lam=0.5: D=2 lat -0.0129±0.0154 (own -0.0136 crowd +0.0008, vol 3.21) noiseP&L +0.119 | D=5 lat -0.0153±0.0106 noiseP&L +0.137
+L2 normal w=120 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0212±0.0372 (own -0.0262 crowd +0.0049, vol 8.19) noiseP&L +0.087 | D=5 lat +0.0091±0.0191 noiseP&L +0.088
+L2 normal w=120 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0087±0.0178 (own -0.0165 crowd +0.0078, vol 3.81) noiseP&L +0.149 | D=5 lat -0.0030±0.0095 noiseP&L +0.171
+L2 normal w=120 h0=0.010 cut= 125m lam=0.1: D=2 lat +0.0100±0.0353 (own +0.0278 crowd -0.0178, vol 4.20) noiseP&L +0.171 | D=5 lat -0.0206±0.0254 noiseP&L +0.179
+L2 normal w=120 h0=0.010 cut= 125m lam=0.5: D=2 lat +0.0042±0.0164 (own +0.0178 crowd -0.0136, vol 2.31) noiseP&L +0.252 | D=5 lat -0.0012±0.0137 noiseP&L +0.290
+L2 normal w=120 h0=0.010 cut= 133m lam=0.1: D=2 lat +0.0183±0.0383 (own +0.0268 crowd -0.0084, vol 4.42) noiseP&L +0.144 | D=5 lat -0.0115±0.0288 noiseP&L +0.199
+L2 normal w=120 h0=0.010 cut= 133m lam=0.5: D=2 lat +0.0223±0.0186 (own +0.0275 crowd -0.0052, vol 2.40) noiseP&L +0.230 | D=5 lat -0.0202±0.0145 noiseP&L +0.324
+L2 normal w=120 h0=0.010 cut= 144m lam=0.1: D=2 lat +0.0470±0.0395 (own +0.0495 crowd -0.0024, vol 4.59) noiseP&L +0.187 | D=5 lat -0.0059±0.0308 noiseP&L +0.231
+L2 normal w=120 h0=0.010 cut= 144m lam=0.5: D=2 lat +0.0229±0.0196 (own +0.0287 crowd -0.0058, vol 2.49) noiseP&L +0.275 | D=5 lat -0.0138±0.0161 noiseP&L +0.372
+L2 normal w=120 h0=0.020 cut= 125m lam=0.1: D=2 lat +0.0443±0.0235 (own +0.0507 crowd -0.0064, vol 1.57) noiseP&L +0.347 | D=5 lat +0.0147±0.0199 noiseP&L +0.534
+L2 normal w=120 h0=0.020 cut= 125m lam=0.5: D=2 lat +0.0257±0.0127 (own +0.0276 crowd -0.0019, vol 0.72) noiseP&L +0.447 | D=5 lat +0.0066±0.0102 noiseP&L +0.711
+L2 normal w=120 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0534±0.0237 (own +0.0529 crowd +0.0005, vol 1.59) noiseP&L +0.339 | D=5 lat +0.0239±0.0205 noiseP&L +0.645
+L2 normal w=120 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0281±0.0131 (own +0.0273 crowd +0.0008, vol 0.72) noiseP&L +0.445 | D=5 lat +0.0105±0.0118 noiseP&L +0.848
+L2 normal w=240 h0=0.005 cut= 245m lam=0.1: D=2 lat +0.0302±0.0648 (own +0.0404 crowd -0.0101, vol 11.38) noiseP&L +0.135 | D=5 lat +0.0005±0.0534 noiseP&L +0.181
+L2 normal w=240 h0=0.005 cut= 245m lam=0.5: D=2 lat +0.0217±0.0282 (own +0.0222 crowd -0.0005, vol 5.09) noiseP&L +0.226 | D=5 lat -0.0130±0.0204 noiseP&L +0.335
+L2 normal w=240 h0=0.010 cut= 245m lam=0.1: D=2 lat +0.0689±0.0509 (own +0.0685 crowd +0.0004, vol 5.04) noiseP&L +0.200 | D=5 lat +0.0507±0.0444 noiseP&L +0.393
+L2 normal w=240 h0=0.010 cut= 245m lam=0.5: D=2 lat +0.0282±0.0224 (own +0.0270 crowd +0.0012, vol 2.68) noiseP&L +0.296 | D=5 lat +0.0274±0.0210 noiseP&L +0.606
+L2 normal w=240 h0=0.020 cut= 245m lam=0.1: D=2 lat +0.0442±0.0251 (own +0.0431 crowd +0.0011, vol 1.58) noiseP&L +0.335 | D=5 lat +0.0391±0.0230 noiseP&L +0.725
+L2 normal w=240 h0=0.020 cut= 245m lam=0.5: D=2 lat +0.0267±0.0133 (own +0.0253 crowd +0.0014, vol 0.72) noiseP&L +0.438 | D=5 lat +0.0238±0.0122 noiseP&L +0.950
+L2 t      w= 30 h0=0.005 cut=  35m lam=0.1: D=2 lat -0.0123±0.0038 (own -0.0029 crowd -0.0094, vol 0.59) noiseP&L +0.017 | D=5 lat -0.0069±0.0038 noiseP&L +0.010
+L2 t      w= 30 h0=0.005 cut=  35m lam=0.5: D=2 lat -0.0143±0.0033 (own -0.0039 crowd -0.0103, vol 0.50) noiseP&L +0.021 | D=5 lat -0.0072±0.0034 noiseP&L +0.014
+L2 t      w= 30 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0098±0.0127 (own -0.0154 crowd +0.0056, vol 3.72) noiseP&L +0.043 | D=5 lat -0.0135±0.0077 noiseP&L +0.042
+L2 t      w= 30 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0058±0.0087 (own -0.0144 crowd +0.0086, vol 2.14) noiseP&L +0.073 | D=5 lat -0.0164±0.0058 noiseP&L +0.073
+L2 t      w= 30 h0=0.010 cut=  35m lam=0.1: D=2 lat -0.0083±0.0042 (own -0.0051 crowd -0.0033, vol 0.43) noiseP&L +0.025 | D=5 lat -0.0085±0.0031 noiseP&L +0.026
+L2 t      w= 30 h0=0.010 cut=  35m lam=0.5: D=2 lat -0.0097±0.0037 (own -0.0073 crowd -0.0025, vol 0.45) noiseP&L +0.036 | D=5 lat -0.0041±0.0035 noiseP&L +0.036
+L2 t      w= 30 h0=0.010 cut=  73m lam=0.1: D=2 lat -0.0092±0.0168 (own -0.0081 crowd -0.0011, vol 1.70) noiseP&L +0.067 | D=5 lat -0.0050±0.0091 noiseP&L +0.045
+L2 t      w= 30 h0=0.010 cut=  73m lam=0.5: D=2 lat -0.0013±0.0098 (own -0.0007 crowd -0.0007, vol 1.15) noiseP&L +0.102 | D=5 lat +0.0056±0.0073 noiseP&L +0.082
+L2 t      w= 30 h0=0.010 cut= 144m lam=0.1: D=2 lat -0.0291±0.0224 (own -0.0212 crowd -0.0079, vol 2.91) noiseP&L +0.109 | D=5 lat -0.0021±0.0126 noiseP&L +0.111
+L2 t      w= 30 h0=0.010 cut= 144m lam=0.5: D=2 lat -0.0234±0.0123 (own -0.0145 crowd -0.0089, vol 1.75) noiseP&L +0.166 | D=5 lat -0.0006±0.0081 noiseP&L +0.173
+L2 t      w= 30 h0=0.020 cut=  35m lam=0.1: D=2 lat +0.0050±0.0065 (own +0.0009 crowd +0.0040, vol 0.26) noiseP&L +0.063 | D=5 lat -0.0024±0.0044 noiseP&L +0.073
+L2 t      w= 30 h0=0.020 cut=  35m lam=0.5: D=2 lat +0.0025±0.0047 (own +0.0021 crowd +0.0003, vol 0.18) noiseP&L +0.086 | D=5 lat +0.0006±0.0034 noiseP&L +0.093
+L2 t      w= 30 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0207±0.0194 (own +0.0329 crowd -0.0122, vol 1.40) noiseP&L +0.286 | D=5 lat +0.0057±0.0152 noiseP&L +0.342
+L2 t      w= 30 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0094±0.0111 (own +0.0202 crowd -0.0107, vol 0.66) noiseP&L +0.374 | D=5 lat +0.0003±0.0088 noiseP&L +0.448
+L2 t      w=120 h0=0.005 cut= 125m lam=0.1: D=2 lat -0.0296±0.0259 (own -0.0306 crowd +0.0010, vol 7.10) noiseP&L +0.069 | D=5 lat -0.0086±0.0177 noiseP&L +0.081
+L2 t      w=120 h0=0.005 cut= 125m lam=0.5: D=2 lat -0.0083±0.0161 (own -0.0139 crowd +0.0056, vol 3.50) noiseP&L +0.119 | D=5 lat -0.0107±0.0113 noiseP&L +0.142
+L2 t      w=120 h0=0.005 cut= 144m lam=0.1: D=2 lat -0.0127±0.0347 (own -0.0254 crowd +0.0128, vol 8.63) noiseP&L +0.088 | D=5 lat -0.0037±0.0209 noiseP&L +0.092
+L2 t      w=120 h0=0.005 cut= 144m lam=0.5: D=2 lat -0.0217±0.0186 (own -0.0173 crowd -0.0044, vol 4.14) noiseP&L +0.152 | D=5 lat -0.0101±0.0098 noiseP&L +0.178
+L2 t      w=120 h0=0.010 cut= 125m lam=0.1: D=2 lat +0.0039±0.0352 (own +0.0187 crowd -0.0148, vol 4.53) noiseP&L +0.175 | D=5 lat -0.0116±0.0261 noiseP&L +0.186
+L2 t      w=120 h0=0.010 cut= 125m lam=0.5: D=2 lat +0.0017±0.0175 (own +0.0158 crowd -0.0141, vol 2.55) noiseP&L +0.256 | D=5 lat -0.0114±0.0133 noiseP&L +0.300
+L2 t      w=120 h0=0.010 cut= 133m lam=0.1: D=2 lat +0.0098±0.0384 (own +0.0188 crowd -0.0090, vol 4.76) noiseP&L +0.152 | D=5 lat -0.0066±0.0291 noiseP&L +0.206
+L2 t      w=120 h0=0.010 cut= 133m lam=0.5: D=2 lat +0.0141±0.0189 (own +0.0270 crowd -0.0129, vol 2.66) noiseP&L +0.240 | D=5 lat -0.0217±0.0161 noiseP&L +0.332
+L2 t      w=120 h0=0.010 cut= 144m lam=0.1: D=2 lat +0.0262±0.0398 (own +0.0313 crowd -0.0051, vol 4.97) noiseP&L +0.194 | D=5 lat -0.0085±0.0316 noiseP&L +0.240
+L2 t      w=120 h0=0.010 cut= 144m lam=0.5: D=2 lat +0.0246±0.0201 (own +0.0274 crowd -0.0028, vol 2.74) noiseP&L +0.282 | D=5 lat -0.0181±0.0166 noiseP&L +0.381
+L2 t      w=120 h0=0.020 cut= 125m lam=0.1: D=2 lat +0.0516±0.0230 (own +0.0565 crowd -0.0049, vol 1.69) noiseP&L +0.348 | D=5 lat +0.0100±0.0208 noiseP&L +0.541
+L2 t      w=120 h0=0.020 cut= 125m lam=0.5: D=2 lat +0.0280±0.0133 (own +0.0307 crowd -0.0027, vol 0.83) noiseP&L +0.444 | D=5 lat +0.0158±0.0110 noiseP&L +0.702
+L2 t      w=120 h0=0.020 cut= 144m lam=0.1: D=2 lat +0.0563±0.0235 (own +0.0574 crowd -0.0011, vol 1.71) noiseP&L +0.343 | D=5 lat +0.0233±0.0208 noiseP&L +0.655
+L2 t      w=120 h0=0.020 cut= 144m lam=0.5: D=2 lat +0.0296±0.0137 (own +0.0307 crowd -0.0011, vol 0.83) noiseP&L +0.443 | D=5 lat +0.0140±0.0123 noiseP&L +0.843
+L2 t      w=240 h0=0.005 cut= 245m lam=0.1: D=2 lat +0.0214±0.0639 (own +0.0330 crowd -0.0116, vol 11.95) noiseP&L +0.138 | D=5 lat +0.0031±0.0517 noiseP&L +0.191
+L2 t      w=240 h0=0.005 cut= 245m lam=0.5: D=2 lat +0.0190±0.0292 (own +0.0203 crowd -0.0013, vol 5.53) noiseP&L +0.229 | D=5 lat -0.0141±0.0218 noiseP&L +0.348
+L2 t      w=240 h0=0.010 cut= 245m lam=0.1: D=2 lat +0.0454±0.0505 (own +0.0450 crowd +0.0004, vol 5.43) noiseP&L +0.209 | D=5 lat +0.0436±0.0431 noiseP&L +0.413
+L2 t      w=240 h0=0.010 cut= 245m lam=0.5: D=2 lat +0.0256±0.0229 (own +0.0234 crowd +0.0023, vol 2.95) noiseP&L +0.303 | D=5 lat +0.0266±0.0216 noiseP&L +0.620
+L2 t      w=240 h0=0.020 cut= 245m lam=0.1: D=2 lat +0.0476±0.0249 (own +0.0470 crowd +0.0007, vol 1.70) noiseP&L +0.337 | D=5 lat +0.0438±0.0225 noiseP&L +0.729
+L2 t      w=240 h0=0.020 cut= 245m lam=0.5: D=2 lat +0.0280±0.0139 (own +0.0265 crowd +0.0016, vol 0.82) noiseP&L +0.434 | D=5 lat +0.0252±0.0127 noiseP&L +0.934

@@ -1,0 +1,5 @@
+pre-event basis pool/Binance = 0.99980
+event 19:39:50+15 min: ETH buyers paid $9.29M, lost $200k vs CEX mark; ETH sellers received $9.08M, gained $187k vs CEX mark
+  w= 30 min window starting 1 min before the event: TWAP shift vs CEX-implied +47.4 bp; max 1 s deviation 601 bp; seconds with |dev|>25 bp: 403
+  w=120 min window starting 1 min before the event: TWAP shift vs CEX-implied +11.5 bp; max 1 s deviation 601 bp; seconds with |dev|>25 bp: 415
+  w=240 min window starting 1 min before the event: TWAP shift vs CEX-implied +5.1 bp; max 1 s deviation 601 bp; seconds with |dev|>25 bp: 415

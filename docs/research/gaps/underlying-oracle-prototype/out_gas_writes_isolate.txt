@@ -1,0 +1,8 @@
+  hookless first swap: 122024
+  VolOracleV2 first swap, no grid crossing: 149660
+  hookless second swap same block: 116482
+  VolOracleV2 second swap same block: 127789
+  hookless first swap (boundary block): 122024
+  VolOracleV2 first swap, crosses 1 boundary: 175694
+  hookless first swap after 1h gap: 116482
+  VolOracleV2 first swap after 1h gap (12 checkpoints): 431370

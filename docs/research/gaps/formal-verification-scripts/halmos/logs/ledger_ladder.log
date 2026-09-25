@@ -1,0 +1,8 @@
+[32m[PASS][0m check_S3S4_otherOps(uint256,uint256,uint256,uint256,uint256,uint8,uint256,bool) (paths: 102, time: 3.07s, bounds: [])
+[32m[PASS][0m check_S3S4_redeem(uint256,uint256,uint256,uint256,uint256,bool,uint256) (paths: 19, time: 0.45s, bounds: [])
+[32m[PASS][0m check_S3S4_swapAbs(uint256,uint256,uint256,uint256,uint256,bool,bool,uint256,uint256) (paths: 96, time: 2.55s, bounds: [])
+[32m[PASS][0m check_S3S4_swapReal(uint256,uint256,uint256,uint256,uint256,bool,bool,bool,uint256,uint256,uint256) (paths: 574, time: 19.06s, bounds: [])
+[32m[PASS][0m check_ladder3(uint64,uint64,uint64,uint64,uint64,uint64,uint64) (paths: 271, time: 3.19s, bounds: [])
+[32m[PASS][0m check_ladder4(uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64) (paths: 1174, time: 18.58s, bounds: [])
+[33m[TIMEOUT][0m check_unionBound3(uint64,uint64,uint64,uint64,uint64,uint64,uint64) (paths: 271, time: 303.10s, bounds: [])
+Symbolic test result: 6 passed; 1 failed; time: 350.11s

@@ -1,0 +1,15 @@
+No files changed, compilation skipped
+
+
+
+
+
+
+Running 1 tests for test/QuoteHalmos.t.sol:QuoteHalmos
+[31mCounterexample: 
+    p_R_uint256_9b070ab_00 = 0x1ffffffff800000001ffffffff800000
+    p_beta_uint256_c1459d4_00 = 0x800000000000000000000000
+    p_lam_uint256_3ba2334_00 = 0x8000000020000000
+    p_s_uint256_bb5ac5f_00 = 0x8000000[0m
+[31m[FAIL][0m check_lemmaS_sell_noband(uint256,uint256,uint256,uint256) (paths: 14, time: 415.37s, bounds: [])
+Symbolic test result: 0 passed; 1 failed; time: 415.41s

@@ -1,0 +1,44 @@
+=== (a) martingale & total QV identity: 1-day ATM, 12s blocks ===
+P0=0.491648  E[payoff]=0.483350 (se 0.0035)   E[sum dP^2]=0.249763 (se 0.00146)  P0(1-P0)=0.249930
+
+=== (b) stale-by-1-block oracle, block-reset linear impact lambda (price per token) ===
+lambda=1e-06 s=0.000: E[arb profit]=124,016 USDC (se 700); E[LP P&L]=-123,552 (se 454); s=0 bound P0(1-P0)/(2 lambda)=124,965
+lambda=1e-06 s=0.002: E[arb profit]=81,254 USDC (se 576); E[LP P&L]=-80,583 (se 510); s=0 bound P0(1-P0)/(2 lambda)=124,965
+lambda=1e-06 s=0.005: E[arb profit]=45,190 USDC (se 452); E[LP P&L]=-45,279 (se 557); s=0 bound P0(1-P0)/(2 lambda)=124,965
+lambda=1e-06 s=0.010: E[arb profit]=22,079 USDC (se 330); E[LP P&L]=-22,419 (se 477); s=0 bound P0(1-P0)/(2 lambda)=124,965
+
+  effect of oracle staleness (lambda=1e-6, s=0.002): stale_blocks = 1, 5, 25, 150(=30min TWAP-like lag)
+  stale=  1 blocks (0.2 min): E[arb profit]=82,523 USDC
+  stale=  5 blocks (1.0 min): E[arb profit]=505,212 USDC
+  stale= 25 blocks (5.0 min): E[arb profit]=2,746,395 USDC
+  stale=150 blocks (30.0 min): E[arb profit]=16,946,919 USDC
+
+=== (c) noise + arbs: break-even noise volume ===
+noise 0.1/block x 500 tok (E vol 360,000 tok): E[noise rev]=1,800  E[arb]=45,380  E[LP]=-42,710 (se 766), sd[LP]=76,560, P(LP<0)=0.775, 1%-quantile=-334,666
+noise 0.3/block x 500 tok (E vol 1,080,000 tok): E[noise rev]=5,396  E[arb]=44,984  E[LP]=-38,805 (se 784), sd[LP]=78,410, P(LP<0)=0.739, 1%-quantile=-351,544
+noise 0.3/block x 2000 tok (E vol 4,320,000 tok): E[noise rev]=21,595  E[arb]=45,557  E[LP]=-24,012 (se 922), sd[LP]=92,227, P(LP<0)=0.567, 1%-quantile=-365,818
+
+=== (d) flat price (no impact) with per-block cap Q, s=0.002: loss ~ Q * sum E(|gap|-s)^+ ===
+T=1h: E[arb profit]=4,972.8 USDC for Q=1000 tokens/block
+T=24h: E[arb profit]=16,686.5 USDC for Q=1000 tokens/block
+
+=== (e) pin-risk profile (ATM, r=0, small sig sqrtT): share of total QV in last h = 1 + (2/pi) asin(h/T - 1) ===
+last   0.1% of life -> 0.028 of the variance / LVR
+last   1.0% of life -> 0.090 of the variance / LVR
+last   5.0% of life -> 0.202 of the variance / LVR
+last  10.0% of life -> 0.287 of the variance / LVR
+last  25.0% of life -> 0.460 of the variance / LVR
+last  50.0% of life -> 0.667 of the variance / LVR
+
+per-block (12s) fair-price std at the money, n(0) sqrt(dt/tau):
+  tau=     1 min: 0.1784
+  tau=     5 min: 0.0798
+  tau=    15 min: 0.0461
+  tau=    60 min: 0.0230
+  tau=   240 min: 0.0115
+  tau=  1440 min: 0.0047
+time-to-expiry below which ATM per-block std exceeds half-spread s: tau* = dt (n(0)/s)^2
+  s=0.005: tau* = 21.22 h
+  s=0.01: tau* = 5.31 h
+  s=0.02: tau* = 1.33 h
+  s=0.05: tau* = 0.21 h

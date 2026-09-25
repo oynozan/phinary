@@ -1,0 +1,26 @@
+--- tenor 1440 min, sigma ewma1440, OOS ('2024-01-01', '2026-09-24'), weeks 143
+   normal: n   6970 logloss 0.46818 Brier 0.15038 ECE 2.05pp max-bin 4.51pp
+       t4: n   6970 logloss 0.47064 Brier 0.15058 ECE 2.62pp max-bin 5.48pp | normal-t4: dLL -0.00246 [-0.00463,-0.00024] dBrier -0.00019 [-0.00081,+0.00043]
+       t5: n   6970 logloss 0.46892 Brier 0.15027 ECE 2.17pp max-bin 5.02pp | normal-t5: dLL -0.00074 [-0.00227,+0.00082] dBrier +0.00012 [-0.00030,+0.00057]
+       t6: n   6970 logloss 0.46832 Brier 0.15018 ECE 2.03pp max-bin 4.77pp | normal-t6: dLL -0.00014 [-0.00130,+0.00111] dBrier +0.00021 [-0.00013,+0.00054]
+--- tenor 1440 min, sigma ewma1440, IS ('2021-01-01', '2024-01-01'), weeks 157
+   normal: n   7646 logloss 0.48360 Brier 0.15664 ECE 1.73pp max-bin 3.98pp
+       t4: n   7646 logloss 0.48823 Brier 0.15747 ECE 3.33pp max-bin 6.21pp | normal-t4: dLL -0.00464 [-0.00775,-0.00129] dBrier -0.00083 [-0.00173,+0.00013]
+       t5: n   7646 logloss 0.48585 Brier 0.15698 ECE 2.63pp max-bin 4.99pp | normal-t5: dLL -0.00226 [-0.00444,+0.00005] dBrier -0.00033 [-0.00099,+0.00035]
+       t6: n   7646 logloss 0.48490 Brier 0.15679 ECE 2.31pp max-bin 4.37pp | normal-t6: dLL -0.00131 [-0.00303,+0.00053] dBrier -0.00014 [-0.00065,+0.00038]
+--- tenor 240 min, sigma ewma240+seas, OOS ('2024-01-01', '2026-09-24'), weeks 143
+   normal: n  37770 logloss 0.46597 Brier 0.14974 ECE 2.20pp max-bin 4.02pp
+     t3.8: n  37770 logloss 0.46712 Brier 0.14961 ECE 2.25pp max-bin 3.06pp | normal-t3.8: dLL -0.00115 [-0.00252,+0.00029] dBrier +0.00012 [-0.00024,+0.00053]
+       t4: n  37770 logloss 0.46658 Brier 0.14952 ECE 2.01pp max-bin 2.96pp | normal-t4: dLL -0.00062 [-0.00181,+0.00063] dBrier +0.00022 [-0.00012,+0.00060]
+--- tenor 240 min, sigma ewma240+seas, IS ('2021-01-01', '2024-01-01'), weeks 157
+   normal: n  43625 logloss 0.46335 Brier 0.14804 ECE 2.29pp max-bin 4.94pp
+     t3.8: n  43625 logloss 0.46378 Brier 0.14763 ECE 2.21pp max-bin 3.55pp | normal-t3.8: dLL -0.00043 [-0.00267,+0.00231] dBrier +0.00040 [-0.00025,+0.00124]
+       t4: n  43625 logloss 0.46329 Brier 0.14756 ECE 1.97pp max-bin 3.45pp | normal-t4: dLL +0.00006 [-0.00193,+0.00264] dBrier +0.00048 [-0.00013,+0.00123]
+--- tenor 60 min, sigma ewma240+seas, OOS ('2024-01-01', '2026-09-24'), weeks 143
+   normal: n 149849 logloss 0.45503 Brier 0.14571 ECE 2.39pp max-bin 5.08pp
+     t3.5: n 149849 logloss 0.45460 Brier 0.14522 ECE 1.90pp max-bin 2.66pp | normal-t3.5: dLL +0.00043 [-0.00076,+0.00164] dBrier +0.00050 [+0.00016,+0.00082]
+       t4: n 149849 logloss 0.45346 Brier 0.14500 ECE 1.25pp max-bin 2.13pp | normal-t4: dLL +0.00157 [+0.00059,+0.00250] dBrier +0.00071 [+0.00044,+0.00098]
+--- tenor 60 min, sigma ewma240+seas, IS ('2021-01-01', '2024-01-01'), weeks 157
+   normal: n 173818 logloss 0.44287 Brier 0.14088 ECE 2.75pp max-bin 5.38pp
+     t3.5: n 173818 logloss 0.44045 Brier 0.13985 ECE 1.45pp max-bin 2.62pp | normal-t3.5: dLL +0.00242 [+0.00012,+0.00535] dBrier +0.00103 [+0.00035,+0.00189]
+       t4: n 173818 logloss 0.43974 Brier 0.13973 ECE 0.85pp max-bin 1.67pp | normal-t4: dLL +0.00313 [+0.00131,+0.00532] dBrier +0.00115 [+0.00059,+0.00183]

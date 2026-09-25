@@ -1,0 +1,32 @@
+=== arb (Delta 1 s): real deviation sd 3.38 bp (MAD 3.78); rho fit by tracking-error MAD:
+   rho=0.02/slot: tracking MAD  5.18 bp, sd  5.81 bp; model deviation sd  6.93 bp
+   rho=0.05/slot: tracking MAD  3.69 bp, sd  3.99 bp; model deviation sd  5.28 bp
+   rho=0.10/slot: tracking MAD  2.79 bp, sd  3.15 bp; model deviation sd  4.50 bp
+   rho=0.20/slot: tracking MAD  2.17 bp, sd  2.62 bp; model deviation sd  3.99 bp
+   rho=0.30/slot: tracking MAD  1.91 bp, sd  2.42 bp; model deviation sd  3.78 bp
+   rho=0.50/slot: tracking MAD  1.64 bp, sd  2.26 bp; model deviation sd  3.60 bp
+   rho=0.70/slot: tracking MAD  1.49 bp, sd  2.19 bp; model deviation sd  3.51 bp
+   rho=1.00/slot: tracking MAD  1.39 bp, sd  2.13 bp; model deviation sd  3.43 bp   <- best
+=== base7 (Delta 2 s): real deviation sd 3.28 bp (MAD 3.96); rho fit by tracking-error MAD:
+   rho=0.02/slot: tracking MAD  6.56 bp, sd  7.25 bp; model deviation sd  8.52 bp
+   rho=0.05/slot: tracking MAD  4.56 bp, sd  4.66 bp; model deviation sd  6.28 bp
+   rho=0.10/slot: tracking MAD  3.42 bp, sd  3.34 bp; model deviation sd  5.17 bp
+   rho=0.20/slot: tracking MAD  2.53 bp, sd  2.43 bp; model deviation sd  4.41 bp
+   rho=0.30/slot: tracking MAD  2.13 bp, sd  2.06 bp; model deviation sd  4.09 bp
+   rho=0.50/slot: tracking MAD  1.73 bp, sd  1.74 bp; model deviation sd  3.78 bp
+   rho=0.70/slot: tracking MAD  1.53 bp, sd  1.61 bp; model deviation sd  3.62 bp
+   rho=1.00/slot: tracking MAD  1.40 bp, sd  1.55 bp; model deviation sd  3.49 bp   <- best
+=== eth (Delta 12 s): real deviation sd 3.67 bp (MAD 4.29); rho fit by tracking-error MAD:
+   rho=0.02/slot: tracking MAD 13.46 bp, sd 17.78 bp; model deviation sd 18.27 bp
+   rho=0.05/slot: tracking MAD  9.51 bp, sd 11.41 bp; model deviation sd 12.28 bp
+   rho=0.10/slot: tracking MAD  6.83 bp, sd  7.89 bp; model deviation sd  9.05 bp
+   rho=0.20/slot: tracking MAD  4.73 bp, sd  5.35 bp; model deviation sd  6.75 bp
+   rho=0.30/slot: tracking MAD  3.76 bp, sd  4.24 bp; model deviation sd  5.73 bp
+   rho=0.50/slot: tracking MAD  2.68 bp, sd  3.16 bp; model deviation sd  4.70 bp
+   rho=0.70/slot: tracking MAD  2.09 bp, sd  2.64 bp; model deviation sd  4.15 bp
+   rho=1.00/slot: tracking MAD  1.62 bp, sd  2.33 bp; model deviation sd  3.65 bp   <- best
+
+full-reversion band follower with effective band f_eff:
+  arb: f_eff=4bp MAD 0.97 sd 1.94*  f_eff=5bp MAD 1.39 sd 2.13  f_eff=6bp MAD 2.53 sd 2.63  f_eff=7bp MAD 3.71 sd 3.22  f_eff=8bp MAD 4.89 sd 3.86
+  base7: f_eff=4bp MAD 1.16 sd 1.37*  f_eff=5bp MAD 1.40 sd 1.55  f_eff=6bp MAD 2.37 sd 2.13  f_eff=7bp MAD 3.56 sd 2.81  f_eff=8bp MAD 4.72 sd 3.50
+  eth: f_eff=4bp MAD 1.52 sd 2.18*  f_eff=5bp MAD 1.62 sd 2.33  f_eff=6bp MAD 2.45 sd 2.78  f_eff=7bp MAD 3.56 sd 3.36  f_eff=8bp MAD 4.67 sd 3.98

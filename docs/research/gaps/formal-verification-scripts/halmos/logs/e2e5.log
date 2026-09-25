@@ -1,0 +1,29 @@
+Solc 0.8.26 finished in 51.99s
+Compiler run successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Running 1 tests for test/HalmosE2E.t.sol:HalmosE2E
+setup: 1.06s (decode: 0.03s, run: 1.04s)
+[32m[PASS][0m check_e2e_oneSwap(bool,bool,bool,uint64,uint64,uint64) (paths: 791, time: 175.93s (paths: 175.93s, models: 0.00s), bounds: [])
+WARNING  check_e2e_oneSwap(bool,bool,bool,uint64,uint64,uint64): paths have not 
+         been fully explored due to the loop unrolling bound: 4                 
+Symbolic test result: 1 passed; 0 failed; time: 177.01s
+
+[time] total: 230.64s (build: 53.21s, load: 0.42s, tests: 177.01s)

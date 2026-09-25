@@ -1,0 +1,7 @@
+
+=== A3. equal-average-spread comparison: is the shape (dual / gamma) better than a flat wider h0? ===
+sob flat h0=0.395c: E[arb]=   4,233 (se 68)  avg half-spread 0.395c
+sob flat h0=0.507c: E[arb]=   3,266 (se 58)  avg half-spread 0.507c
+sob flat h0=0.830c: E[arb]=   1,636 (se 37)  avg half-spread 0.830c
+sob flat h0=1.005c: E[arb]=   1,173 (se 30)  avg half-spread 1.005c
+sob flat h0=1.099c: E[arb]=     992 (se 26)  avg half-spread 1.099c

@@ -1,0 +1,15 @@
+FAIL at z ~ 4.465813 width 62500000000000
+certified ratio non-increasing on [0,4.465): False chunks 4478
+36-decimal Horner: ratio certified non-increasing at every 1-wei step on [0,7.071068): True chunks 708
+z~0.5: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~1.0: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~2.0: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~3.0: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~4.0: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~4.3: ratio-up steps 0/200000, max relative up-tick 0.000e+00
+z~4.47: ratio-up steps 22/200000, max relative up-tick 2.936e-21
+z~4.5: ratio-up steps 113/200000, max relative up-tick 2.939e-21
+z~4.6: ratio-up steps 1976/200000, max relative up-tick 4.166e-21
+z~5.0: ratio-up steps 5618/200000, max relative up-tick 3.157e-20
+z~6.0: ratio-up steps 6981/200000, max relative up-tick 1.295e-19
+z~7.0: ratio-up steps 7052/200000, max relative up-tick 2.161e-19

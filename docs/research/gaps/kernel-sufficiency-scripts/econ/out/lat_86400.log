@@ -1,0 +1,15 @@
+seconds 10022400 days 116.0
+tenor 86400s block 12s normal: LP pnl/market vs latency arb -0.0030 ± 0.0129 (n=791) arb vol 1.89
+tenor 86400s block 12s     t4: LP pnl/market vs latency arb -0.0068 ± 0.0146 (n=791) arb vol 3.22
+tenor 86400s block 12s     t5: LP pnl/market vs latency arb -0.0043 ± 0.0141 (n=791) arb vol 2.72
+tenor 86400s block 12s     t6: LP pnl/market vs latency arb -0.0033 ± 0.0139 (n=791) arb vol 2.49
+   paired normal - t4: +0.0038 ± 0.0065 (listing-clustered SE)
+   paired normal - t5: +0.0013 ± 0.0048 (listing-clustered SE)
+   paired normal - t6: +0.0003 ± 0.0038 (listing-clustered SE)
+tenor 86400s block  2s normal: LP pnl/market vs latency arb +0.0015 ± 0.0104 (n=791) arb vol 0.69
+tenor 86400s block  2s     t4: LP pnl/market vs latency arb +0.0013 ± 0.0133 (n=791) arb vol 1.21
+tenor 86400s block  2s     t5: LP pnl/market vs latency arb +0.0010 ± 0.0126 (n=791) arb vol 1.01
+tenor 86400s block  2s     t6: LP pnl/market vs latency arb +0.0019 ± 0.0122 (n=791) arb vol 0.92
+   paired normal - t4: +0.0001 ± 0.0057 (listing-clustered SE)
+   paired normal - t5: +0.0005 ± 0.0041 (listing-clustered SE)
+   paired normal - t6: -0.0005 ± 0.0033 (listing-clustered SE)

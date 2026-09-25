@@ -1,0 +1,96 @@
+No files changed, compilation skipped
+Ran 12 tests for test/RoutingFork.t.sol:RoutingForkTest
+[PASS] test_UR212_fiveFieldEncoding_revertsWithoutData() (gas: 61559)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_UR212_merge_permit2TransferThenV4Swap() (gas: 609402)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_UR212_multiHop_ETH_USDC_YES_pricedAtSoB() (gas: 713760)
+Logs:
+  fork chain: mainnet block: 26055400
+  S_SoB (USD/ETH e18): 2684155842729447946096
+  S_after_hop1       : 2203998051825985501004
+  USDC into hook     : 243104089905
+  YES out            : 481394237435
+  YES if priced live : 533256821992
+  quoter             : 481394237435
+[PASS] test_UR212_multiHop_YES_USDC_NO_noProfit() (gas: 984662)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_UR212_multiHop_afterEarlierSwapInSameBlock_stillSoB() (gas: 281948)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_UR212_singleHop_buyYes_matchesQuoterAndHookQuote() (gas: 545738)
+Logs:
+  fork chain: mainnet block: 26055400
+  gas: UR.execute buy YES (mint path, incl. Permit2 pull): 303894
+  YES out (UR 2.1.2): 19801980198 quoter: 19801980198
+[PASS] test_UR212_singleHop_sellYes() (gas: 590052)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_UR212_split_inV4Swap() (gas: 620199)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_foreignInitialize_reverts() (gas: 36645)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_halt_softFailInsideSubPlan() (gas: 167911)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_halts_quoterAndRouterRevertData() (gas: 680334)
+Logs:
+  fork chain: mainnet block: 26055400
+[PASS] test_merge_withoutPrefund_reverts() (gas: 390921)
+Logs:
+  fork chain: mainnet block: 26055400
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 159.31ms (20.98ms CPU time)
+Ran 1 test suite in 161.66ms (159.31ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+No files changed, compilation skipped
+Ran 12 tests for test/RoutingFork.t.sol:RoutingForkTest
+[PASS] test_UR212_fiveFieldEncoding_revertsWithoutData() (gas: 61571)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_UR212_merge_permit2TransferThenV4Swap() (gas: 608836)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_UR212_multiHop_ETH_USDC_YES_pricedAtSoB() (gas: 711592)
+Logs:
+  fork chain: unichain block: 59602400
+  S_SoB (USD/ETH e18): 2677987111847144117503
+  S_after_hop1       : 2199407432035748499375
+  USDC into hook     : 242571561491
+  YES out            : 480339725724
+  YES if priced live : 532026345595
+  quoter             : 480339725724
+[PASS] test_UR212_multiHop_YES_USDC_NO_noProfit() (gas: 984292)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_UR212_multiHop_afterEarlierSwapInSameBlock_stillSoB() (gas: 281731)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_UR212_singleHop_buyYes_matchesQuoterAndHookQuote() (gas: 545275)
+Logs:
+  fork chain: unichain block: 59602400
+  gas: UR.execute buy YES (mint path, incl. Permit2 pull): 303524
+  YES out (UR 2.1.2): 19801980198 quoter: 19801980198
+[PASS] test_UR212_singleHop_sellYes() (gas: 589486)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_UR212_split_inV4Swap() (gas: 619558)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_foreignInitialize_reverts() (gas: 36645)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_halt_softFailInsideSubPlan() (gas: 167721)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_halts_quoterAndRouterRevertData() (gas: 680226)
+Logs:
+  fork chain: unichain block: 59602400
+[PASS] test_merge_withoutPrefund_reverts() (gas: 390563)
+Logs:
+  fork chain: unichain block: 59602400
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 152.19ms (30.85ms CPU time)
+Ran 1 test suite in 154.81ms (152.19ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)

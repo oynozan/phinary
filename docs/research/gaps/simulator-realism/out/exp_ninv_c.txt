@@ -1,0 +1,8 @@
+   max-single-agent aggregation (lat): ann +79% lo95 +71% CVaR95 0.53% CVaR99 1.42% maxDD 2.1%
+kappa .10 s 3% ev_on   D=2.0 IS: lat +0.0008 tail +0.0050 iv +0.0211 dir +0.0134 jump +0.0043 smile +0.0109 orv -0.0135 noise +0.0600 | ext: ann +79% lo95 +71% CVaR95 0.53% CVaR99 1.42% maxDD 2.1% (counted []) | +orv lo95 +34%
+   max-single-agent aggregation (smile): ann +79% lo95 +73% CVaR95 0.37% CVaR99 0.66% maxDD 0.7%
+kappa .10 s 3% ev_on   D=2.0 OOS: lat -0.0018 tail +0.0006 iv +0.0075 dir +0.0126 jump -0.0002 smile -0.0022 orv -0.0155 noise +0.0625 | ext: ann +74% lo95 +63% CVaR95 1.87% CVaR99 3.19% maxDD 4.2% (counted ['lat', 'jump', 'smile']) | +orv lo95 +16%
+   max-single-agent aggregation (lat): ann +372% lo95 +361% CVaR95 -4.48% CVaR99 -2.94% maxDD 0.0%
+kappa .10 s 3% ev_on   D=5.0 IS: lat -0.0024 tail +0.0000 iv +0.0160 dir +0.0060 jump -0.0009 smile +0.0074 orv -0.0226 noise +0.1781 | ext: ann +370% lo95 +354% CVaR95 -2.59% CVaR99 -1.79% maxDD 0.0% (counted ['lat', 'jump']) | +orv lo95 +283%
+   max-single-agent aggregation (jump): ann +364% lo95 +355% CVaR95 -4.63% CVaR99 -4.39% maxDD 0.0%
+kappa .10 s 3% ev_on   D=5.0 OOS: lat -0.0095 tail -0.0113 iv -0.0037 dir +0.0034 jump -0.0121 smile -0.0117 orv -0.0283 noise +0.1845 | ext: ann +272% lo95 +207% CVaR95 15.24% CVaR99 23.83% maxDD 43.6% (counted ['lat', 'tail', 'iv', 'jump', 'smile']) | +orv lo95 +118%

@@ -1,0 +1,21 @@
+Ran 13 tests for test/Accounting.t.sol:AccountingTest
+[PASS] test_T23_donateSameCurrency_hookNotMisCredited() (gas: 24748819)
+[PASS] test_T23_preSync_inventoryOnlyMode_works() (gas: 24580994)
+[PASS] test_T23_preSync_inventoryPath_works() (gas: 24591147)
+[PASS] test_T23_preSync_onDemandMint_failsClosed() (gas: 24478384)
+[PASS] test_T23_preSync_repayingRouter_selfHarmOnly() (gas: 24958892)
+[PASS] test_deltaTable_outcomeIsCurrency0() (gas: 27974428)
+[PASS] test_deltaTable_outcomeIsCurrency1() (gas: 27973337)
+[PASS] test_gas_buyPaths() (gas: 24079764)
+[PASS] test_inventoryOnly_capacityLimit() (gas: 24222836)
+[PASS] test_lifecycle_settle_redeem_noStuckFunds() (gas: 24972780)
+[PASS] test_userClaims_roundTrip() (gas: 24051225)
+[PASS] test_v4Router_all8_outcome0() (gas: 27874959)
+[PASS] test_v4Router_all8_outcome1() (gas: 27875237)
+Ran 1 test for test/Invariants.t.sol:Invariant_InventoryOnly_Outcome1
+[PASS] invariant_accounting() (runs: 256, calls: 25600, reverts: 0)
+Ran 1 test for test/Invariants.t.sol:Invariant_OnDemand_Outcome0
+[PASS] invariant_accounting() (runs: 256, calls: 25600, reverts: 0)
+Ran 1 test for test/Invariants.t.sol:Invariant_OnDemand_Outcome1
+[PASS] invariant_accounting() (runs: 256, calls: 25600, reverts: 0)
+Ran 4 test suites in 9.72s (28.45s CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)

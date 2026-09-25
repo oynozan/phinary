@@ -1,0 +1,49 @@
+[PASS] testFuzz_randomOps(uint256) (runs: 1000, μ: 26165415, ~: 27390948)
+[PASS] test_endToEnd_claimsOnlySwapPath() (gas: 12438135)
+  LP P&L (units): 722973190
+[PASS] test_gas_lpOps() (gas: 10612618)
+  subscribe (first): 200491
+  subscribe (second LP): 132091
+  topUp (first, per market): 282440
+  topUp (repeat): 128528
+  merge: 170544
+  settle (series, oracle stub): 56582
+  finalize (3 markets): 486458
+  redeem -> 6909 claims: 95508
+  redeem -> ERC20 (unlock+take): 97050
+  LP claim -> 6909 claims: 82214
+  LP claim -> ERC20: 83627
+[PASS] test_gas_n1() (gas: 2870130)
+  swap gas, 1 strike, exact ladder: 209781
+[PASS] test_gas_n16() (gas: 27836119)
+  swap gas, 16 strikes, exact ladder: 291392
+[PASS] test_gas_n30() (gas: 51137051)
+  swap gas, 30 strikes, exact ladder: 367580
+[PASS] test_gas_n30_fastPath() (gas: 50973477)
+  swap gas, 30 strikes, O(1) fast path: 204282
+[PASS] test_gas_n8() (gas: 14520960)
+  swap gas, 8 strikes, exact ladder: 247875
+[PASS] test_inflation_and_donations_do_not_move_shares() (gas: 6350084)
+[PASS] test_ladderCap_exactAllowsOffsetting_blocksAligned() (gas: 9059212)
+  minW after rejected trade: 883600000000
+[PASS] test_liveness_pause_and_deadOracle() (gas: 8176410)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 3.73s (3.78s CPU time)
+[PASS] testFuzz_randomOps(uint256) (runs: 1000, μ: 26088085, ~: 27216996)
+[PASS] test_endToEnd_claimsOnlySwapPath() (gas: 12438102)
+  LP P&L (units): 722973190
+[PASS] test_gas_n1() (gas: 2870112)
+  swap gas, 1 strike, exact ladder: 209763
+[PASS] test_gas_n16() (gas: 27836079)
+  swap gas, 16 strikes, exact ladder: 291374
+[PASS] test_gas_n30() (gas: 51137033)
+  swap gas, 30 strikes, exact ladder: 367562
+[PASS] test_gas_n30_fastPath() (gas: 50973459)
+  swap gas, 30 strikes, O(1) fast path: 204264
+[PASS] test_gas_n8() (gas: 14520942)
+  swap gas, 8 strikes, exact ladder: 247857
+[PASS] test_inflation_and_donations_do_not_move_shares() (gas: 6350084)
+[PASS] test_ladderCap_exactAllowsOffsetting_blocksAligned() (gas: 9059160)
+  minW after rejected trade: 883600000000
+[PASS] test_liveness_pause_and_deadOracle() (gas: 8176321)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 3.73s (3.76s CPU time)
+Ran 2 test suites in 3.73s (7.46s CPU time): 21 tests passed, 0 failed, 0 skipped (21 total tests)

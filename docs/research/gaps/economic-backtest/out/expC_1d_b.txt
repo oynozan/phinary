@@ -1,0 +1,4 @@
+tenor 1440   pmamm eta   1.0  OOS: per-market LP pnl: noise +0.0084 | lat -0.3863 tail -0.4279 iv -0.4301 orv -0.4599 dir -0.0571 | conservative total -1.2930 | weekly-return ann -469.243 CI95lo -499.150 maxDD 1290.418 CVaR95w 19.515
+tenor 1440   pmamm eta   1.0 FULL: per-market LP pnl: noise +0.0076 | lat -0.3945 tail -0.4343 iv -0.4358 orv -0.4660 dir -0.0580 | conservative total -1.3149 | weekly-return ann -476.808 CI95lo -502.291 maxDD 2750.816 CVaR95w 21.522
+tenor 1440   pmamm eta   5.0  OOS: per-market LP pnl: noise +0.1070 | lat -0.4561 tail -0.4994 iv -0.5012 orv -0.5315 dir -0.0596 | conservative total -1.4093 | weekly-return ann -511.442 CI95lo -541.485 maxDD 1406.465 CVaR95w 20.417
+tenor 1440   pmamm eta   5.0 FULL: per-market LP pnl: noise +0.1040 | lat -0.4617 tail -0.5033 iv -0.5041 orv -0.5353 dir -0.0604 | conservative total -1.4255 | weekly-return ann -516.900 CI95lo -542.510 maxDD 2982.117 CVaR95w 22.352

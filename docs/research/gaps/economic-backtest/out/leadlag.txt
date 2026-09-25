@@ -1,0 +1,19 @@
+Downloading pandas (9.7MiB)
+ Downloaded pandas
+Installed 4 packages in 22ms
+pool swap-blocks 26742 span days 6.466111111111111 median gap between swap blocks (s) 12.0
+basis pool - Binance(USDT) bps: mean -1.36 sd 4.07 (USDC/USDT basis included)
+de-meaned basis bps: sd 4.04, |.|>5bp 21.9%, |.|>10bp 0.37%, p99 8.5
+corr(pool 12s return, Binance 12s return lagged -24s) = -0.007
+corr(pool 12s return, Binance 12s return lagged -12s) = +0.082
+corr(pool 12s return, Binance 12s return lagged +0s) = +0.540
+corr(pool 12s return, Binance 12s return lagged +12s) = +0.255
+corr(pool 12s return, Binance 12s return lagged +24s) = +0.156
+corr(pool 12s return, Binance 12s return lagged +36s) = +0.093
+corr(pool 12s return, Binance 12s return lagged +60s) = +0.039
+start-of-block oracle vs CEX 6s later: sd 4.35 bps; |.|>5bp 23.8%
+  oracle age  0s: sd 3.80 bps
+  oracle age  2s: sd 3.92 bps
+  oracle age 12s: sd 4.92 bps
+  oracle age 60s: sd 8.26 bps
+pool vs 5bp-band model on Binance: sd 2.34 bps

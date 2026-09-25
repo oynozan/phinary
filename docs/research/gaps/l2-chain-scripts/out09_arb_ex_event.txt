@@ -1,0 +1,10 @@
+arb ex-event: 172417 slots; deviation sd 2.98 bp; |e|<=f 95.0%; |e|<=2f 100.0%; p1/p99 -5.5/5.7
+  SoB error age  0s: sd 2.98 bp
+  SoB error age  1s: sd 3.12 bp
+  SoB error age  2s: sd 3.26 bp
+  SoB error age  4s: sd 3.52 bp
+  SoB error age 12s: sd 4.45 bp
+  SoB error age 60s: sd 8.02 bp
+  lead-lag (1 s returns): L=-2:+0.011  L=-1:+0.033  L=+0:+0.453  L=+1:+0.270  L=+2:+0.117  L=+4:+0.092  L=+12:+0.040
+  lead-lag (12 s returns): L=-12:-0.003  L=+0:+0.715  L=+12:+0.317  L=+24:+0.146  L=+60:+0.046
+  beta( 1s) = 0.288  beta( 2s) = 0.345  beta( 4s) = 0.404  beta(12s) = 0.525  beta(60s) = 0.787

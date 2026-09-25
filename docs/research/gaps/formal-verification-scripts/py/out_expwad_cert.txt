@@ -1,0 +1,6 @@
+reduced-argument range [T0,T1] = -27458388733853736671888762601 27458388733853736674576759248  (L/2 = 27458388733853736675570735564 )
+real roots in range: P 0  Q 0  G=P'Q-PQ' 0
+signs at 0: P 1 Q 1 G 1
+rigorous lower bound on F' over range: 0.117145  => min increase per 1-wei step of x >= 9.28116e+9 internal units
+eP ~ 2^105.8, eq = 1.523, Qmin ~ 2^114.1
+rigorous |r - F| <= 1.003325 internal units (vs >= 9.28e9 increase per wei step)

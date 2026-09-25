@@ -1,0 +1,29 @@
+Solc 0.8.26 finished in 135.24s
+Compiler run successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Running 1 tests for test/HalmosE2E.t.sol:HalmosE2E
+ERROR    setUp() failed: HalmosException: No successful path found in setUp()   
+Symbolic test result: 0 passed; 1 failed; time: 339.60s
+
+[time] total: 476.29s (build: 136.18s, load: 0.51s, tests: 339.60s)

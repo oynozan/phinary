@@ -1,0 +1,37 @@
+seconds 10022400 days 116.0 realised vol (1m-sampled) 0.538
+1h L1 12s    reset/block s=0.01: LP pnl/market vs latency arb -0.0253 ± 0.0038  arb vol   6.32  noise pnl/unit +0.0334  => break-even eta 0.76
+1h L1 12s    reset/block s=0.02: LP pnl/market vs latency arb -0.0054 ± 0.0036  arb vol   4.05  noise pnl/unit +0.0405  => break-even eta 0.13
+1h L1 12s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.0449 ± 0.0033  arb vol   6.73  noise pnl/unit +0.0334  => break-even eta 1.35
+1h L1 12s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0230 ± 0.0031  arb vol   4.58  noise pnl/unit +0.0405  => break-even eta 0.57
+1h L1 12s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.0690 ± 0.0030  arb vol   7.52  noise pnl/unit +0.0334  => break-even eta 2.06
+1h L1 12s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0440 ± 0.0028  arb vol   5.18  noise pnl/unit +0.0405  => break-even eta 1.09
+1h  L2 2s    reset/block s=0.01: LP pnl/market vs latency arb -0.0055 ± 0.0033  arb vol   3.97  noise pnl/unit +0.0334  => break-even eta 0.17
+1h  L2 2s    reset/block s=0.02: LP pnl/market vs latency arb +0.0072 ± 0.0032  arb vol   2.08  noise pnl/unit +0.0405  => break-even eta 0.00
+1h  L2 2s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.0183 ± 0.0030  arb vol   3.93  noise pnl/unit +0.0334  => break-even eta 0.55
+1h  L2 2s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0046 ± 0.0028  arb vol   2.30  noise pnl/unit +0.0405  => break-even eta 0.11
+1h  L2 2s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.0370 ± 0.0026  arb vol   4.46  noise pnl/unit +0.0334  => break-even eta 1.11
+1h  L2 2s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0173 ± 0.0025  arb vol   2.61  noise pnl/unit +0.0405  => break-even eta 0.43
+4h L1 12s    reset/block s=0.01: LP pnl/market vs latency arb -0.0414 ± 0.0072  arb vol   9.40  noise pnl/unit +0.0202  => break-even eta 2.05
+4h L1 12s    reset/block s=0.02: LP pnl/market vs latency arb -0.0060 ± 0.0071  arb vol   4.79  noise pnl/unit +0.0273  => break-even eta 0.22
+4h L1 12s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.0682 ± 0.0059  arb vol  10.65  noise pnl/unit +0.0202  => break-even eta 3.37
+4h L1 12s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0303 ± 0.0056  arb vol   5.81  noise pnl/unit +0.0273  => break-even eta 1.11
+4h L1 12s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.1002 ± 0.0051  arb vol  11.99  noise pnl/unit +0.0202  => break-even eta 4.96
+4h L1 12s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0579 ± 0.0047  arb vol   6.62  noise pnl/unit +0.0273  => break-even eta 2.12
+4h  L2 2s    reset/block s=0.01: LP pnl/market vs latency arb -0.0071 ± 0.0066  arb vol   4.75  noise pnl/unit +0.0202  => break-even eta 0.35
+4h  L2 2s    reset/block s=0.02: LP pnl/market vs latency arb +0.0093 ± 0.0062  arb vol   1.97  noise pnl/unit +0.0273  => break-even eta 0.00
+4h  L2 2s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.0353 ± 0.0050  arb vol   5.25  noise pnl/unit +0.0202  => break-even eta 1.74
+4h  L2 2s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0142 ± 0.0047  arb vol   2.45  noise pnl/unit +0.0273  => break-even eta 0.52
+4h  L2 2s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.0565 ± 0.0042  arb vol   5.99  noise pnl/unit +0.0202  => break-even eta 2.79
+4h  L2 2s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0272 ± 0.0039  arb vol   2.77  noise pnl/unit +0.0273  => break-even eta 1.00
+1d L1 12s    reset/block s=0.01: LP pnl/market vs latency arb -0.0785 ± 0.0171  arb vol  11.11  noise pnl/unit +0.0120  => break-even eta 6.53
+1d L1 12s    reset/block s=0.02: LP pnl/market vs latency arb -0.0450 ± 0.0164  arb vol   4.33  noise pnl/unit +0.0190  => break-even eta 2.36
+1d L1 12s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.1074 ± 0.0128  arb vol  14.16  noise pnl/unit +0.0120  => break-even eta 8.94
+1d L1 12s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0677 ± 0.0118  arb vol   5.87  noise pnl/unit +0.0190  => break-even eta 3.55
+1d L1 12s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.1313 ± 0.0104  arb vol  16.13  noise pnl/unit +0.0120  => break-even eta 10.92
+1d L1 12s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0775 ± 0.0097  arb vol   6.67  noise pnl/unit +0.0190  => break-even eta 4.07
+1d  L2 2s    reset/block s=0.01: LP pnl/market vs latency arb -0.0441 ± 0.0162  arb vol   4.41  noise pnl/unit +0.0120  => break-even eta 3.67
+1d  L2 2s    reset/block s=0.02: LP pnl/market vs latency arb -0.0077 ± 0.0146  arb vol   1.67  noise pnl/unit +0.0190  => break-even eta 0.40
+1d  L2 2s   decay hl=60s s=0.01: LP pnl/market vs latency arb -0.0624 ± 0.0116  arb vol   5.88  noise pnl/unit +0.0120  => break-even eta 5.20
+1d  L2 2s   decay hl=60s s=0.02: LP pnl/market vs latency arb -0.0354 ± 0.0113  arb vol   2.36  noise pnl/unit +0.0190  => break-even eta 1.86
+1d  L2 2s  decay hl=300s s=0.01: LP pnl/market vs latency arb -0.0727 ± 0.0087  arb vol   6.57  noise pnl/unit +0.0120  => break-even eta 6.06
+1d  L2 2s  decay hl=300s s=0.02: LP pnl/market vs latency arb -0.0394 ± 0.0097  arb vol   2.59  noise pnl/unit +0.0190  => break-even eta 2.07

@@ -1,0 +1,2 @@
+drift crossings [4.47,7.07]: 1.593e+11 ; [5,7.07]: 9.672e+09
+estimated violating steps (x 0.0287): 2.77e+08 ; density per wei step 1.34e-10

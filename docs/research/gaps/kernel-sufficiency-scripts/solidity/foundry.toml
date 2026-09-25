@@ -1,0 +1,16 @@
+[profile.default]
+src = "src"
+test = "test"
+libs = ["lib"]
+solc = "../foundry-bin/solc-0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10000
+via_ir = false
+offline = true
+gas_limit = "18446744073709551615"
+memory_limit = 2147483648
+fs_permissions = [{ access = "read", path = "./vectors" }]
+remappings = ["forge-std/=lib/forge-std/src/"]
+[fuzz]
+runs = 100000

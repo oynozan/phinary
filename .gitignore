@@ -1,0 +1,17 @@
+# Foundry
+/out/
+/cache/
+broadcast/*/31337/
+broadcast/**/dry-run/
+# Env / secrets
+.env
+.env.*
+!.env.example
+# Node / Python
+node_modules/
+__pycache__/
+.venv/
+# Uniswap interface fork (separate git repo)
+interface/
+# OS
+.DS_Store

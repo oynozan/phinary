@@ -1,0 +1,8 @@
+Choudhury Phi(-1e-12)=0.500139944837 Phi(0)=0.500139944838 Phi(+1e-12)=0.499860055163 drop=2.799e-04
+A&S7.1.26 Phi(-1e-12)=0.499999999500 Phi(0)=0.500000000500 Phi(+1e-12)=0.500000000500 drop=-1.001e-09
+Hart Phi(-1e-12)=0.500000000000 Phi(0)=0.500000000000 Phi(+1e-12)=0.500000000000 drop=-7.980e-13
+solstat max drop across 0 ~ 2.999920256e-08
+tick(S=4000, ETH/USDC native)= -193380
+s=0.002: kappa=0.655  break-even noise volume V*/ell = kappa*P0(1-P0)/(2s) = 40.9
+s=0.005: kappa=0.364  break-even noise volume V*/ell = kappa*P0(1-P0)/(2s) = 9.1
+s=0.01: kappa=0.178  break-even noise volume V*/ell = kappa*P0(1-P0)/(2s) = 2.2

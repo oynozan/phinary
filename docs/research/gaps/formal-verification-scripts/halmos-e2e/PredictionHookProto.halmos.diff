@@ -1,0 +1,19 @@
+147,158c147,151
+<     function _deployOrdered(string memory sym, bool below, uint256 id, uint256 side) internal returns (OutcomeToken t) {
+<         bytes32 initHash = keccak256(abi.encodePacked(type(OutcomeToken).creationCode, abi.encode(sym, sym)));
+<         for (uint256 i;; ++i) {
+<             bytes32 salt = keccak256(abi.encode(id, side, i));
+<             address a = address(
+<                 uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, initHash))))
+<             );
+<             if ((a < Currency.unwrap(usdc)) == below) {
+<                 t = new OutcomeToken{salt: salt}(sym, sym);
+<                 return t;
+<             }
+<         }
+---
+>     /// HALMOS SPIKE CHANGE: plain CREATE instead of a keccak-predicted CREATE2 salt search (halmos models keccak and
+>     /// CREATE2 addresses symbolically, so the ordering search cannot terminate). Ordering vs USDC is then whatever
+>     /// the deployment addresses give; the swap path handles both orderings.
+>     function _deployOrdered(string memory sym, bool, uint256, uint256) internal returns (OutcomeToken t) {
+>         t = new OutcomeToken(sym, sym);

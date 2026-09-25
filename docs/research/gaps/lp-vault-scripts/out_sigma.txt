@@ -1,0 +1,3 @@
+S=4800 K=5000: argmax_sigma=2.0633 max P=0.387541; closed form sigma*=2.0633 P*=0.387541; monotone decreasing? False
+S=4000 K=5000: argmax_sigma=3.0000 max P=0.228186; closed form sigma*=4.8240 P*=0.252052; monotone decreasing? False
+S=5200 K=5000: argmax_sigma=0.0500 max P=1.000000; closed form sigma*=nan P*=nan; monotone decreasing? True

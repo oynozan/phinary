@@ -1,0 +1,80 @@
+=== Worked examples (r=0 unless stated; T in years ACT/365) ===
+S=4000 K=5000 sig=0.8 T=30.0000d r=0: d1=-0.858250 d2=-1.087603 YES=0.138385154823 NO=0.861614845177 YES+NO=1.0 e^-rT=1.0
+     delta=0.00024070582 (per $; x100 = per $100: 0.0240706), gamma=2.2518342e-7, vega=0.2369053 (per 1.00 vol; per vol-pt 0.00236905), theta/yr=-1.1529391 theta/day=-0.00315874
+S=4000 K=5000 sig=0.8 T=30.0000d r=0.05: d1=-0.840332 d2=-1.069685 YES=0.141796629743 NO=0.854102214021 YES+NO=0.995898843764 e^-rT=0.995898843764
+     delta=0.00024439684 (per $; x100 = per $100: 0.0244397), gamma=2.2386304e-7, vega=0.23551618 (per 1.00 vol; per vol-pt 0.00235516), theta/yr=-1.1879683 theta/day=-0.00325471
+S=4000 K=4000 sig=0.8 T=30.0000d r=0: d1=0.114676 d2=-0.114676 YES=0.454350796091 NO=0.545649203909 YES+NO=1.0 e^-rT=1.0
+     delta=0.00043200648 (per $; x100 = per $100: 0.0432006), gamma=-5.400081e-8, vega=-0.056811811 (per 1.00 vol; per vol-pt -0.000568118), theta/yr=0.27648414 theta/day=0.000757491
+S=4000 K=4400 sig=0.6 T=7.0000d r=0: d1=-1.105513 d2=-1.188604 YES=0.117297830057 NO=0.882702169943 YES+NO=1.0 e^-rT=1.0
+     delta=0.00059226387 (per $; x100 = per $100: 0.0592264), gamma=1.9699951e-6, vega=0.36269499 (per 1.00 vol; per vol-pt 0.00362695), theta/yr=-5.6735859 theta/day=-0.0155441
+S=4000 K=4040 sig=0.6 T=1.0000d r=0: d1=-0.301132 d2=-0.332537 YES=0.369741755266 NO=0.630258244734 YES+NO=1.0 e^-rT=1.0
+     delta=0.0030049197 (per $; x100 = per $100: 0.300492), gamma=7.2031906e-6, vega=0.18945378 (per 1.00 vol; per vol-pt 0.00189454), theta/yr=-20.745189 theta/day=-0.0568361
+S=4000 K=4000 sig=0.6 T=0.0417d r=0: d1=0.003205 d2=-0.003205 YES=0.498721270973 NO=0.501278729027 YES+NO=1.0 e^-rT=1.0
+     delta=0.015557817 (per $; x100 = per $100: 1.55578), gamma=-1.9447271e-6, vega=-0.0021312077 (per 1.00 vol; per vol-pt -2.13121e-5), theta/yr=5.600814 theta/day=0.0153447
+S=4000 K=4010 sig=0.6 T=0.0417d r=0: d1=-0.386287 d2=-0.392697 YES=0.34727154238 NO=0.65272845762 YES+NO=1.0 e^-rT=1.0
+     delta=0.014403378 (per $; x100 = per $100: 1.44034), gamma=0.00021697759, vega=0.23778366 (per 1.00 vol; per vol-pt 0.00237784), theta/yr=-624.89546 theta/day=-1.71204
+S=3000 K=5000 sig=0.8 T=97.0000d r=0: d1=-1.032430 d2=-1.444840 YES=0.074251439004 NO=0.925748560996 YES+NO=1.0 e^-rT=1.0
+     delta=0.00011354056 (per $; x100 = per $100: 0.0113541), gamma=9.4745982e-8, vega=0.1812893 (per 1.00 vol; per vol-pt 0.00181289), theta/yr=-0.27286843 theta/day=-0.000747585
+
+=== Analytic Greeks vs finite differences (rel err) ===
+4000 5000 0.8 0.0821917808219178 0 {'delta': '1.46e-24', 'gamma': '3.08e-24', 'vega': '1.53e-25', 'theta': '4.68e-23', 'dK': '3.28e-24'}
+4000 3500 0.5 0.00821917808219178 0.04 {'delta': '6.48e-22', 'gamma': '2.52e-22', 'vega': '1.41e-23', 'theta': '2.15e-21', 'dK': '5.83e-22'}
+4000 4001 1.2 0.001 0 {'delta': '1.16e-22', 'gamma': '7.05e-22', 'vega': '3.69e-25', 'theta': '1.41e-19', 'dK': '1.15e-22'}
+
+=== Max delta over S = 1/(K sig sqrt(2 pi T)), attained at d1=0 i.e. S*=K exp(-(r+sig^2/2)T) ===
+K=5000.0 sig=0.80000000000000004440892098500626161694526672363281 T=0.082192 r=0.0: numeric argmax S=4870.20749309 formula S*=4870.20749309; max delta=0.000347885140973 formula=0.000347885140973; => max price move per 1% spot move ~ 0.0169427
+K=5000.0 sig=0.80000000000000004440892098500626161694526672363281 T=0.082192 r=0.050000000000000002775557561562891351059079170227051: numeric argmax S=4850.23401126 formula S*=4850.23401126; max delta=0.000347885140973 formula=0.000347885140973; => max price move per 1% spot move ~ 0.0168732
+K=4000.0 sig=0.59999999999999997779553950749686919152736663818359 T=0.002740 r=0.0: numeric argmax S=3998.02788358 formula S*=3998.02788358; max delta=0.00317574231886 formula=0.00317574231886; => max price move per 1% spot move ~ 0.126967
+K=4000.0 sig=0.59999999999999997779553950749686919152736663818359 T=0.000114 r=0.0: numeric argmax S=3999.91780906 formula S*=3999.91780906; max delta=0.0155578964715 formula=0.0155578964715; => max price move per 1% spot move ~ 0.622303
+
+=== Vega sign change at d1=0 (K_v = S exp((r+sig^2/2)T)); theta sign change at d1 = 2 r sqrt(T)/sig ===
+K=4065.535201: d1=0.0438204 vega=-0.0214794 theta=0.104533
+K=4106.601213: d1=-7.28344e-51 vega=3.53781e-51 theta=-1.72173e-50
+K=4147.667225: d1=-0.0433844 vega=0.0208449 theta=-0.101445
+
+=== Limits ===
+T=0.01: YES(S=K)=0.484046563147  YES(S=1.001K)=0.48902798  YES(S=0.999K)=0.47906266
+T=0.0001: YES(S=K)=0.498404235134  YES(S=1.001K)=0.54812975  YES(S=0.999K)=0.44865408
+T=1e-06: YES(S=K)=0.499840423092  YES(S=1.001K)=0.89416297  YES(S=0.999K)=0.1054626
+T=1e-08: YES(S=K)=0.499984042309  YES(S=1.001K)=1.0  YES(S=0.999K)=3.4483691e-36
+T=1e-10: YES(S=K)=0.499998404231  YES(S=1.001K)=1.0  YES(S=0.999K)=1.5200549e-3399
+sig=1: YES(S=K,T=30d)=0.4430086438 YES(S=2K)=0.988529139
+sig=3: YES(S=K,T=30d)=0.3335844963 YES(S=2K)=0.6464968702
+sig=10: YES(S=K,T=30d)=0.07586386116 YES(S=2K)=0.11669327
+sig=30: YES(S=K,T=30d)=8.525799481e-6 YES(S=2K)=1.222732923e-5
+sig=100: YES(S=K,T=30d)=6.654896908e-47 YES(S=2K)=9.424439732e-47
+sig=0.01: YES(S=K,r=0)=0.499428134211 [-> 1/2]; YES(S=K, r=5%)=0.92014204991 [-> e^-rT=0.995898843764 since F>K]
+sig=0.0001: YES(S=K,r=0)=0.49999428134 [-> 1/2]; YES(S=K, r=5%)=0.995898843764 [-> e^-rT=0.995898843764 since F>K]
+sig=1e-08: YES(S=K,r=0)=0.499999999428 [-> 1/2]; YES(S=K, r=5%)=0.995898843764 [-> e^-rT=0.995898843764 since F>K]
+S->0: 7.6225e-2026  S->inf: 1.0
+
+=== ATM price for r=0 is N(-sig sqrt(T)/2) < 1/2 (lognormal median below mean) ===
+sig=0.4 T=  0.0417d: YES_ATM=0.49914751 | sig=0.4 T=  1.0000d: YES_ATM=0.49582376 | sig=0.4 T=  7.0000d: YES_ATM=0.48895191 | sig=0.4 T= 30.0000d: YES_ATM=0.47713789 | sig=0.4 T= 90.0000d: YES_ATM=0.46044499 | sig=0.4 T=365.0000d: YES_ATM=0.42074029 | 
+sig=0.8 T=  0.0417d: YES_ATM=0.49829503 | sig=0.8 T=  1.0000d: YES_ATM=0.49164797 | sig=0.8 T=  7.0000d: YES_ATM=0.4779123 | sig=0.8 T= 30.0000d: YES_ATM=0.4543508 | sig=0.8 T= 90.0000d: YES_ATM=0.42127789 | sig=0.8 T=365.0000d: YES_ATM=0.34457826 | 
+sig=1.2 T=  0.0417d: YES_ATM=0.49744256 | sig=1.2 T=  1.0000d: YES_ATM=0.4874731 | sig=1.2 T=  7.0000d: YES_ATM=0.4668896 | sig=1.2 T= 30.0000d: YES_ATM=0.431713 | sig=1.2 T= 90.0000d: YES_ATM=0.3828752 | sig=1.2 T=365.0000d: YES_ATM=0.27425312 | 
+
+=== Drift sensitivity: E_P[1{S_T>K}] - price(r=0), mu = real-world drift of ETH ===
+mu=-0.5 T= 1d K/S=1.0: price=0.491648 P-prob=0.478607 edge=-0.01304
+mu=-0.5 T= 1d K/S=1.1: price=0.0108077 P-prob=0.00990905 edge=-0.0008986
+mu=-0.5 T= 7d K/S=1.0: price=0.477912 P-prob=0.443561 edge=-0.03435
+mu=-0.5 T= 7d K/S=1.1: price=0.179915 P-prob=0.158114 edge=-0.0218
+mu=-0.5 T=30d K/S=1.0: price=0.454351 P-prob=0.384433 edge=-0.06992
+mu=-0.5 T=30d K/S=1.1: price=0.297974 P-prob=0.239032 edge=-0.05894
+mu=+0.2 T= 1d K/S=1.0: price=0.491648 P-prob=0.496868 edge=0.00522
+mu=+0.2 T= 1d K/S=1.1: price=0.0108077 P-prob=0.0111865 edge=0.0003788
+mu=+0.2 T= 7d K/S=1.0: price=0.477912 P-prob=0.491713 edge=0.0138
+mu=+0.2 T= 7d K/S=1.1: price=0.179915 P-prob=0.189141 edge=0.009226
+mu=+0.2 T=30d K/S=1.0: price=0.454351 P-prob=0.482849 edge=0.0285
+mu=+0.2 T=30d K/S=1.1: price=0.297974 P-prob=0.323273 edge=0.0253
+mu=+0.5 T= 1d K/S=1.0: price=0.491648 P-prob=0.504698 edge=0.01305
+mu=+0.5 T= 1d K/S=1.1: price=0.0108077 P-prob=0.0117764 edge=0.0009687
+mu=+0.5 T= 7d K/S=1.0: price=0.477912 P-prob=0.512429 edge=0.03452
+mu=+0.5 T= 7d K/S=1.1: price=0.179915 P-prob=0.203514 edge=0.0236
+mu=+0.5 T=30d K/S=1.0: price=0.454351 P-prob=0.525716 edge=0.07137
+mu=+0.5 T=30d K/S=1.1: price=0.297974 P-prob=0.362773 edge=0.0648
+mu=+1.0 T= 1d K/S=1.0: price=0.491648 P-prob=0.517744 edge=0.0261
+mu=+1.0 T= 1d K/S=1.1: price=0.0108077 P-prob=0.0128196 edge=0.002012
+mu=+1.0 T= 7d K/S=1.0: price=0.477912 P-prob=0.546852 edge=0.06894
+mu=+1.0 T= 7d K/S=1.1: price=0.179915 P-prob=0.228868 edge=0.04895
+mu=+1.0 T=30d K/S=1.0: price=0.454351 P-prob=0.596264 edge=0.1419
+mu=+1.0 T=30d K/S=1.1: price=0.297974 P-prob=0.431768 edge=0.1338

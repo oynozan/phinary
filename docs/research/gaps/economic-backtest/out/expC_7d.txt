@@ -1,0 +1,4 @@
+tenor 10080    hook eta   5.0  OOS: per-market LP pnl: noise +0.0456 | lat +0.0003 tail +0.0483 iv +0.1861 orv -0.3823 dir +0.0682 | conservative total +0.0456 | weekly-return ann +1.158 CI95lo +0.976 maxDD 0.076 CVaR95w 0.029
+tenor 10080    hook eta   5.0 FULL: per-market LP pnl: noise +0.0446 | lat +0.0004 tail +0.0317 iv +0.1410 orv -0.3853 dir +0.0670 | conservative total +0.0446 | weekly-return ann +1.132 CI95lo +1.011 maxDD 0.076 CVaR95w 0.033
+tenor 10080  thales eta   5.0  OOS: per-market LP pnl: noise +0.0931 | lat +0.0000 tail -0.0004 iv -0.0013 orv -0.0025 dir +0.1023 | conservative total +0.0914 | weekly-return ann +2.321 CI95lo +2.100 maxDD 0.022 CVaR95w 0.009
+tenor 10080  thales eta   5.0 FULL: per-market LP pnl: noise +0.0958 | lat +0.0000 tail +0.0019 iv -0.0002 orv -0.0075 dir +0.1033 | conservative total +0.0955 | weekly-return ann +2.426 CI95lo +2.283 maxDD 0.013 CVaR95w 0.002

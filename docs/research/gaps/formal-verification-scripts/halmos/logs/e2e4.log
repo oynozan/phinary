@@ -1,0 +1,26 @@
+Solc 0.8.26 finished in 211.06s
+Compiler run successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Running 1 tests for test/HalmosE2E.t.sol:HalmosE2E
+ERROR    setUp() failed: HalmosException: Multiple paths were found in setUp()  
+Symbolic test result: 0 passed; 1 failed; time: 3.82s
+
+[time] total: 216.76s (build: 212.30s, load: 0.64s, tests: 3.82s)

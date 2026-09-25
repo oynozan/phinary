@@ -1,0 +1,21 @@
+== 1d: IS-selected config {'kernel': 't', 'sig': 'ewma1440', 'season': 0, 's': 0.02, 'lam': 0.1, 'cut': 144, 'pmin': 0.02, 'vm': 1.0} (score 2.62)
+-- naive: OOS per-market LP P&L (units of budget B): lat +0.0006 tail +0.0524 iv +0.0807 orv -0.2995 dir +0.0114 noise +0.0136 | sub-minute latency charge (L1) -0.0682
+   D= 2.0/day (eta   2.00/mkt)  IS: edge/mkt -0.0449B | vault ann  -114.0% CI95lo  -121.6% | weekly sd 1.02% VaR95 3.84% CVaR95 4.20% CVaR99 4.56% | maxDD 344.1% worst wk 4.61% P(lose wk) 0.98
+   D= 2.0/day (eta   2.00/mkt) OOS: edge/mkt -0.0409B | vault ann  -104.0% CI95lo  -111.2% | weekly sd 0.88% VaR95 3.56% CVaR95 3.76% CVaR99 3.93% | maxDD 286.0% worst wk 3.96% P(lose wk) 0.99
+   D= 5.0/day (eta   5.00/mkt)  IS: edge/mkt -0.0100B | vault ann   -25.5% CI95lo   -43.8% | weekly sd 2.52% VaR95 4.58% CVaR95 5.50% CVaR99 6.38% | maxDD 107.4% worst wk 6.52% P(lose wk) 0.60
+   D= 5.0/day (eta   5.00/mkt) OOS: edge/mkt -0.0001B | vault ann    -0.1% CI95lo   -17.5% | weekly sd 2.18% VaR95 3.88% CVaR95 4.40% CVaR99 4.82% | maxDD 42.6% worst wk 4.89% P(lose wk) 0.45
+   D=5 per-year vault ann (conservative, excl. latency charge): 2021:+113% 2022:+132% 2023:-187% 2024:+180% 2025:-22% 2026:+174%
+   D=5 stress weeks (weekly vault return): 2021-05-19 crash: -3.18%; 2022-06-13 3AC/Celsius: -0.69%; 2022-11-08 FTX: -1.29%; 2024-08-05 yen-carry: +4.45%; 2025-04-07 tariffs: +3.07%
+   D=10.0/day (eta  10.00/mkt)  IS: edge/mkt +0.0481B | vault ann  +122.1% CI95lo   +85.9% | weekly sd 5.04% VaR95 5.82% CVaR95 7.65% CVaR99 9.41% | maxDD 21.9% worst wk 9.70% P(lose wk) 0.33
+   D=10.0/day (eta  10.00/mkt) OOS: edge/mkt +0.0681B | vault ann  +173.0% CI95lo  +138.8% | weekly sd 4.36% VaR95 4.41% CVaR95 5.46% CVaR99 6.30% | maxDD 18.1% worst wk 6.44% P(lose wk) 0.22
+   STRESS (+oracle-vol agent) D=5.0: vault ann -587.6% CI95lo -714.6% maxDD 1622.5% CVaR95 36.46%
+-- selected: OOS per-market LP P&L (units of budget B): lat +0.0000 tail +0.0036 iv +0.0846 orv -0.2194 dir +0.0108 noise +0.0218 | sub-minute latency charge (L1) -0.0293
+   D= 2.0/day (eta   2.00/mkt)  IS: edge/mkt +0.0135B | vault ann   +34.1% CI95lo   +26.4% | weekly sd 1.03% VaR95 1.04% CVaR95 1.59% CVaR99 2.22% | maxDD 4.9% worst wk 2.41% P(lose wk) 0.25
+   D= 2.0/day (eta   2.00/mkt) OOS: edge/mkt +0.0142B | vault ann   +36.2% CI95lo   +29.3% | weekly sd 0.89% VaR95 0.93% CVaR95 1.07% CVaR99 1.21% | maxDD 2.9% worst wk 1.23% P(lose wk) 0.20
+   D= 5.0/day (eta   5.00/mkt)  IS: edge/mkt +0.0776B | vault ann  +196.8% CI95lo  +177.9% | weekly sd 2.59% VaR95 0.44% CVaR95 1.83% CVaR99 3.41% | maxDD 3.9% worst wk 3.88% P(lose wk) 0.08
+   D= 5.0/day (eta   5.00/mkt) OOS: edge/mkt +0.0796B | vault ann  +202.1% CI95lo  +185.1% | weekly sd 2.22% VaR95 0.18% CVaR95 0.52% CVaR99 0.88% | maxDD 1.0% worst wk 0.91% P(lose wk) 0.06
+   D=5 per-year vault ann (conservative, excl. latency charge): 2021:+223% 2022:+86% 2023:+299% 2024:+247% 2025:+212% 2026:+289%
+   D=5 stress weeks (weekly vault return): 2021-05-19 crash: +2.35%; 2022-06-13 3AC/Celsius: -1.50%; 2022-11-08 FTX: -0.06%; 2024-08-05 yen-carry: +3.45%; 2025-04-07 tariffs: +2.46%
+   D=10.0/day (eta  10.00/mkt)  IS: edge/mkt +0.1845B | vault ann  +468.0% CI95lo  +430.4% | weekly sd 5.18% VaR95 -0.56% CVaR95 2.22% CVaR99 5.38% | maxDD 6.3% worst wk 6.32% P(lose wk) 0.04
+   D=10.0/day (eta  10.00/mkt) OOS: edge/mkt +0.1884B | vault ann  +478.6% CI95lo  +444.8% | weekly sd 4.44% VaR95 -1.08% CVaR95 -0.39% CVaR99 0.32% | maxDD 0.4% worst wk 0.39% P(lose wk) 0.02
+   STRESS (+oracle-vol agent) D=5.0: vault ann -280.9% CI95lo -343.8% maxDD 775.7% CVaR95 23.28%

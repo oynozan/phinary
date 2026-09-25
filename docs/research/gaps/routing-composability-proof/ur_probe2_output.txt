@@ -1,0 +1,40 @@
+=== mainnet
+-- UR v2.0: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT PoolNotInitialized()
+   6-field hookData=''      REVERT no-data (execution reverted)
+-- UR v2.1.1: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+-- UR v2.1.2: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+=== base
+-- UR v2.0: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT PoolNotInitialized()
+   6-field hookData=''      REVERT no-data (execution reverted)
+-- UR v2.1.1: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+-- UR v2.1.2: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+=== arbitrum
+-- UR v2.0: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT PoolNotInitialized()
+   6-field hookData=''      REVERT no-data (execution reverted)
+-- UR v2.1.1: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+-- UR v2.1.2: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+=== unichain
+-- UR v2.0: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT PoolNotInitialized()
+   6-field hookData=''      REVERT no-data (execution reverted)
+-- UR v2.1.1: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()
+-- UR v2.1.2: msgSender() -> OK 0x00000000
+   5-field hookData=''      REVERT no-data (execution reverted)
+   6-field hookData=''      REVERT PoolNotInitialized()

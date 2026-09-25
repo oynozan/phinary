@@ -1,0 +1,124 @@
+
+=== mainnet block 26055414
+-- UR v2.0 0x66a9893cc07d91d95644aedd05d03f95e1dba8af codeLen=19499
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 5-field, hookData=32B               REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=2^200               REVERT no-data (execution reverted)
+   multi 4-field (v2.0 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+-- UR v2.1.1 0x4c82d1fbfe28c977cbb58d8c7ff8fcf9f70a2cca codeLen=24546
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- UR v2.1.2 0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85 codeLen=24380
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26779515)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- Quoter 0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203: amountOut=26779515 gasEstimate=41702
+-- Quoter msgSender(): REVERT no-data (execution reverted) 
+
+=== base block 51780707
+-- UR v2.0 0x6ff5693b99212da76ad316178a184ab56d299b43 codeLen=19499
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   single 5-field, hookData=32B               REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   single 6-field, minHop=2^200               REVERT no-data (execution reverted)
+   multi 4-field (v2.0 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+-- UR v2.1.1 0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7 codeLen=24546
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26754970)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- UR v2.1.2 0xd6145b2D3F379919E8CdEda7B97e37c4b2Ca9c40 codeLen=24380
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26752052)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- Quoter 0x0d5e0f971ed27fbff6c2837bf31316121532048d: amountOut=26752052 gasEstimate=41670
+-- Quoter msgSender(): REVERT no-data (execution reverted) 
+
+=== arbitrum block 508807065
+-- UR v2.0 0xa51afafe0263b40edaef0df8781ea9aa03e381a3 codeLen=19499
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26751029)
+   single 5-field, hookData=32B               REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26751029)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26751029)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26751029)
+   single 6-field, minHop=2^200               REVERT no-data (execution reverted)
+   multi 4-field (v2.0 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26751029)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+-- UR v2.1.1 0x8b844f885672f333bc0042cb669255f93a4c1e6b codeLen=24546
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- UR v2.1.2 0x2d01411773c8C24805306E89A41F7855C3c4Fe65 codeLen=24380
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748070)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- Quoter 0x3972c00f7ed4885e145823eb7c655375d275a1c5: amountOut=26748070 gasEstimate=42471
+-- Quoter msgSender(): REVERT no-data (execution reverted) 
+
+=== unichain block 59602420
+-- UR v2.0 0xef740bf23acae26f6492b10de645d6b98dc8eaf3 codeLen=19499
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 5-field, hookData=32B               REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=2^200               REVERT no-data (execution reverted)
+   multi 4-field (v2.0 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceived(uint256,uint256) (min=10000000000000000, actual=0)
+-- UR v2.1.1 0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7 codeLen=24546
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- UR v2.1.2 0xD1b797D92d87B688193A2B976eFc8D577D204343 codeLen=24380
+   single 5-field, hookData=''                REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 5-field, hookData=32B               REVERT no-data (execution reverted)
+   single 6-field, minHop=0, hookData=''      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=0, hookData=32B     REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   single 6-field, minHop=2^200               REVERT V4TooLittleReceivedPerHopSingle(uint256,uint256)
+   multi 4-field (v2.0 ExactInputParams)      REVERT no-data (execution reverted)
+   multi 5-field (v2.1 ExactInputParams)      REVERT V4TooLittleReceived(uint256,uint256) (min=170141183460469231731687303715884105728, actual=26748553)
+   multi 5-field, minHop=[2^200]              REVERT V4TooLittleReceivedPerHop(uint256,uint256,uint256)
+-- Quoter 0x333e3c607b141b18ff6de9f258db6e77fe7491e0: amountOut=26748553 gasEstimate=37191
+-- Quoter msgSender(): REVERT no-data (execution reverted) 

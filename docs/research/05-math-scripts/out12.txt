@@ -1,0 +1,1 @@
+mean HL under perfect calibration (fixed p, 10 deciles): 9.941278762038479 var 19.49644150584023 (chi2_10: 10,20; chi2_8: 8,16)

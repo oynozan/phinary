@@ -1,0 +1,56 @@
+=== A. S-input rule vs LP arbitrage loss (L1: dt=12s, 1-day ATM, sigma=60%, l=1e5, h0=0.3c, cutoff 30 min) ===
+rule                     E[arb extraction] $      se   avg half-spread (c)
+sob-1                                  5,304      78                 0.300   x1.00
+twap-2                                 7,160     103                 0.300   x1.35
+twap-5                                14,776     200                 0.300   x2.79
+twap-25                               75,803     934                 0.300   x14.29
+twap-150                             492,802   5,857                 0.300   x92.90
+dual-2                                 4,058      61                 0.395   x0.77
+dual-5                                 3,478      52                 0.507   x0.66
+dual-25                                3,006      45                 0.830   x0.57
+bound l*P0(1-P0)/2 (s=0) = 12,500
+
+=== A2. same with the gamma spread term (c_delta=1, gamma0=5.5bp) ===
+sob-1                                    175       3                 1.005   x1.00
+twap-5                                 1,870      27                 1.005   x10.69
+dual-2                                   124       2                 1.099   x0.71
+dual-5                                   107       2                 1.212   x0.61
+
+=== B. per-epoch reset vs carried (permanent / decaying) impact skew, SoB rule ===
+rho=0.0  E[arb]=     5,304 (se 78)  x1.00   arb volume 1,270,007
+rho=0.5  E[arb]=     6,312 (se 95)  x1.19   arb volume 1,395,631
+rho=0.9  E[arb]=     9,099 (se 137)  x1.72   arb volume 1,722,504
+rho=1.0  E[arb]=    10,207 (se 153)  x1.92   arb volume 1,848,906
+
+=== C. epoch key vs oracle refresh on a 1 s-timestamp chain (4h ATM market, dt=1s) ===
+key == oracle epoch (block.timestamp):            E[arb]=2,475 (se 42)
+key finer (reset each of 4 sub-blocks/second):     E[arb]=4,743 (se 87)  x1.92
+key coarser (reset every 12 oracle epochs, L1 no.): E[arb]=4,362 (se 76)  x1.76
+
+=== D. per-epoch cap Q with impact (SoB) ===
+Q=   None: E[arb]=     5,304 (se 78)   arb volume 1,270,007 tokens
+Q=  50000: E[arb]=     5,304 (se 78)   arb volume 1,270,007 tokens
+Q=   5000: E[arb]=     5,299 (se 78)   arb volume 1,269,370 tokens
+Q=    433: E[arb]=     3,311 (se 38)   arb volume 854,992 tokens
+
+=== E. builder/last-tx manipulation of SoB (attacker shifts closing log-price by delta at cost c*delta) ===
+tau=24h v4 5bp mainnet ($55/1%): Delta_bin=12.70/unit log, q_safe=c/Delta = 433 tokens/epoch (x5 = 2,165 with a 5-epoch anchor vs single-block attackers)
+    sob    Q=    None: max attacker profit $    11,458 at delta=966.3 bp
+    sob    Q=     433: max attacker profit $         0 at delta=0.0 bp
+    dual5  Q=    None: max attacker profit $     6,468 at delta=2000.0 bp
+    dual5  Q=    2165: max attacker profit $         0 at delta=0.0 bp
+tau=24h v3 5bp mainnet ($773/1%): Delta_bin=12.70/unit log, q_safe=c/Delta = 6,086 tokens/epoch (x5 = 30,430 with a 5-epoch anchor vs single-block attackers)
+    sob    Q=    None: max attacker profit $     6,093 at delta=635.2 bp
+    sob    Q=    6085: max attacker profit $         0 at delta=0.0 bp
+    dual5  Q=    None: max attacker profit $         0 at delta=0.0 bp
+    dual5  Q=   30429: max attacker profit $         0 at delta=0.0 bp
+tau=1h v4 5bp mainnet ($55/1%): Delta_bin=62.23/unit log, q_safe=c/Delta = 88 tokens/epoch (x5 = 442 with a 5-epoch anchor vs single-block attackers)
+    sob    Q=    None: max attacker profit $    12,150 at delta=232.6 bp
+    sob    Q=      88: max attacker profit $         0 at delta=0.0 bp
+    dual5  Q=    None: max attacker profit $    11,680 at delta=1008.3 bp
+    dual5  Q=     441: max attacker profit $         0 at delta=0.0 bp
+tau=1h v3 5bp mainnet ($773/1%): Delta_bin=62.23/unit log, q_safe=c/Delta = 1,242 tokens/epoch (x5 = 6,211 with a 5-epoch anchor vs single-block attackers)
+    sob    Q=    None: max attacker profit $    10,741 at delta=178.6 bp
+    sob    Q=    1242: max attacker profit $         0 at delta=0.0 bp
+    dual5  Q=    None: max attacker profit $     6,043 at delta=670.7 bp
+    dual5  Q=    6210: max attacker profit $         0 at delta=0.0 bp

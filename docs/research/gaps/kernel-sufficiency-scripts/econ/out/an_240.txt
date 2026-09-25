@@ -1,0 +1,86 @@
+
+=== OOS ('2024-01-01', '2026-09-25'), tenor 240 min; latency from 1-s sim (116 d, 2026-06..09) of the same config & kernel
+-- L1 (12 s blocks)
+  normal: latency charge -0.0029±0.0074 B/mkt (charged -0.0029) | break-even eta0  0.11 | D*  0.12 (with latency SE:  0.55) | D*_stress(+orv)   6.50
+   t_fit: latency charge -0.0179±0.0078 B/mkt (charged -0.0179) | break-even eta0  0.64 | D*  0.68 (with latency SE:  1.12) | D*_stress(+orv)   3.95
+      t4: latency charge -0.0164±0.0078 B/mkt (charged -0.0164) | break-even eta0  0.61 | D*  0.65 (with latency SE:  1.10) | D*_stress(+orv)   4.20
+  D=2 normal: edge +0.0519 B/mkt | ann +791.3% E3 lo95 +764.4% (incl. latency SE +604.6%) | E4: CVaR95 -8.80% CVaR99 -7.27% maxDD 0.0% worst wk -7.05%
+  D=2  t_fit: edge +0.0379 B/mkt | ann +578.2% E3 lo95 +552.0% (incl. latency SE +384.3%) | E4: CVaR95 -4.74% CVaR99 -2.24% maxDD 0.0% worst wk -1.93%
+  D=2     t4: edge +0.0376 B/mkt | ann +573.8% E3 lo95 +544.8% (incl. latency SE +380.5%) | E4: CVaR95 -5.07% CVaR99 -3.73% maxDD 0.0% worst wk -3.21%
+  D=2 paired normal-t_fit: d(ann) +213.0% [95% CI  +85.5, +342.0] | d(edge) +0.0140 B/mkt [+0.0056, +0.0224] | d(latency) +0.0150±0.0043
+  D=2 paired normal-t4: d(ann) +217.4% [95% CI  +97.6, +342.0] | d(edge) +0.0143 B/mkt [+0.0064, +0.0224] | d(latency) +0.0135±0.0040
+  D=5 normal: edge +0.1341 B/mkt | ann +2044.3% E3 lo95 +1977.3% (incl. latency SE +1851.8%) | E4: CVaR95 -23.20% CVaR99 -19.45% maxDD 0.0% worst wk -18.90%
+  D=5  t_fit: edge +0.1217 B/mkt | ann +1855.6% E3 lo95 +1790.8% (incl. latency SE +1653.9%) | E4: CVaR95 -19.33% CVaR99 -13.50% maxDD 0.0% worst wk -12.73%
+  D=5     t4: edge +0.1188 B/mkt | ann +1810.5% E3 lo95 +1738.8% (incl. latency SE +1604.4%) | E4: CVaR95 -19.55% CVaR99 -15.96% maxDD 0.0% worst wk -15.27%
+  D=5 paired normal-t_fit: d(ann) +188.7% [95% CI  +40.3, +338.1] | d(edge) +0.0124 B/mkt [+0.0026, +0.0222] | d(latency) +0.0150±0.0043
+  D=5 paired normal-t4: d(ann) +233.8% [95% CI  +91.0, +372.5] | d(edge) +0.0153 B/mkt [+0.0060, +0.0244] | d(latency) +0.0135±0.0040
+  STRESS(+orv) break-even eta0 normal-t_fit: +2.40 [95% CI +1.97, +2.82]
+  break-even eta0 normal-t_fit: -0.54 [95% CI -0.84, -0.24]
+  STRESS(+orv) break-even eta0 normal-t4: +2.17 [95% CI +1.77, +2.59]
+  break-even eta0 normal-t4: -0.50 [95% CI -0.79, -0.22]
+-- L2 (2 s blocks)
+  normal: latency charge +0.0013±0.0060 B/mkt (charged +0.0000) | break-even eta0 -0.00 | D*  0.03 (with latency SE:  0.33) | D*_stress(+orv)   6.40
+   t_fit: latency charge -0.0084±0.0070 B/mkt (charged -0.0084) | break-even eta0  0.30 | D*  0.33 (with latency SE:  0.75) | D*_stress(+orv)   3.60
+      t4: latency charge -0.0066±0.0070 B/mkt (charged -0.0066) | break-even eta0  0.24 | D*  0.28 (with latency SE:  0.68) | D*_stress(+orv)   3.83
+  D=2 normal: edge +0.0548 B/mkt | ann +835.4% E3 lo95 +808.6% (incl. latency SE +706.5%) | E4: CVaR95 -9.60% CVaR99 -8.12% maxDD 0.0% worst wk -7.90%
+  D=2  t_fit: edge +0.0475 B/mkt | ann +724.1% E3 lo95 +698.1% (incl. latency SE +544.3%) | E4: CVaR95 -7.40% CVaR99 -5.05% maxDD 0.0% worst wk -4.74%
+  D=2     t4: edge +0.0475 B/mkt | ann +723.6% E3 lo95 +694.9% (incl. latency SE +550.9%) | E4: CVaR95 -7.81% CVaR99 -6.38% maxDD 0.0% worst wk -6.10%
+  D=2 paired normal-t_fit: d(ann) +111.3% [95% CI  -11.7, +243.8] | d(edge) +0.0073 B/mkt [-0.0008, +0.0160] | d(latency) +0.0084±0.0044
+  D=2 paired normal-t4: d(ann) +111.8% [95% CI   +4.6, +234.8] | d(edge) +0.0073 B/mkt [+0.0003, +0.0154] | d(latency) +0.0066±0.0040
+  D=5 normal: edge +0.1370 B/mkt | ann +2088.4% E3 lo95 +2021.6% (incl. latency SE +1948.0%) | E4: CVaR95 -24.00% CVaR99 -20.30% maxDD 0.0% worst wk -19.75%
+  D=5  t_fit: edge +0.1313 B/mkt | ann +2001.5% E3 lo95 +1937.0% (incl. latency SE +1823.2%) | E4: CVaR95 -21.99% CVaR99 -16.32% maxDD 0.0% worst wk -15.55%
+  D=5     t4: edge +0.1286 B/mkt | ann +1960.3% E3 lo95 +1888.9% (incl. latency SE +1773.3%) | E4: CVaR95 -22.28% CVaR99 -18.23% maxDD 0.0% worst wk -18.16%
+  D=5 paired normal-t_fit: d(ann)  +87.0% [95% CI  -52.9, +238.9] | d(edge) +0.0057 B/mkt [-0.0035, +0.0157] | d(latency) +0.0084±0.0044
+  D=5 paired normal-t4: d(ann) +128.1% [95% CI   -3.1, +262.7] | d(edge) +0.0084 B/mkt [-0.0002, +0.0172] | d(latency) +0.0066±0.0040
+  STRESS(+orv) break-even eta0 normal-t_fit: +2.64 [95% CI +2.21, +3.06]
+  break-even eta0 normal-t_fit: -0.30 [95% CI -0.60, +0.00]
+  STRESS(+orv) break-even eta0 normal-t4: +2.43 [95% CI +2.03, +2.84]
+  break-even eta0 normal-t4: -0.24 [95% CI -0.53, +0.00]
+
+=== IS ('2021-01-01', '2024-01-01'), tenor 240 min; latency from 1-s sim (116 d, 2026-06..09) of the same config & kernel
+-- L1 (12 s blocks)
+  normal: latency charge -0.0029±0.0074 B/mkt (charged -0.0029) | break-even eta0  0.11 | D*  0.12 (with latency SE:  0.58) | D*_stress(+orv)   7.70
+   t_fit: latency charge -0.0179±0.0078 B/mkt (charged -0.0179) | break-even eta0  0.65 | D*  0.70 (with latency SE:  1.12) | D*_stress(+orv)   4.73
+      t4: latency charge -0.0164±0.0078 B/mkt (charged -0.0164) | break-even eta0  0.61 | D*  0.68 (with latency SE:  1.12) | D*_stress(+orv)   5.05
+  D=2 normal: edge +0.0515 B/mkt | ann +784.6% E3 lo95 +736.8% (incl. latency SE +592.5%) | E4: CVaR95 -6.53% CVaR99 -3.49% maxDD 0.0% worst wk -1.49%
+  D=2  t_fit: edge +0.0376 B/mkt | ann +572.7% E3 lo95 +518.9% (incl. latency SE +367.1%) | E4: CVaR95 -2.97% CVaR99 -1.84% maxDD 0.0% worst wk -1.41%
+  D=2     t4: edge +0.0376 B/mkt | ann +572.9% E3 lo95 +517.4% (incl. latency SE +371.8%) | E4: CVaR95 -2.86% CVaR99 -2.02% maxDD 0.0% worst wk -1.72%
+  D=2 paired normal-t_fit: d(ann) +211.9% [95% CI  +79.3, +345.1] | d(edge) +0.0139 B/mkt [+0.0052, +0.0227] | d(latency) +0.0150±0.0043
+  D=2 paired normal-t4: d(ann) +211.7% [95% CI  +85.2, +331.6] | d(edge) +0.0139 B/mkt [+0.0056, +0.0218] | d(latency) +0.0135±0.0040
+  D=5 normal: edge +0.1331 B/mkt | ann +2027.6% E3 lo95 +1908.3% (incl. latency SE +1811.6%) | E4: CVaR95 -17.52% CVaR99 -9.61% maxDD 0.0% worst wk -4.25%
+  D=5  t_fit: edge +0.1209 B/mkt | ann +1841.4% E3 lo95 +1707.9% (incl. latency SE +1612.0%) | E4: CVaR95 -14.73% CVaR99 -10.40% maxDD 0.0% worst wk -9.37%
+  D=5     t4: edge +0.1187 B/mkt | ann +1808.0% E3 lo95 +1670.2% (incl. latency SE +1578.4%) | E4: CVaR95 -13.87% CVaR99 -10.14% maxDD 0.0% worst wk -8.73%
+  D=5 paired normal-t_fit: d(ann) +186.2% [95% CI  +45.0, +334.2] | d(edge) +0.0122 B/mkt [+0.0030, +0.0219] | d(latency) +0.0150±0.0043
+  D=5 paired normal-t4: d(ann) +219.6% [95% CI  +85.6, +357.0] | d(edge) +0.0144 B/mkt [+0.0056, +0.0234] | d(latency) +0.0135±0.0040
+  STRESS(+orv) break-even eta0 normal-t_fit: +2.90 [95% CI +2.40, +3.37]
+  break-even eta0 normal-t_fit: -0.54 [95% CI -0.85, -0.24]
+  STRESS(+orv) break-even eta0 normal-t4: +2.60 [95% CI +2.14, +3.05]
+  break-even eta0 normal-t4: -0.51 [95% CI -0.80, -0.22]
+-- L2 (2 s blocks)
+  normal: latency charge +0.0013±0.0060 B/mkt (charged +0.0000) | break-even eta0 -0.00 | D*  0.03 (with latency SE:  0.33) | D*_stress(+orv)   7.60
+   t_fit: latency charge -0.0084±0.0070 B/mkt (charged -0.0084) | break-even eta0  0.30 | D*  0.33 (with latency SE:  0.73) | D*_stress(+orv)   4.38
+      t4: latency charge -0.0066±0.0070 B/mkt (charged -0.0066) | break-even eta0  0.24 | D*  0.28 (with latency SE:  0.70) | D*_stress(+orv)   4.70
+  D=2 normal: edge +0.0544 B/mkt | ann +828.7% E3 lo95 +781.0% (incl. latency SE +689.0%) | E4: CVaR95 -7.32% CVaR99 -4.08% maxDD 0.0% worst wk -1.84%
+  D=2  t_fit: edge +0.0472 B/mkt | ann +718.4% E3 lo95 +664.9% (incl. latency SE +539.5%) | E4: CVaR95 -5.57% CVaR99 -3.91% maxDD 0.0% worst wk -3.61%
+  D=2     t4: edge +0.0474 B/mkt | ann +722.6% E3 lo95 +667.5% (incl. latency SE +540.6%) | E4: CVaR95 -5.54% CVaR99 -4.05% maxDD 0.0% worst wk -3.49%
+  D=2 paired normal-t_fit: d(ann) +110.3% [95% CI  -15.7, +243.4] | d(edge) +0.0072 B/mkt [-0.0010, +0.0160] | d(latency) +0.0084±0.0044
+  D=2 paired normal-t4: d(ann) +106.1% [95% CI   +1.5, +227.0] | d(edge) +0.0070 B/mkt [+0.0001, +0.0149] | d(latency) +0.0066±0.0040
+  D=5 normal: edge +0.1360 B/mkt | ann +2071.7% E3 lo95 +1952.4% (incl. latency SE +1896.7%) | E4: CVaR95 -18.31% CVaR99 -10.21% maxDD 0.0% worst wk -4.59%
+  D=5  t_fit: edge +0.1305 B/mkt | ann +1987.1% E3 lo95 +1854.1% (incl. latency SE +1770.9%) | E4: CVaR95 -17.34% CVaR99 -12.38% maxDD 0.0% worst wk -10.51%
+  D=5     t4: edge +0.1285 B/mkt | ann +1957.6% E3 lo95 +1820.4% (incl. latency SE +1739.8%) | E4: CVaR95 -16.55% CVaR99 -12.17% maxDD 0.0% worst wk -9.90%
+  D=5 paired normal-t_fit: d(ann)  +84.6% [95% CI  -55.4, +234.1] | d(edge) +0.0056 B/mkt [-0.0036, +0.0154] | d(latency) +0.0084±0.0044
+  D=5 paired normal-t4: d(ann) +114.1% [95% CI  -10.5, +251.7] | d(edge) +0.0075 B/mkt [-0.0007, +0.0165] | d(latency) +0.0066±0.0040
+  STRESS(+orv) break-even eta0 normal-t_fit: +3.14 [95% CI +2.65, +3.60]
+  break-even eta0 normal-t_fit: -0.30 [95% CI -0.63, +0.00]
+  STRESS(+orv) break-even eta0 normal-t4: +2.86 [95% CI +2.39, +3.28]
+  break-even eta0 normal-t4: -0.25 [95% CI -0.54, +0.00]
+
+=== per calendar year, D=2, conservative, incl. L1 latency charge (ann. vault return)
+  normal: 2021:+625% 2022:+721% 2023:+494% 2024:+776% 2025:+733% 2026:+851%
+   t_fit: 2021:+374% 2022:+488% 2023:+786% 2024:+597% 2025:+512% 2026:+614%
+      t4: 2021:+356% 2022:+505% 2023:+792% 2024:+587% 2025:+508% 2026:+616%
+
+=== per calendar year, D=5, conservative, incl. L1 latency charge (ann. vault return)
+  normal: 2021:+1627% 2022:+1868% 2023:+2028% 2024:+2005% 2025:+1897% 2026:+2193%
+   t_fit: 2021:+1411% 2022:+1626% 2023:+2370% 2024:+1897% 2025:+1685% 2026:+1936%
+      t4: 2021:+1327% 2022:+1633% 2023:+2351% 2024:+1840% 2025:+1640% 2026:+1909%

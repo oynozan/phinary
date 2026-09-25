@@ -1,0 +1,3 @@
+max |tail36 - Phi(-z)| on [0,7.07) step 1e-4: 42.23 wei at z=0.0179;  original WAD port: 42.23 wei
+cut error at SPLIT: Phi(-7.0710678)*1e18 = 768730.0 wei
+junction original: tail(SPLIT-1)= 768729 tail(SPLIT)= 768729

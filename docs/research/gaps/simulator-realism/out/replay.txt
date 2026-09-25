@@ -1,0 +1,12 @@
+LP-era trades 54297, markets 6640, price-data coverage 0.936 (by volume 0.945)
+on-chain: sum $-39671, cumulative return 0.8615
+tape rebuild (actual prices): sum $-44358, cumulative 0.8518, corr with on-chain per round 0.961
+price fidelity: actual - (base +/- 3%) : median -0.0061, IQR [-0.0199,+0.0034], vol-weighted mean -0.0086
+SIM replay B=   2000 kappa=0.15 spread=per-address: sum $+509482, cumulative 4.5297, per-round corr with on-chain 0.680, sign agreement 0.78
+SIM replay B=   5000 kappa=0.15 spread=per-address: sum $+337811, cumulative 2.4221, per-round corr with on-chain 0.792, sign agreement 0.86
+SIM replay B=  20000 kappa=0.15 spread=per-address: sum $+153877, cumulative 1.4224, per-round corr with on-chain 0.886, sign agreement 0.95
+SIM replay B=   5000 kappa=0.0 spread=per-address: sum $+76159, cumulative 1.1453, per-round corr with on-chain 0.912, sign agreement 0.99
+SIM replay B=   5000 kappa=0.15 spread=0.03: sum $+515275, cumulative 4.0794, per-round corr with on-chain 0.752, sign agreement 0.79
+DECOMPOSITION (covered trades, 50835): actual LP P&L $-22406 = at-Thales-mid (zero spread) $-342382 + execution margin $+319976; at BS N(d2) mid (zero spread) $-348240
+   execution margin from whitelisted 0.5%-spread contracts $+63065 on volume $4871520; from others $+256911 on $5805766
+   effective margin per token: whitelisted 0.83c, others 2.09c (nominal 0.5c / 3c)

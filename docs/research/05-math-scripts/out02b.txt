@@ -1,0 +1,21 @@
+=== expWad accuracy for outputs > 1e12 wei, and monotonicity on random sorted pairs ===
+expWad max rel err (x in [-27,60]) = 4.688e-7
+expWad decreases on 100k random x<y pairs: 0
+
+=== solstat cdf around 0 (the NR erfcc branch switch) ===
+x=  -100000000000 wei: cdf=499999975105519686  exact=499999960105771959
+x=   -10000000000 wei: cdf=500000011010552171  exact=499999996010577195
+x=    -1000000000 wei: cdf=500000014601055419  exact=499999999601057719
+x=     -100000000 wei: cdf=500000014960105744  exact=499999999960105771
+x=             -1 wei: cdf=500000000000000000  exact=499999999999999999
+x=              0 wei: cdf=500000000000000000  exact=500000000000000000
+x=              1 wei: cdf=500000000000000000  exact=500000000000000000
+x=      100000000 wei: cdf=499999985039894255  exact=500000000039894228
+x=     1000000000 wei: cdf=499999985398944580  exact=500000000398942280
+x=    10000000000 wei: cdf=499999988989447828  exact=500000003989422804
+x=   100000000000 wei: cdf=500000024894480313  exact=500000039894228040
+jump cdf(-1)-cdf(+1) = 0 wei; the non-monotone band is |x| <~ 0.0 wei
+
+Hart/West WAD port: max abs err on [-9,9] step 1e-3 = 42.77 wei (= 4.28e-17) at x=0.019
+Hart/West WAD port monotonicity: 150000 ordered pairs, decreases=0, max drop=0 wei
+Hart symmetry max |cdf(x)+cdf(-x)-1e18| over 20k: 0

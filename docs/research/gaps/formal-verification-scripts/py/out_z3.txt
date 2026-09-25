@@ -1,0 +1,14 @@
+Lemma S buy: feasible                                   PROVED             0.25s
+Lemma S buy: maximal                                    PROVED             0.28s
+Lemma S buy: q >= 0                                     PROVED             0.15s
+Lemma S sell: sufficient WITHOUT band (expect CEX)      COUNTEREXAMPLE     0.25s
+   model: [R = 2, lam = 15, beta = 14, s = 8, q = 1]
+Lemma S sell: sufficient WITH band 2 lam q <= beta      PROVED             0.53s
+Lemma S sell: minimal                                   PROVED             0.23s
+Lemma A: N(I,q1)+N(I+q1,q2) == N(I,q1+q2)               PROVED             1.36s
+Thm N exact-out buy: ceil+ceil >= ceil(sum)             PROVED             0.03s
+Thm N exact-in sell: floor+floor <= floor(sum)          PROVED             0.14s
+Thm N exact-in buy: q1+q2 <= q(A1+A2)                   PROVED             1.34s
+E2: floor(M_b(I+q,q)/D) <= ceil(N_a(I,q)/D)             PROVED             2.03s
+E2 identity: N_a(I,q) - M_b(I+q,q) == 2e6 (a-b) q       PROVED             0.00s
+E1: N_a(I,q) - M_b(I,q) == 2e6(a-b)q + 2 lam q^2        PROVED             0.00s

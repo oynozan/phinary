@@ -1,0 +1,35 @@
+=== (a) calibration under the pricing model (n=200k independent quotes) ===
+Brier=0.11528 (E under H0 = mean p(1-p) = 0.11473); Murphy: REL=3.35e-06 RES=0.1334 UNC=0.2498 (Brier~REL-RES+UNC=0.11638)
+Spiegelhalter Z=+1.505   Hosmer-Lemeshow chi2=7.26 p=0.509
+   bin mean p=0.0006  realised freq=0.0004  diff=-0.0002  (2se=0.0003, n=20000)
+   bin mean p=0.0254  realised freq=0.0260  diff=+0.0006  (2se=0.0022, n=20000)
+   bin mean p=0.1100  realised freq=0.1090  diff=-0.0011  (2se=0.0044, n=20000)
+   bin mean p=0.2391  realised freq=0.2423  diff=+0.0032  (2se=0.0060, n=20000)
+   bin mean p=0.3904  realised freq=0.3923  diff=+0.0019  (2se=0.0069, n=20000)
+   bin mean p=0.5518  realised freq=0.5541  diff=+0.0023  (2se=0.0070, n=20000)
+   bin mean p=0.7112  realised freq=0.7110  diff=-0.0002  (2se=0.0064, n=20000)
+   bin mean p=0.8545  realised freq=0.8511  diff=-0.0033  (2se=0.0050, n=20000)
+   bin mean p=0.9614  realised freq=0.9601  diff=-0.0013  (2se=0.0027, n=20000)
+   bin mean p=0.9989  realised freq=0.9986  diff=-0.0003  (2se=0.0005, n=20000)
+
+=== (b) power: quoting with the wrong sigma / ignoring drift ===
+true sig=0.8, quoted sig=0.7, real drift mu=0.0, n=20000: Z=+11.52, HL p=0.00e+00, REL=5.93e-04
+true sig=0.8, quoted sig=0.7, real drift mu=0.0, n=200000: Z=+31.60, HL p=0.00e+00, REL=4.24e-04
+true sig=0.8, quoted sig=0.6, real drift mu=0.0, n=20000: Z=+19.93, HL p=0.00e+00, REL=1.50e-03
+true sig=0.8, quoted sig=0.8, real drift mu=1.0, n=200000: Z=+2.14, HL p=0.00e+00, REL=9.51e-04
+true sig=0.8, quoted sig=0.8, real drift mu=0.3, n=200000: Z=-1.34, HL p=1.62e-13, REL=7.07e-05
+
+=== (c) Merton jump-diffusion vs BS with total variance (what an RV estimator sees) ===
+diffusive sigma=0.6, lambda=10.0/yr, jump mean=-0.05, jump sd=0.08 -> total vol 0.6701
+T= 1d | K/S=0.85: M=0.9974 BS=1.0000 d=-0.0026 | K/S=0.9: M=0.9926 BS=0.9986 d=-0.0060 | K/S=0.95: M=0.9393 BS=0.9258 d=+0.0135 | K/S=1.0: M=0.5035 BS=0.4930 d=+0.0105 | K/S=1.05: M=0.0648 BS=0.0795 d=-0.0147 | K/S=1.1: M=0.0025 BS=0.0031 d=-0.0006 | K/S=1.2: M=0.0001 BS=0.0000 d=+0.0001
+T= 7d | K/S=0.85: M=0.9525 BS=0.9559 d=-0.0034 | K/S=0.9: M=0.8694 BS=0.8619 d=+0.0075 | K/S=0.95: M=0.7097 BS=0.6937 d=+0.0160 | K/S=1.0: M=0.4931 BS=0.4815 d=+0.0116 | K/S=1.05: M=0.2835 BS=0.2836 d=-0.0001 | K/S=1.1: M=0.1343 BS=0.1415 d=-0.0073 | K/S=1.2: M=0.0180 BS=0.0222 d=-0.0042
+T=30d | K/S=0.85: M=0.7787 BS=0.7734 d=+0.0054 | K/S=0.9: M=0.6824 BS=0.6745 d=+0.0079 | K/S=0.95: M=0.5765 BS=0.5679 d=+0.0086 | K/S=1.0: M=0.4692 BS=0.4617 d=+0.0074 | K/S=1.05: M=0.3682 BS=0.3632 d=+0.0050 | K/S=1.1: M=0.2790 BS=0.2769 d=+0.0022 | K/S=1.2: M=0.1457 BS=0.1480 d=-0.0023
+MC check T=7d K/S=0.95: P=0.7092 +- 0.0007 vs formula 0.7097
+
+=== (d) sample sizes ===
+calibration bin at p~0.5: detect |freq - p| >= 0.02 (alpha 5%, power 80%): n_bin = 4,906
+calibration bin at p~0.5: detect |freq - p| >= 0.01 (alpha 5%, power 80%): n_bin = 19,622
+calibration bin at p~0.5: detect |freq - p| >= 0.005 (alpha 5%, power 80%): n_bin = 78,489
+LP mean P&L test: to resolve mean to +-10% of |mean| with sd/|mean| = 5: n = 9,604 paths
+LP mean P&L test: to resolve mean to +-10% of |mean| with sd/|mean| = 20: n = 153,664 paths
+LP mean P&L test: to resolve mean to +-10% of |mean| with sd/|mean| = 100: n = 3,841,600 paths

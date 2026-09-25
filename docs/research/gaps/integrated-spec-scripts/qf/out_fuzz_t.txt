@@ -1,0 +1,64 @@
+floor-isqrt without fix-up under-delivers in 0/3547 exact-in cases
+F3 naive WAD solver: over-delivers (cost(q)>A, vault loss) in 1/8000, under-delivers in 1018/8000
+F3 over-delivery example (Lam,a,I0,A,q_exact,q_naive,true cost of q_naive): (1000000000007, 255543233374923047, -41643935, 9511067541, 34848539349, 34848539350, 9511067542)
+F3 naive split-advantage example (Lam,a,I0,A1,A2,q1,q2,q_whole): None
+F7x counterexample gamma outside max: ('sell_yes_in', 0, 2633, 2588, 0.3116195368322144)
+F7y counterexample with k uncapped: None
+Mills lemma: max over grid of (1-Phi(d))/(k phi(d)) for d>1/k = 0.980297951788165 (<1 as required)
+F3b naive WAD solver split advantage (Lam,a,A1,A2,q1,q2,q_whole_naive,q_whole_exact): None
+F8 separate impact: mint 100 sets for 100 USDC, sell both -> 101.3000 USDC (profit +1.3000);  shared signed impact -> 99.3000 (profit -0.7000)
+F9 clamp-mid: fair YES 1.00000, clamped ask 0.98000 -> buyer edge +0.02000 per token every epoch (spec halts instead: up_ok=False)
+
+=== property results (checked, violations) ===
+F1 buy exact-in: cost(q)<=A                                                    3547     0
+F1 buy exact-in: cost(q+1)>A (maximal)                                         3547     0
+F1 floor-isqrt candidate never over-delivers                                   3547     0
+F1 floor-isqrt candidate short by <=1 when Lam>=1                              3547     0
+F2 sell exact-out: proceeds(q)>=A                                              3473     0
+F2 sell exact-out: proceeds(q-1)<A (minimal)                                   3473     0
+F4 no-split buy_no_in                                                            25     0
+F4 no-split buy_no_out                                                           23     0
+F4 no-split buy_yes_in                                                           24     0
+F4 no-split buy_yes_out                                                          26     0
+F4 no-split sell_no_in                                                           33     0
+F4 no-split sell_no_out                                                          25     0
+F4 no-split sell_yes_in                                                          36     0
+F4 no-split sell_yes_out                                                         25     0
+F4 same token quantity -> same final I (path independence of state)             118     0
+F5 round trip kind 0: loses >= 2*h0*q (minus 1 unit rounding slack none)         33     0
+F5 round trip kind 0: trader net <= 0                                            33     0
+F5 round trip kind 1: loses >= 2*h0*q (minus 1 unit rounding slack none)         27     0
+F5 round trip kind 1: trader net <= 0                                            27     0
+F5 round trip kind 2: loses >= 2*h0*q (minus 1 unit rounding slack none)         32     0
+F5 round trip kind 2: trader net <= 0                                            32     0
+F5 round trip kind 3: trader net <= 0                                            33     0
+F5 round trip kind 4: trader net <= 0                                            31     0
+F5 round trip kind 5: trader net <= 0                                            37     0
+F6 amounts: cost(YES q)+cost(NO q) >= q (same state)                            398     0
+F6 amounts: proceeds(YES q)+proceeds(NO q) <= q (same state)                    398     0
+F6 marginal: askY+askN >= 1                                                     398     0
+F6 marginal: bidY+bidN <= 1                                                     398     0
+F7 monotone (spec) buy_no_in                                                    182     0
+F7 monotone (spec) buy_no_out                                                   189     0
+F7 monotone (spec) buy_yes_in                                                   192     0
+F7 monotone (spec) buy_yes_out                                                  194     0
+F7 monotone (spec) sell_no_in                                                   194     0
+F7 monotone (spec) sell_no_out                                                  187     0
+F7 monotone (spec) sell_yes_in                                                  189     0
+F7 monotone (spec) sell_yes_out                                                 184     0
+F7x gamma-outside-max (broken) buy_no_in                                        142     5
+F7x gamma-outside-max (broken) buy_no_out                                       147     5
+F7x gamma-outside-max (broken) buy_yes_in                                       139     4
+F7x gamma-outside-max (broken) buy_yes_out                                      142     3
+F7x gamma-outside-max (broken) sell_no_in                                       142     3
+F7x gamma-outside-max (broken) sell_no_out                                      136     2
+F7x gamma-outside-max (broken) sell_yes_in                                      147     5
+F7x gamma-outside-max (broken) sell_yes_out                                     145     7
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma buy_no_in     150     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma buy_no_out     153     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma buy_yes_in     163     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma buy_yes_out     169     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma sell_no_in     169     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma sell_no_out     163     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma sell_yes_in     153     0
+F7y no k cap at all (k up to ~10): still monotone by the Mills-ratio lemma sell_yes_out     149     0

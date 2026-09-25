@@ -1,0 +1,5 @@
+=== eth: 15747 swaps, 2.06 days of 1 s grid ===
+  H=300s: n=591 returns; sigma_pool 0.4990, sigma_binance 0.5094; var ratio 0.9595 (day-block bootstrap 95% [0.957,0.968]); implied c = +0.40 (model c=0.5 -> ratio 0.9494); ratio after +beta 1.0102
+     per-day ratios: 0.968 0.957
+  H=900s: n=196 returns; sigma_pool 0.4726, sigma_binance 0.4750; var ratio 0.9901 (day-block bootstrap 95% [0.990,0.992]); implied c = +0.26 (model c=0.5 -> ratio 0.9806); ratio after +beta 1.0095
+     per-day ratios: 0.990 0.992

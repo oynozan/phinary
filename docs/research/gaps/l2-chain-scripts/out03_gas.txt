@@ -1,0 +1,12 @@
+arb: 40 v4-swap txs in last 1200 blocks; median gasUsed 161,216 (execution), median effectiveGasPrice 0.0204 gwei; median total fee $0.0091 (L1 data part median $0.0002, max $0.0007); p90 total $0.0410
+   hook swap 180,000 gas: execution $0.0099 + L1 data ~$0.0002 = $0.0101
+   hook swap 250,000 gas: execution $0.0137 + L1 data ~$0.0002 = $0.0139
+   hook swap 300,000 gas: execution $0.0165 + L1 data ~$0.0002 = $0.0166
+base: 40 v4-swap txs in last 150 blocks; median gasUsed 196,910 (execution), median effectiveGasPrice 0.0055 gwei; median total fee $0.0047 (L1 data part median $0.0000, max $0.0003); p90 total $0.0567
+   hook swap 180,000 gas: execution $0.0027 + L1 data ~$0.0000 = $0.0027
+   hook swap 250,000 gas: execution $0.0037 + L1 data ~$0.0000 = $0.0037
+   hook swap 300,000 gas: execution $0.0044 + L1 data ~$0.0000 = $0.0045
+eth: 40 v4-swap txs in last 25 blocks; median gasUsed 331,195 (execution), median effectiveGasPrice 0.8237 gwei; median total fee $0.7052 (L1 data part median $0.0000, max $0.0000); p90 total $9.9624
+   hook swap 180,000 gas: execution $0.3988 + L1 data ~$0.0000 = $0.3988
+   hook swap 250,000 gas: execution $0.5539 + L1 data ~$0.0000 = $0.5539
+   hook swap 300,000 gas: execution $0.6647 + L1 data ~$0.0000 = $0.6647

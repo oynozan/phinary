@@ -1,0 +1,50 @@
+=== (a) unbiasedness & variance, 1-day window, sigma=0.8 ===
+regular 5-min (n=288)              n=  288: E[s2]=0.64013 (true 0.64000), Var[s2]=2.877e-03, theory 2s^4 sum(dt^2)/W^2=2.844e-03, 2s^4/n=2.844e-03; rel SE(sigma_hat)=0.0419 vs 1/sqrt(2n)=0.0417
+regular 1-min (n=1440)             n= 1440: E[s2]=0.64013 (true 0.64000), Var[s2]=5.711e-04, theory 2s^4 sum(dt^2)/W^2=5.689e-04, 2s^4/n=5.689e-04; rel SE(sigma_hat)=0.0187 vs 1/sqrt(2n)=0.0186
+irregular Exp(5min) swap-driven    n=  320: E[s2]=0.64056 (true 0.64000), Var[s2]=5.187e-03, theory 2s^4 sum(dt^2)/W^2=5.228e-03, 2s^4/n=2.560e-03; rel SE(sigma_hat)=0.0560 vs 1/sqrt(2n)=0.0395
+irregular heavy (Pareto) gaps      n=  345: E[s2]=0.63995 (true 0.64000), Var[s2]=6.311e-03, theory 2s^4 sum(dt^2)/W^2=6.363e-03, 2s^4/n=2.374e-03; rel SE(sigma_hat)=0.0613 vs 1/sqrt(2n)=0.0381
+
+=== drift contamination: mu=+300%/yr (extreme), regular 5-min ===
+E[s2]=0.640234 vs sigma^2=0.6400000000000001; theoretical bias m^2*dt = 6.83e-05
+
+=== (b) chi-square CI coverage (regular sampling, zero drift), 95% nominal ===
+n=   24: coverage=0.9506; typical 95% CI for sigma: [0.781, 1.391] x sigma_hat
+n=   96: coverage=0.9517; typical 95% CI for sigma: [0.876, 1.165] x sigma_hat
+n=  288: coverage=0.9485; typical 95% CI for sigma: [0.925, 1.089] x sigma_hat
+n= 1440: coverage=0.9493; typical 95% CI for sigma: [0.965, 1.038] x sigma_hat
+
+=== (c) tick quantisation (slot0.tick = floor(log_1.0001 P)) ===
+sample every    12s: E[RV_tick]/E[RV_exact] = 1.0069  (predicted 1 + ln(1.0001)^2/6 / (sig^2 dt) = 1.0068)
+sample every    60s: E[RV_tick]/E[RV_exact] = 1.0014  (predicted 1 + ln(1.0001)^2/6 / (sig^2 dt) = 1.0014)
+sample every   300s: E[RV_tick]/E[RV_exact] = 1.0003  (predicted 1 + ln(1.0001)^2/6 / (sig^2 dt) = 1.0003)
+sample every  3600s: E[RV_tick]/E[RV_exact] = 1.0000  (predicted 1 + ln(1.0001)^2/6 / (sig^2 dt) = 1.0000)
+
+=== (d) microstructure: pool price = CEX GBM reflected into a no-arb band of half-width gamma (fee) ===
+fee= 5bp sample    12s: E[s2_pool]/sigma^2-1=-63.500% (exact-CEX-sampled: +0.025%); sqrt-ratio=0.6042
+fee= 5bp sample    60s: E[s2_pool]/sigma^2-1=-30.248% (exact-CEX-sampled: -0.043%); sqrt-ratio=0.8352
+fee= 5bp sample   300s: E[s2_pool]/sigma^2-1=-6.737% (exact-CEX-sampled: -0.117%); sqrt-ratio=0.9657
+fee= 5bp sample  3600s: E[s2_pool]/sigma^2-1=-0.126% (exact-CEX-sampled: +0.367%); sqrt-ratio=0.9994
+fee=30bp sample    12s: E[s2_pool]/sigma^2-1=-91.285% (exact-CEX-sampled: +0.025%); sqrt-ratio=0.2952
+fee=30bp sample    60s: E[s2_pool]/sigma^2-1=-82.031% (exact-CEX-sampled: -0.043%); sqrt-ratio=0.4239
+fee=30bp sample   300s: E[s2_pool]/sigma^2-1=-60.221% (exact-CEX-sampled: -0.117%); sqrt-ratio=0.6307
+fee=30bp sample  3600s: E[s2_pool]/sigma^2-1=-9.469% (exact-CEX-sampled: +0.367%); sqrt-ratio=0.9515
+
+=== (e) price error from sigma estimation error: SE(P) ~ |vega| * sigma/sqrt(2n) = n(d2)|d1|/sqrt(2n) ===
+K/S=1.00 T= 1d: P=0.4916 |dP/dln(sig)|=0.0084; SE(P) with n=288 (1d@5min): 0.0003; n=2016 (7d@5min): 0.0001; 10% vol error -> 0.0008
+K/S=1.00 T= 7d: P=0.4779 |dP/dln(sig)|=0.0221; SE(P) with n=288 (1d@5min): 0.0009; n=2016 (7d@5min): 0.0003; 10% vol error -> 0.0022
+K/S=1.00 T=30d: P=0.4544 |dP/dln(sig)|=0.0454; SE(P) with n=288 (1d@5min): 0.0019; n=2016 (7d@5min): 0.0007; 10% vol error -> 0.0045
+K/S=1.05 T= 1d: P=0.1178 |dP/dln(sig)|=0.2259; SE(P) with n=288 (1d@5min): 0.0094; n=2016 (7d@5min): 0.0036; 10% vol error -> 0.0226
+K/S=1.05 T= 7d: P=0.3100 |dP/dln(sig)|=0.1358; SE(P) with n=288 (1d@5min): 0.0057; n=2016 (7d@5min): 0.0021; 10% vol error -> 0.0136
+K/S=1.05 T=30d: P=0.3717 |dP/dln(sig)|=0.0371; SE(P) with n=288 (1d@5min): 0.0015; n=2016 (7d@5min): 0.0006; 10% vol error -> 0.0037
+K/S=1.10 T= 1d: P=0.0108 |dP/dln(sig)|=0.0643; SE(P) with n=288 (1d@5min): 0.0027; n=2016 (7d@5min): 0.0010; 10% vol error -> 0.0064
+K/S=1.10 T= 7d: P=0.1799 |dP/dln(sig)|=0.2111; SE(P) with n=288 (1d@5min): 0.0088; n=2016 (7d@5min): 0.0033; 10% vol error -> 0.0211
+K/S=1.10 T=30d: P=0.2980 |dP/dln(sig)|=0.1043; SE(P) with n=288 (1d@5min): 0.0043; n=2016 (7d@5min): 0.0016; 10% vol error -> 0.0104
+K/S=1.25 T= 1d: P=0.0000 |dP/dln(sig)|=0.0000; SE(P) with n=288 (1d@5min): 0.0000; n=2016 (7d@5min): 0.0000; 10% vol error -> 0.0000
+K/S=1.25 T= 7d: P=0.0192 |dP/dln(sig)|=0.0918; SE(P) with n=288 (1d@5min): 0.0038; n=2016 (7d@5min): 0.0014; 10% vol error -> 0.0092
+K/S=1.25 T=30d: P=0.1384 |dP/dln(sig)|=0.1895; SE(P) with n=288 (1d@5min): 0.0079; n=2016 (7d@5min): 0.0030; 10% vol error -> 0.0190
+
+=== (f) EWMA sigma^2_t = lam sigma^2_{t-1} + (1-lam) r_t^2/dt : effective n and SE ===
+lambda=0.94: n_eff=(1+lam)/(1-lam)=32, rel SE(sigma_hat) ~ 1/sqrt(2 n_eff) = 0.124
+lambda=0.97: n_eff=(1+lam)/(1-lam)=66, rel SE(sigma_hat) ~ 1/sqrt(2 n_eff) = 0.087
+lambda=0.99: n_eff=(1+lam)/(1-lam)=199, rel SE(sigma_hat) ~ 1/sqrt(2 n_eff) = 0.050
+lambda=0.997: n_eff=(1+lam)/(1-lam)=666, rel SE(sigma_hat) ~ 1/sqrt(2 n_eff) = 0.027

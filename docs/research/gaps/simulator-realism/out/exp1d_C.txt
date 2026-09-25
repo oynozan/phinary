@@ -1,0 +1,70 @@
+== pmin=0.05: {'pmin': 0.05}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0227/2.98 iv +0.0872/3.14 orv -0.2071/5.50 dir +0.0110/0.40 jump +0.0196/3.00 smile -0.0027/2.83 noise +0.0182/0.61
+      D* old set 1.75 (counted []) | D* extended 2.80 (counted ['smile']) | smile-covered mkts n=7483: smile -0.0027/2.90, D* ext 2.90
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0033/3.01 iv +0.0791/4.86 orv -0.2060/5.95 dir +0.0106/0.40 jump +0.0042/3.04 smile -0.0270/3.85 noise +0.0192/0.60
+      D* old set 1.65 (counted []) | D* extended 4.70 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0271/3.87, D* ext 4.75
+      D=2.0: vault ann -44.6% CI95lo -129.0% | CVaR95 17.14% CVaR99 21.00% maxDD 233.6% worst wk 24.14%
+      D=2.0 per-year (ext set, latency charged): 2021:+16% 2022:-341% 2023:-53% 2024:+27% 2025:-285% 2026:-26%
+      D=5.0: vault ann +101.9% CI95lo +17.8% | CVaR95 15.01% CVaR99 19.77% maxDD 105.1% worst wk 23.10%
+      D=5.0 per-year (ext set, latency charged): 2021:+149% 2022:-227% 2023:+109% 2024:+176% 2025:-150% 2026:+125%
+
+== pmin=0.10: {'pmin': 0.1}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0231/2.80 iv +0.0753/2.76 orv -0.1575/3.68 dir +0.0098/0.35 jump +0.0194/2.82 smile -0.0009/2.38 noise +0.0143/0.46
+      D* old set 2.25 (counted []) | D* extended 3.30 (counted ['smile']) | smile-covered mkts n=7483: smile -0.0009/2.43, D* ext 3.35
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0023/2.81 iv +0.0593/4.05 orv -0.1589/3.93 dir +0.0096/0.35 jump +0.0030/2.84 smile -0.0270/2.97 noise +0.0143/0.45
+      D* old set 2.25 (counted []) | D* extended 6.00 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0272/2.99, D* ext 6.00
+      D=2.0: vault ann -69.5% CI95lo -135.9% | CVaR95 15.20% CVaR99 17.84% maxDD 249.9% worst wk 19.75%
+      D=2.0 per-year (ext set, latency charged): 2021:-11% 2022:-324% 2023:-56% 2024:-18% 2025:-303% 2026:-32%
+      D=5.0: vault ann +39.7% CI95lo -31.0% | CVaR95 14.22% CVaR99 17.14% maxDD 120.2% worst wk 17.98%
+      D=5.0 per-year (ext set, latency charged): 2021:+82% 2022:-216% 2023:+66% 2024:+92% 2025:-205% 2026:+85%
+
+== kappa=0.05: {'kappa': 0.05}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0058/0.67 iv +0.0251/1.38 orv -0.0347/1.99 dir +0.0123/0.42 jump +0.0048/0.73 smile +0.0119/1.36 noise +0.0214/0.77
+      D* old set 1.50 (counted []) | D* extended 1.50 (counted []) | smile-covered mkts n=7483: smile +0.0122/1.39, D* ext 1.50
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0047/0.76 iv +0.0134/1.74 orv -0.0341/2.17 dir +0.0123/0.42 jump +0.0037/0.85 smile -0.0081/1.54 noise +0.0218/0.76
+      D* old set 1.45 (counted []) | D* extended 1.95 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0081/1.55, D* ext 1.95
+      D=2.0: vault ann +16.4% CI95lo +3.1% | CVaR95 3.29% CVaR99 3.89% maxDD 16.2% worst wk 4.13%
+      D=2.0 per-year (ext set, latency charged): 2021:+17% 2022:-3% 2023:+57% 2024:+7% 2025:-7% 2026:+39%
+      D=5.0: vault ann +182.3% CI95lo +162.5% | CVaR95 2.02% CVaR99 2.82% maxDD 3.2% worst wk 3.16%
+      D=5.0 per-year (ext set, latency charged): 2021:+151% 2022:+151% 2023:+250% 2024:+155% 2025:+164% 2026:+214%
+
+== kappa=0.10: {'kappa': 0.1}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0029/0.37 iv +0.0168/0.90 orv -0.0182/1.32 dir +0.0131/0.45 jump +0.0025/0.42 smile +0.0074/0.85 noise +0.0214/0.77
+      D* old set 1.50 (counted []) | D* extended 1.50 (counted []) | smile-covered mkts n=7483: smile +0.0076/0.87, D* ext 1.50
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0027/0.41 iv +0.0066/1.06 orv -0.0180/1.47 dir +0.0134/0.45 jump +0.0020/0.48 smile -0.0039/0.93 noise +0.0218/0.76
+      D* old set 1.45 (counted []) | D* extended 1.70 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0040/0.93, D* ext 1.70
+      D=2.0: vault ann +26.9% CI95lo +17.4% | CVaR95 2.16% CVaR99 2.99% maxDD 5.4% worst wk 3.82%
+      D=2.0 per-year (ext set, latency charged): 2021:+17% 2022:+14% 2023:+57% 2024:+17% 2025:+18% 2026:+42%
+      D=5.0: vault ann +192.8% CI95lo +174.8% | CVaR95 1.30% CVaR99 2.47% maxDD 3.3% worst wk 3.34%
+      D=5.0 per-year (ext set, latency charged): 2021:+151% 2022:+168% 2023:+250% 2024:+165% 2025:+189% 2026:+216%
+
+== kappa=0.10 + pmin=0.05: {'kappa': 0.1, 'pmin': 0.05}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0029/0.36 iv +0.0179/0.86 orv -0.0173/1.25 dir +0.0128/0.43 jump +0.0026/0.41 smile +0.0078/0.80 noise +0.0182/0.61
+      D* old set 1.75 (counted []) | D* extended 1.75 (counted []) | smile-covered mkts n=7483: smile +0.0080/0.82, D* ext 1.75
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0027/0.41 iv +0.0080/1.01 orv -0.0170/1.39 dir +0.0131/0.43 jump +0.0021/0.47 smile -0.0037/0.87 noise +0.0192/0.60
+      D* old set 1.65 (counted []) | D* extended 1.90 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0037/0.88, D* ext 1.90
+      D=2.0: vault ann +14.5% CI95lo +5.4% | CVaR95 2.58% CVaR99 3.23% maxDD 9.3% worst wk 3.28%
+      D=2.0 per-year (ext set, latency charged): 2021:+16% 2022:-13% 2023:+36% 2024:+18% 2025:-6% 2026:+26%
+      D=5.0: vault ann +160.9% CI95lo +142.8% | CVaR95 2.35% CVaR99 2.84% maxDD 3.1% worst wk 2.89%
+      D=5.0 per-year (ext set, latency charged): 2021:+149% 2022:+101% 2023:+199% 2024:+168% 2025:+129% 2026:+177%
+
+== kappa=0.10 + pmin=0.05 + ev_on + s=3%: {'kappa': 0.1, 'pmin': 0.05, 'ev_on': 1.0, 's': 0.03}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0032/0.23 iv +0.0182/0.64 orv -0.0121/0.93 dir +0.0142/0.34 jump +0.0027/0.20 smile +0.0091/0.55 noise +0.0239/0.61
+      D* old set 1.30 (counted []) | D* extended 1.30 (counted []) | smile-covered mkts n=7483: smile +0.0093/0.56, D* ext 1.35
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0038/0.23 iv +0.0107/0.72 orv -0.0109/1.03 dir +0.0142/0.34 jump +0.0030/0.22 smile +0.0000/0.58 noise +0.0226/0.61
+      D* old set 1.35 (counted []) | D* extended 1.35 (counted []) | smile-covered mkts n=6951: smile +0.0000/0.58, D* ext 1.40
+      D=2.0: vault ann +41.3% CI95lo +36.0% | CVaR95 1.03% CVaR99 1.56% maxDD 1.7% worst wk 1.71%
+      D=2.0 per-year (ext set, latency charged): 2021:+46% 2022:+37% 2023:+57% 2024:+43% 2025:+34% 2026:+41%
+      D=5.0: vault ann +213.7% CI95lo +200.8% | CVaR95 0.43% CVaR99 1.78% maxDD 2.1% worst wk 2.15%
+      D=5.0 per-year (ext set, latency charged): 2021:+224% 2022:+203% 2023:+253% 2024:+217% 2025:+201% 2026:+211%
+
+== kappa=0.10 + pmin=0.05 + ev_on + halt30 + skew: {'kappa': 0.1, 'pmin': 0.05, 'ev_on': 1.0, 'halt_pre': 30, 'halt_post': 30, 'skew': 0.5}
+  IS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0045/0.40 iv +0.0186/0.86 orv -0.0164/1.22 dir +0.0132/0.42 jump +0.0040/0.37 smile +0.0090/0.77 noise +0.0163/0.61
+      D* old set 1.95 (counted []) | D* extended 1.95 (counted []) | smile-covered mkts n=7483: smile +0.0092/0.79, D* ext 2.00
+  OOS: per-mkt LP pnl lat +0.0000/0.00 tail +0.0039/0.43 iv +0.0095/1.00 orv -0.0151/1.34 dir +0.0136/0.43 jump +0.0033/0.41 smile -0.0020/0.83 noise +0.0182/0.60
+      D* old set 1.75 (counted []) | D* extended 1.95 (counted ['smile']) | smile-covered mkts n=6951: smile -0.0020/0.84, D* ext 1.95
+      D=2.0: vault ann +13.5% CI95lo +3.9% | CVaR95 2.53% CVaR99 3.07% maxDD 15.0% worst wk 3.08%
+      D=2.0 per-year (ext set, latency charged): 2021:+5% 2022:-17% 2023:+28% 2024:+19% 2025:+5% 2026:+15%
+      D=5.0: vault ann +151.9% CI95lo +133.0% | CVaR95 2.45% CVaR99 3.34% maxDD 5.9% worst wk 3.76%
+      D=5.0 per-year (ext set, latency charged): 2021:+122% 2022:+82% 2023:+179% 2024:+159% 2025:+140% 2026:+149%
+

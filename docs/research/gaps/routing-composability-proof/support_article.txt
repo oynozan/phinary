@@ -1,0 +1,27 @@
+We're excited that you're building hooks on Uniswap. Our routing algorithm automatically picks up most hooks, but some require special allowlisting by the Uniswap Labs team. Use the guide below to determine if your hook needs to be submitted for allowlisting:
+Your hook is automatically allowed unless:
+
+- Your hook is deployed to an address that starts with “0x91…”
+
+- Your hook uses any of the following flags: beforeSwapReturnsDelta, afterSwapReturnsDelta, or dynamicFees
+
+
+If neither of these apply, nothing else is needed from you. Our routing algorithm already automatically considers eligible pools with your hook.
+If either or both conditions apply to your hook, it will need to be manually reviewed and allowlisted for our routing algorithm to consider.
+To submit your hook for allowlisting, fill in this form. Meeting these criteria will increase the likelihood of your hook being allowlisted:
+
+- Your hook should already be deployed on an L1 or L2 mainnet which Uniswap Labs supports
+
+- Your hook code should be validated in a block explorer
+
+- Your hook should not modify or bypass the AMM protocol fee
+
+- Your hook must not be deployed through a proxy contract which permits upgrading the hook
+
+- Your hook must not be malicious or extractive towards swappers or LPers
+
+- Your hook must not require custom calldata which the Uniswap Labs’ router could only produce with modification
+
+While we can’t guarantee that we will be able to allowlist your hook, meeting these criteria will help. Allowlisting decisions are made at Uniswap Labs' sole discretion and may change at any time. Allowlisting means only that our routing algorithm may consider pools using your hook. It is not an endorsement, recommendation, or security review of your hook.
+After you launch your hook, we also highly encourage you to submit an issue to the Uniswap Labs Hooklist repo. We use the information provided here to give hooks human-readable names and descriptions in our interfaces, making it easier for users to find your hook and understand what it does.
+

@@ -1,0 +1,8 @@
+v1                                 smile[full    ]: IS -0.0041 (vol 3.06, share of mkts traded 0.91) | OOS -0.0280 (vol 4.22, share of mkts traded 0.92)
+v1                                 smile[level   ]: IS +0.0073 (vol 2.98, share of mkts traded 0.90) | OOS -0.0371 (vol 4.64, share of mkts traded 0.94)
+v1                                 smile[shape   ]: IS +0.0306 (vol 1.63, share of mkts traded 0.75) | OOS +0.0103 (vol 1.13, share of mkts traded 0.76)
+v1                                 smile[skewonly]: IS +0.0318 (vol 2.13, share of mkts traded 0.86) | OOS +0.0124 (vol 1.73, share of mkts traded 0.86)
+kappa=0.10+s=3%+pmin=0.05+ev_on    smile[full    ]: IS +0.0093 (vol 0.56, share of mkts traded 0.81) | OOS +0.0000 (vol 0.58, share of mkts traded 0.82)
+kappa=0.10+s=3%+pmin=0.05+ev_on    smile[level   ]: IS +0.0118 (vol 0.66, share of mkts traded 0.82) | OOS +0.0019 (vol 0.68, share of mkts traded 0.86)
+kappa=0.10+s=3%+pmin=0.05+ev_on    smile[shape   ]: IS +0.0038 (vol 0.15, share of mkts traded 0.47) | OOS +0.0026 (vol 0.09, share of mkts traded 0.44)
+kappa=0.10+s=3%+pmin=0.05+ev_on    smile[skewonly]: IS +0.0047 (vol 0.20, share of mkts traded 0.71) | OOS +0.0046 (vol 0.15, share of mkts traded 0.71)

@@ -1,0 +1,2 @@
+60 random runs x 4000 ops: all invariants held. LP P&L (USDC): min=-3091 max=3356
+bidY+bidN=1.02 exploit: trader profit after 100 loops = 2.0 USDC (vault drained by the same)

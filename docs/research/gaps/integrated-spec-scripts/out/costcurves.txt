@@ -1,0 +1,30 @@
+L1 w= 30m C(2.5bp) $226 C(5bp) $1,208 C(10bp) $7,400 C(30bp) $65,645
+   h0=1c cut=w+b (35 min) sd_G  27.8bp  Q_safe numeric $7,356  closed form (kin spec) $4,494 | M2 %Q at Q=10k/30k/100k/300k/1M: 11.41 18.72 33.50 53.61 66.24
+   h0=1c cut=cut05 (338 min) sd_G 128.0bp  Q_safe numeric $216,502  closed form (kin spec) $95,998 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.54 4.17 7.69 13.45 17.06
+   h0=2c cut=w+b (35 min) sd_G  27.8bp  Q_safe numeric $14,226  closed form (kin spec) $8,987 | M2 %Q at Q=10k/30k/100k/300k/1M: 11.41 18.72 33.50 53.61 66.24
+   h0=2c cut=cut05 (100 min) sd_G  64.0bp  Q_safe numeric $108,411  closed form (kin spec) $47,999 | M2 %Q at Q=10k/30k/100k/300k/1M: 5.01 8.26 15.20 26.22 33.10
+L1 w=120m C(2.5bp) $883 C(5bp) $4,782 C(10bp) $29,498 C(30bp) $262,421
+   h0=1c cut=w+b (125 min) sd_G  48.1bp  Q_safe numeric $82,413  closed form (kin spec) $54,165 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.88 5.91 10.04 17.31 31.64
+   h0=1c cut=cut05 (398 min) sd_G 128.0bp  Q_safe numeric $856,790  closed form (kin spec) $383,993 | M2 %Q at Q=10k/30k/100k/300k/1M: 1.50 2.26 3.82 6.62 12.42
+   h0=2c cut=w+b (125 min) sd_G  48.1bp  Q_safe numeric $196,115  closed form (kin spec) $108,330 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.88 5.91 10.04 17.31 31.64
+   h0=2c cut=cut05 (160 min) sd_G  64.0bp  Q_safe numeric $429,030  closed form (kin spec) $191,996 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.93 4.46 7.58 13.11 24.26
+L1 w=240m C(2.5bp) $1,770 C(5bp) $9,615 C(10bp) $59,128 C(30bp) $525,190
+   h0=1c cut=w+b (245 min) sd_G  66.1bp  Q_safe numeric $321,818  closed form (kin spec) $204,838 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.24 3.30 5.34 8.93 16.52
+   h0=1c cut=cut05 (478 min) sd_G 128.0bp  Q_safe numeric $1,722,681  closed form (kin spec) $767,985 | M2 %Q at Q=10k/30k/100k/300k/1M: 1.18 1.73 2.79 4.65 8.64
+   h0=2c cut=w+b (245 min) sd_G  66.1bp  Q_safe numeric $946,787  closed form (kin spec) $409,676 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.24 3.30 5.34 8.93 16.52
+   h0=2c cut=cut05 (245 min) sd_G  66.1bp  Q_safe numeric $946,787  closed form (kin spec) $409,676 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.24 3.30 5.34 8.93 16.52
+L2 w= 30m C(2.5bp) $170 C(5bp) $1,465 C(10bp) $18,877 C(30bp) $169,681
+   h0=1c cut=w+b (35 min) sd_G  27.8bp  Q_safe numeric $5,993  closed form (kin spec) $3,407 | M2 %Q at Q=10k/30k/100k/300k/1M: 8.74 12.55 21.28 35.96 57.55
+   h0=1c cut=cut05 (73 min) sd_G  52.3bp  Q_safe numeric $18,776  closed form (kin spec) $12,064 | M2 %Q at Q=10k/30k/100k/300k/1M: 4.69 6.74 11.49 20.00 34.26
+   h0=2c cut=w+b (35 min) sd_G  27.8bp  Q_safe numeric $10,729  closed form (kin spec) $6,814 | M2 %Q at Q=10k/30k/100k/300k/1M: 8.74 12.55 21.28 35.96 57.55
+   h0=2c cut=cut05 (35 min) sd_G  27.8bp  Q_safe numeric $10,729  closed form (kin spec) $6,814 | M2 %Q at Q=10k/30k/100k/300k/1M: 8.74 12.55 21.28 35.96 57.55
+L2 w=120m C(2.5bp) $682 C(5bp) $6,060 C(10bp) $75,878 C(30bp) $679,590
+   h0=1c cut=w+b (125 min) sd_G  48.1bp  Q_safe numeric $63,590  closed form (kin spec) $40,917 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.69 4.68 6.81 10.84 19.72
+   h0=1c cut=cut05 (133 min) sd_G  52.3bp  Q_safe numeric $75,072  closed form (kin spec) $48,256 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.40 4.32 6.27 10.00 18.20
+   h0=2c cut=w+b (125 min) sd_G  48.1bp  Q_safe numeric $159,309  closed form (kin spec) $81,835 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.69 4.68 6.81 10.84 19.72
+   h0=2c cut=cut05 (125 min) sd_G  48.1bp  Q_safe numeric $159,309  closed form (kin spec) $81,835 | M2 %Q at Q=10k/30k/100k/300k/1M: 3.69 4.68 6.81 10.84 19.72
+L2 w=240m C(2.5bp) $1,357 C(5bp) $12,092 C(10bp) $151,713 C(30bp) $1,359,097
+   h0=1c cut=w+b (245 min) sd_G  66.1bp  Q_safe numeric $245,553  closed form (kin spec) $154,603 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.30 2.94 3.95 5.82 10.16
+   h0=1c cut=cut05 (245 min) sd_G  66.1bp  Q_safe numeric $245,553  closed form (kin spec) $154,603 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.30 2.94 3.95 5.82 10.16
+   h0=2c cut=w+b (245 min) sd_G  66.1bp  Q_safe numeric $965,483  closed form (kin spec) $309,207 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.30 2.94 3.95 5.82 10.16
+   h0=2c cut=cut05 (245 min) sd_G  66.1bp  Q_safe numeric $965,483  closed form (kin spec) $309,207 | M2 %Q at Q=10k/30k/100k/300k/1M: 2.30 2.94 3.95 5.82 10.16

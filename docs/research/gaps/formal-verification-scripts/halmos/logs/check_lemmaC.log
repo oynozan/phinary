@@ -1,0 +1,10 @@
+No files changed, compilation skipped
+
+
+
+
+
+
+Running 1 tests for test/HartHalmos.t.sol:HartHalmos
+[32m[PASS][0m check_lemmaC(int256,int256,int256,int256) (paths: 26, time: 0.39s, bounds: [])
+Symbolic test result: 1 passed; 0 failed; time: 0.39s

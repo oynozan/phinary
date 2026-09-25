@@ -1,0 +1,10 @@
+fitted windows 6629
+ETH/BTC covered trades with a same-expiry Deribit smile 17960 of 33900
+calibration (token-weighted): mean(1{UP} - smile) +5.16 pp vs mean(1{UP} - Thales odds) +4.65 pp; Brier smile 0.1600 vs Thales 0.1621; mean |smile - Thales| 2.97 pp; median sigma smile/Thales 1.20
+   trader edge vs smile in [-1.00,-0.05): trades   4097 volume $   570085 LP P&L $   +65575 (+11.50% of vol)
+   trader edge vs smile in [-0.05,-0.02): trades   5069 volume $   948575 LP P&L $   +99642 (+10.50% of vol)
+   trader edge vs smile in [-0.02,+0.00): trades   3615 volume $   730820 LP P&L $   -21287 (-2.91% of vol)
+   trader edge vs smile in [+0.00,+0.02): trades   2670 volume $   545208 LP P&L $   -28180 (-5.17% of vol)
+   trader edge vs smile in [+0.02,+0.05): trades   1863 volume $   389073 LP P&L $   -49424 (-12.70% of vol)
+   trader edge vs smile in [+0.05,+1.00): trades    646 volume $   157370 LP P&L $   -27265 (-17.33% of vol)
+   LP P&L on trades a smile-desk would have taken (edge > +1c): $-98448 on 3709 trades; all covered $+39062

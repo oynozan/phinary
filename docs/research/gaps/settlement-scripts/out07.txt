@@ -1,0 +1,3 @@
+spot: one end-of-block sample: 0.6bp:$1  1.6bp:$4  5.0bp:$24  10.0bp:$72  15.0bp:$140  35.0bp:$607  55.0bp:$1,385
+TWAP w = 30 min: 1.2bp:$56  2.5bp:$223  5.0bp:$1,209  10.0bp:$7,398  15.0bp:$17,522  35.0bp:$87,511  55.0bp:$204,162
+(slot0 read at settle time instead of an end-of-block sample: round trip inside one unlock, fees only: ~ 2 f y_v delta/2 = $233 for 30 bp)

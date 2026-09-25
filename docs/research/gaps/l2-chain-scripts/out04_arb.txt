@@ -1,0 +1,7 @@
+=== arb: 62098 swaps, 2.09 days of 1 s grid ===
+  H=300s: n=601 returns; sigma_pool 0.7738, sigma_binance 0.5640; var ratio 1.8824 (day-block bootstrap 95% [0.992,2.954]); implied c = -10.68 (model c=0.5 -> ratio 0.9587); ratio after +beta 1.9237
+     per-day ratios: 0.992 2.954
+  H=900s: n=199 returns; sigma_pool 0.5736, sigma_binance 0.5280; var ratio 1.1803 (day-block bootstrap 95% [1.014,1.390]); implied c = -5.74 (model c=0.5 -> ratio 0.9843); ratio after +beta 1.1960
+     per-day ratios: 1.014 1.390
+  H=300s: pool/Binance variance ratio excluding the event windows (11 returns dropped): 0.9874; all windows with the 400-tick clamp: 1.8824; largest |r| in event 239 bp; event share of pool sum r^2: 47.8%
+  H=900s: pool/Binance variance ratio excluding the event windows (5 returns dropped): 1.0188; all windows with the 400-tick clamp: 1.1803; largest |r| in event 95 bp; event share of pool sum r^2: 14.5%

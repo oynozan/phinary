@@ -1,0 +1,65 @@
+== {'chain': 'L1', 'kernel': 'normal', 'sig': 'rv_ewma', 'lam_block': 0.1}
+  D=2 2021: noise +0.345 lat +0.000 tail +0.883 iv +0.705 orv -1.652 dir +0.065 | manip(noise run) -0.0019
+  D=2 2022: noise +0.306 lat +0.000 tail -0.433 iv +0.018 orv -1.981 dir +0.079 | manip(noise run) -0.0091
+  D=2 2023: noise +0.357 lat +0.000 tail -0.426 iv -0.271 orv -1.960 dir +0.140 | manip(noise run) -0.0146
+  D=2 2024: noise +0.353 lat +0.000 tail +0.579 iv +0.376 orv -1.805 dir +0.063 | manip(noise run) -0.0074
+  D=2 2025: noise +0.307 lat +0.000 tail +0.312 iv -0.051 orv -1.999 dir +0.096 | manip(noise run) -0.0037
+  D=2 2026: noise +0.365 lat +0.000 tail -0.291 iv +0.157 orv -1.897 dir +0.074 | manip(noise run) -0.0047
+  D=5 2021: noise +0.801 lat +0.000 tail +0.911 iv +0.601 orv -1.860 dir +0.069 | manip(noise run) -0.0030
+  D=5 2022: noise +0.736 lat +0.000 tail -0.537 iv +0.012 orv -2.208 dir +0.083 | manip(noise run) -0.0125
+  D=5 2023: noise +0.834 lat +0.000 tail -0.616 iv -0.393 orv -2.112 dir +0.126 | manip(noise run) -0.0282
+  D=5 2024: noise +0.825 lat +0.000 tail +0.374 iv +0.212 orv -1.978 dir +0.070 | manip(noise run) -0.0135
+  D=5 2025: noise +0.770 lat +0.000 tail +0.185 iv -0.079 orv -2.202 dir +0.097 | manip(noise run) -0.0052
+  D=5 2026: noise +0.865 lat +0.000 tail -0.474 iv +0.100 orv -2.168 dir +0.079 | manip(noise run) -0.0097
+== {'chain': 'L1', 'kernel': 't', 'sig': 'rv_ewma', 'lam_block': 0.5}
+  D=2 2021: noise +0.442 lat +0.000 tail +0.063 iv +0.270 orv -1.029 dir +0.060 | manip(noise run) -0.0019
+  D=2 2022: noise +0.399 lat +0.000 tail -0.018 iv +0.046 orv -1.692 dir +0.077 | manip(noise run) -0.0091
+  D=2 2023: noise +0.455 lat +0.000 tail -0.095 iv -0.058 orv -1.635 dir +0.135 | manip(noise run) -0.0149
+  D=2 2024: noise +0.451 lat +0.000 tail +0.015 iv +0.015 orv -1.469 dir +0.060 | manip(noise run) -0.0076
+  D=2 2025: noise +0.401 lat +0.000 tail -0.049 iv +0.045 orv -1.536 dir +0.095 | manip(noise run) -0.0039
+  D=2 2026: noise +0.468 lat +0.000 tail -0.072 iv +0.336 orv -1.489 dir +0.070 | manip(noise run) -0.0053
+  D=5 2021: noise +0.994 lat +0.000 tail +0.062 iv +0.189 orv -1.195 dir +0.063 | manip(noise run) -0.0030
+  D=5 2022: noise +0.927 lat +0.000 tail -0.020 iv -0.026 orv -1.894 dir +0.083 | manip(noise run) -0.0130
+  D=5 2023: noise +1.028 lat +0.000 tail -0.089 iv -0.177 orv -1.839 dir +0.121 | manip(noise run) -0.0300
+  D=5 2024: noise +1.029 lat +0.000 tail +0.008 iv -0.035 orv -1.660 dir +0.067 | manip(noise run) -0.0146
+  D=5 2025: noise +0.968 lat +0.000 tail -0.049 iv -0.001 orv -1.761 dir +0.099 | manip(noise run) -0.0060
+  D=5 2026: noise +1.074 lat +0.000 tail -0.079 iv +0.282 orv -1.730 dir +0.069 | manip(noise run) -0.0093
+== {'chain': 'L2', 'kernel': 'normal', 'sig': 'rv_ewma', 'lam_block': 0.5}
+  D=2 2021: noise +0.427 lat +0.000 tail +1.061 iv +0.432 orv -1.725 dir +0.059 | manip(noise run) -0.0019
+  D=2 2022: noise +0.386 lat +0.000 tail -0.189 iv -0.007 orv -1.882 dir +0.074 | manip(noise run) -0.0092
+  D=2 2023: noise +0.434 lat +0.000 tail -0.414 iv -0.335 orv -1.817 dir +0.135 | manip(noise run) -0.0150
+  D=2 2024: noise +0.436 lat +0.000 tail +0.673 iv +0.387 orv -1.693 dir +0.061 | manip(noise run) -0.0075
+  D=2 2025: noise +0.387 lat +0.000 tail +0.359 iv +0.230 orv -1.865 dir +0.096 | manip(noise run) -0.0042
+  D=2 2026: noise +0.449 lat +0.000 tail -0.155 iv +0.295 orv -1.786 dir +0.069 | manip(noise run) -0.0050
+  D=5 2021: noise +0.976 lat +0.000 tail +1.158 iv +0.425 orv -1.893 dir +0.064 | manip(noise run) -0.0030
+  D=5 2022: noise +0.904 lat +0.000 tail -0.354 iv -0.034 orv -2.215 dir +0.082 | manip(noise run) -0.0110
+  D=5 2023: noise +0.949 lat +0.000 tail -0.544 iv -0.487 orv -1.990 dir +0.116 | manip(noise run) -0.0282
+  D=5 2024: noise +1.002 lat +0.000 tail +0.370 iv +0.238 orv -1.945 dir +0.066 | manip(noise run) -0.0141
+  D=5 2025: noise +0.948 lat +0.000 tail +0.220 iv +0.200 orv -2.067 dir +0.098 | manip(noise run) -0.0041
+  D=5 2026: noise +1.040 lat +0.000 tail -0.344 iv +0.114 orv -2.065 dir +0.070 | manip(noise run) -0.0067
+== {'chain': 'L2', 'kernel': 't', 'sig': 'rv_ewma', 'lam_block': 0.5}
+  D=2 2021: noise +0.423 lat +0.000 tail +0.303 iv +1.219 orv -1.315 dir +0.053 | manip(noise run) -0.0019
+  D=2 2022: noise +0.379 lat +0.000 tail +0.012 iv +0.160 orv -1.824 dir +0.071 | manip(noise run) -0.0091
+  D=2 2023: noise +0.427 lat +0.000 tail -0.211 iv -0.025 orv -1.558 dir +0.134 | manip(noise run) -0.0148
+  D=2 2024: noise +0.430 lat +0.000 tail +0.011 iv +0.069 orv -1.453 dir +0.058 | manip(noise run) -0.0076
+  D=2 2025: noise +0.381 lat +0.000 tail -0.132 iv +0.490 orv -1.686 dir +0.095 | manip(noise run) -0.0043
+  D=2 2026: noise +0.445 lat +0.000 tail -0.025 iv +0.782 orv -1.528 dir +0.064 | manip(noise run) -0.0059
+  D=5 2021: noise +0.946 lat +0.000 tail +0.306 iv +1.177 orv -1.512 dir +0.056 | manip(noise run) -0.0030
+  D=5 2022: noise +0.872 lat +0.000 tail -0.005 iv +0.036 orv -2.068 dir +0.078 | manip(noise run) -0.0115
+  D=5 2023: noise +0.922 lat +0.000 tail -0.220 iv -0.163 orv -1.777 dir +0.115 | manip(noise run) -0.0288
+  D=5 2024: noise +0.974 lat +0.000 tail +0.029 iv -0.068 orv -1.678 dir +0.062 | manip(noise run) -0.0145
+  D=5 2025: noise +0.919 lat +0.000 tail -0.140 iv +0.395 orv -1.938 dir +0.097 | manip(noise run) -0.0042
+  D=5 2026: noise +1.014 lat +0.000 tail -0.137 iv +0.762 orv -1.794 dir +0.060 | manip(noise run) -0.0061
+== {'chain': 'L1', 'kernel': 'normal', 'sig': 'modeA', 'lam_block': 0.1}
+  D=2 2021: noise +0.342 lat +0.000 tail +0.371 iv +0.756 orv -1.485 dir +0.065 | manip(noise run) -0.0019
+  D=2 2022: noise +0.304 lat +0.000 tail -0.696 iv +0.048 orv -1.786 dir +0.085 | manip(noise run) -0.0115
+  D=2 2023: noise +0.382 lat +0.000 tail -0.693 iv -0.482 orv -1.812 dir +0.132 | manip(noise run) -0.0130
+  D=2 2024: noise +0.347 lat +0.000 tail -0.312 iv -0.314 orv -1.625 dir +0.060 | manip(noise run) -0.0054
+  D=2 2025: noise +0.348 lat +0.000 tail -0.331 iv -0.140 orv -1.847 dir +0.093 | manip(noise run) -0.0068
+  D=2 2026: noise +0.376 lat +0.000 tail -0.431 iv -0.245 orv -1.778 dir +0.082 | manip(noise run) -0.0052
+  D=5 2021: noise +0.797 lat +0.000 tail +0.301 iv +0.647 orv -1.682 dir +0.070 | manip(noise run) -0.0030
+  D=5 2022: noise +0.715 lat +0.000 tail -0.772 iv -0.022 orv -2.017 dir +0.088 | manip(noise run) -0.0124
+  D=5 2023: noise +0.825 lat +0.000 tail -0.858 iv -0.552 orv -1.964 dir +0.128 | manip(noise run) -0.0329
+  D=5 2024: noise +0.817 lat +0.000 tail -0.430 iv -0.399 orv -1.864 dir +0.073 | manip(noise run) -0.0076
+  D=5 2025: noise +0.792 lat +0.000 tail -0.467 iv -0.231 orv -2.043 dir +0.095 | manip(noise run) -0.0103
+  D=5 2026: noise +0.882 lat +0.000 tail -0.504 iv -0.341 orv -2.027 dir +0.078 | manip(noise run) -0.0103

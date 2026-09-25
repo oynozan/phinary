@@ -1,0 +1,9 @@
+Thales trades: token-weighted mean(1{UP} - Thales odds) = +3.23 pp; unweighted +0.28 pp; net trader UP-equivalent tokens +790032 of gross 19901675
+   ETH: mean(1{UP} - odds) +7.74 pp, net UP tokens +325130
+   BTC: mean(1{UP} - odds) +4.96 pp, net UP tokens +365529
+   model edge at mid $-342382; of which from buyers of UP-equivalent $-492927, DOWN-equivalent $+150545
+1d markets IS 2021-23: mean(1{UP} - mid) +1.31 pp (day-clustered SE 0.83); ETH log return over period +113%
+1d markets OOS 2024-26: mean(1{UP} - mid) +0.55 pp (day-clustered SE 0.85); ETH log return over period +16%
+1d markets Thales era: mean(1{UP} - mid) +0.98 pp (day-clustered SE 1.06); ETH log return over period +44%
+1d markets 2022: mean(1{UP} - mid) -1.14 pp (day-clustered SE 1.50); ETH log return over period -113%
+1d markets 2024: mean(1{UP} - mid) +1.21 pp (day-clustered SE 1.42); ETH log return over period +38%

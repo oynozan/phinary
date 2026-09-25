@@ -1,0 +1,41 @@
+=== (a) E[((|X|-s)^+)^2] closed form vs MC ===
+v=0.0001 s=0.0: closed=1.0000e-04 MC=1.0006e-04
+v=0.0001 s=0.005: closed=4.1928e-05 MC=4.1964e-05
+v=0.0001 s=0.02: closed=1.1537e-06 MC=1.1516e-06
+v=4e-06 s=0.002: closed=6.0272e-07 MC=6.0113e-07
+
+=== (b) share of total quadratic variation in last fraction h/T (ATM, 1d, 12s blocks) ===
+last 1%: MC share=0.092  formula=0.090
+last 10%: MC share=0.286  formula=0.287
+last 25%: MC share=0.459  formula=0.460
+last 50%: MC share=0.666  formula=0.667
+
+=== (c1) spot-oracle manipulation: safe per-trade size q_safe = f * L*sqrt(S) * sigma*sqrt(tau) / n(d2) ===
+   (L*sqrt(S) ~= 200 * D1, D1 = USDC needed to move the underlying pool price by 1%, CPMM-in-range approximation)
+D1=$   1,000,000 fee=   5bp (sigma=0.8, ATM) q_safe tokens -> 7d:       27,770 | 1d:       10,496 | 1h:        2,143 | 5m:          618
+D1=$   1,000,000 fee=  30bp (sigma=0.8, ATM) q_safe tokens -> 7d:      166,623 | 1d:       62,977 | 1h:       12,855 | 5m:        3,711
+D1=$   5,000,000 fee=   5bp (sigma=0.8, ATM) q_safe tokens -> 7d:      138,852 | 1d:       52,481 | 1h:       10,713 | 5m:        3,092
+D1=$   5,000,000 fee=  30bp (sigma=0.8, ATM) q_safe tokens -> 7d:      833,113 | 1d:      314,887 | 1h:       64,276 | 5m:       18,555
+D1=$  20,000,000 fee=   5bp (sigma=0.8, ATM) q_safe tokens -> 7d:      555,408 | 1d:      209,925 | 1h:       42,851 | 5m:       12,370
+D1=$  20,000,000 fee=  30bp (sigma=0.8, ATM) q_safe tokens -> 7d:    3,332,451 | 1d:    1,259,548 | 1h:      257,104 | 5m:       74,220
+
+=== (c2) TWAP settlement manipulation, fee-band aware: C(delta) ~ L sqrt(S) [ f delta + (w/dt) (delta-f)^+ (delta+3f)/4 ] ===
+   (displacements inside the +-f no-arbitrage band are not reverted by arbitrageurs -> almost free)
+D1=$   1M f= 5bp w= 5m | d= 5bp/12s:          50 | d= 5bp/ 1s:          50 | d=10bp/12s:       1,662 | d=10bp/ 1s:      18,850 | d=50bp/12s:      37,063 | d=50bp/ 1s:     439,250
+D1=$   1M f= 5bp w=30m | d= 5bp/12s:          50 | d= 5bp/ 1s:          50 | d=10bp/12s:       9,475 | d=10bp/ 1s:     112,600 | d=50bp/12s:     219,875 | d=50bp/ 1s:   2,633,000
+D1=$   1M f=30bp w= 5m | d= 5bp/12s:         300 | d= 5bp/ 1s:         300 | d=10bp/12s:         600 | d=10bp/ 1s:         600 | d=50bp/12s:      38,000 | d=50bp/ 1s:     423,000
+D1=$   1M f=30bp w=30m | d= 5bp/12s:         300 | d= 5bp/ 1s:         300 | d=10bp/12s:         600 | d=10bp/ 1s:         600 | d=50bp/12s:     213,000 | d=50bp/ 1s:   2,523,000
+D1=$   5M f= 5bp w= 5m | d= 5bp/12s:         250 | d= 5bp/ 1s:         250 | d=10bp/12s:       8,312 | d=10bp/ 1s:      94,250 | d=50bp/12s:     185,313 | d=50bp/ 1s:   2,196,250
+D1=$   5M f= 5bp w=30m | d= 5bp/12s:         250 | d= 5bp/ 1s:         250 | d=10bp/12s:      47,375 | d=10bp/ 1s:     563,000 | d=50bp/12s:   1,099,375 | d=50bp/ 1s:  13,165,000
+D1=$   5M f=30bp w= 5m | d= 5bp/12s:       1,500 | d= 5bp/ 1s:       1,500 | d=10bp/12s:       3,000 | d=10bp/ 1s:       3,000 | d=50bp/12s:     190,000 | d=50bp/ 1s:   2,115,000
+D1=$   5M f=30bp w=30m | d= 5bp/12s:       1,500 | d= 5bp/ 1s:       1,500 | d=10bp/12s:       3,000 | d=10bp/ 1s:       3,000 | d=50bp/12s:   1,065,000 | d=50bp/ 1s:  12,615,000
+D1=$  20M f= 5bp w= 5m | d= 5bp/12s:       1,000 | d= 5bp/ 1s:       1,000 | d=10bp/12s:      33,250 | d=10bp/ 1s:     377,000 | d=50bp/12s:     741,250 | d=50bp/ 1s:   8,785,000
+D1=$  20M f= 5bp w=30m | d= 5bp/12s:       1,000 | d= 5bp/ 1s:       1,000 | d=10bp/12s:     189,500 | d=10bp/ 1s:   2,252,000 | d=50bp/12s:   4,397,500 | d=50bp/ 1s:  52,660,000
+D1=$  20M f=30bp w= 5m | d= 5bp/12s:       6,000 | d= 5bp/ 1s:       6,000 | d=10bp/12s:      12,000 | d=10bp/ 1s:      12,000 | d=50bp/12s:     760,000 | d=50bp/ 1s:   8,460,000
+D1=$  20M f=30bp w=30m | d= 5bp/12s:       6,000 | d= 5bp/ 1s:       6,000 | d=10bp/12s:      12,000 | d=10bp/ 1s:      12,000 | d=50bp/12s:   4,260,000 | d=50bp/ 1s:  50,460,000
+
+probability that the settlement statistic lands within +-delta of K (flip-able), ATM start: ~ 2 delta n(d2) / (sigma sqrt(T - 2w/3))
+T=1d delta=5bp: 0.0095
+T=1d delta=10bp: 0.0191
+T=7d delta=5bp: 0.0036
+T=7d delta=10bp: 0.0072

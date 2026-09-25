@@ -1,0 +1,29 @@
+  CPI: n=80 spike ratio median 3.2, share>2x 0.65 | mean excess var 4.25e-04 (= 2.06% move-equivalent) | median 1.44e-04 | walk-fwd J2 last 4.21e-04
+ FOMC: n=53 spike ratio median 4.3, share>2x 0.77 | mean excess var 5.49e-04 (= 2.34% move-equivalent) | median 2.33e-04 | walk-fwd J2 last 5.51e-04
+  ETF: n=4 spike ratio median 3.3, share>2x 0.75 | mean excess var 6.62e-04 (= 2.57% move-equivalent) | median 2.66e-04 | walk-fwd J2 last 5.62e-04
+  UPG: n=4 spike ratio median 5.4, share>2x 1.00 | mean excess var 3.64e-04 (= 1.91% move-equivalent) | median 1.06e-04 | walk-fwd J2 last 5.29e-04
+  weak CPI spike 2020-01-14 13:30:00+00:00 0.65
+  weak CPI spike 2020-03-11 12:30:00+00:00 0.69
+  weak CPI spike 2020-04-10 12:30:00+00:00 0.72
+  weak CPI spike 2020-05-12 12:30:00+00:00 0.33
+  weak CPI spike 2020-06-10 12:30:00+00:00 0.31
+  weak CPI spike 2020-07-14 12:30:00+00:00 1.12
+  weak CPI spike 2020-08-12 12:30:00+00:00 0.3
+  weak CPI spike 2020-09-11 12:30:00+00:00 1.03
+  weak CPI spike 2020-10-13 12:30:00+00:00 0.75
+  weak CPI spike 2020-11-12 13:30:00+00:00 0.39
+  weak CPI spike 2021-02-10 13:30:00+00:00 1.49
+  weak CPI spike 2021-03-10 13:30:00+00:00 1.02
+  weak CPI spike 2021-04-13 12:30:00+00:00 0.27
+  weak CPI spike 2021-05-12 12:30:00+00:00 0.23
+  weak CPI spike 2021-06-10 12:30:00+00:00 0.42
+  weak CPI spike 2021-08-11 12:30:00+00:00 0.41
+  weak CPI spike 2021-10-13 12:30:00+00:00 0.47
+  weak CPI spike 2021-11-10 13:30:00+00:00 1.35
+  weak CPI spike 2022-03-10 13:30:00+00:00 1.15
+  weak CPI spike 2024-12-11 13:30:00+00:00 1.21
+  weak CPI spike 2025-03-12 12:30:00+00:00 1.48
+  weak CPI spike 2025-06-11 12:30:00+00:00 0.57
+  weak CPI spike 2025-10-24 12:30:00+00:00 0.25
+  weak CPI spike 2026-02-13 13:30:00+00:00 1.13
+  weak CPI spike 2026-04-10 12:30:00+00:00 1.02

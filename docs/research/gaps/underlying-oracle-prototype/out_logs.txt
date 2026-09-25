@@ -1,0 +1,62 @@
+  sigma_hat^2 / sigma^2 (1 day, through PoolManager): 1.022700848141959487
+  blocks where slot0.tick = target - 1 (Pool.sol:431 edge): 8
+  [no write yet in block] sobTick: 13827
+  [no write yet in block] sobSqrtPriceX96: 11412
+  [no write yet in block] cumulativeNow: 13926
+  [no write yet in block] cumulativeAtGrid(ring): 9137
+  [no write yet] varianceE36(12) ring end: 13977
+  [written this block] sobTick: 8272
+  [written this block] sobSqrtPriceX96: 5846
+  [written this block] cumulativeNow: 8063
+  [written this block] varianceE36(12): 13977
+  [written this block] varianceE36(24): 13977
+  sigma_hat^2 / sigma^2 (1 day, through PoolManager): 1.022700848141959487
+  blocks where slot0.tick = target - 1 (Pool.sol:431 edge): 8
+  [no write yet in block] sobTick: 13827
+  [no write yet in block] sobSqrtPriceX96: 11412
+  [no write yet in block] cumulativeNow: 13926
+  [no write yet in block] cumulativeAtGrid(ring): 9137
+  [no write yet] varianceE36(12) ring end: 13977
+  [written this block] sobTick: 8272
+  [written this block] sobSqrtPriceX96: 5846
+  [written this block] cumulativeNow: 8063
+  [written this block] varianceE36(12): 13977
+  [written this block] varianceE36(24): 13977
+  raw ratio: 0.924409994117708908
+  corrected ratio: 0.976969994117708908
+  raw ratio: 0.939389316685599708
+  corrected ratio: 0.991949316685599708
+  raw ratio: 0.962542116808402348
+  corrected ratio: 1.015102116808402348
+  sigma_hat^2/sigma^2: 1.003550502811734968
+  sigma_hat^2/sigma^2: 0.997939617495301560
+  sigma_hat^2/sigma^2: 1.043987576479523464
+  sigma_hat^2/sigma^2: 1.035205300867079980
+  sigma_hat^2/sigma^2: 1.015087312525460132
+  sigma_hat^2/sigma^2: 1.008703550194336336
+  pooled ratio: 1.017412310062239406
+  checkpoints written by first poke: 87
+  window differences measured: 85
+  sigma_hat^2 annual (TWAP-return, H=300, raw): 0.533184551689687042
+  hours covered: 7
+  fork block: 26055331
+  raw slot0 tick: 197332
+  normalized SoB tick: -197332
+  last v3 write: 1790349731
+  raw slot0 tick after 3000 WETH dump: 198517
+  adapter sobTick (no v3 write this block): 12908
+  adapter cumulativeNow (observe([0])): 16807
+  adapter cumulativeAtGrid: 5654
+  adapter varianceE36: 11281
+  adapter sobTick (v3 wrote this block): 16710
+  poke gas: 119321
+  poke checkpoints: 1
+  checkpoints written by first poke: 87
+  window differences measured: 85
+  sigma_hat^2 annual (TWAP-return, H=300, raw): 0.533184551689687042
+  hours covered: 7
+  fork block: 26055331
+  raw slot0 tick: 197332
+  normalized SoB tick: -197332
+  last v3 write: 1790349731
+  raw slot0 tick after 3000 WETH dump: 198517

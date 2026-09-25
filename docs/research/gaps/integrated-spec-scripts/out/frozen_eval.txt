@@ -1,0 +1,20 @@
+== L1 t lam 0.5 M2 0.096 B/series
+  D=1 strict+M2 OOS: edge +0.090 B ($+1,807)/series | ann +33% LB95 +25% | wk sd 1.26% CVaR95 2.84% CVaR99 5.65% maxDD 8.1% worst 8.08% P(lose) 0.19 | years 2021:+48% 2022:+34% 2023:+14% 2024:+47% 2025:+21% 2026:+27% | E5 (+orv) ann -481% LB95 -526%
+  D=2 strict+M2 OOS: edge +0.305 B ($+6,097)/series | ann +111% LB95 +102% | wk sd 1.34% CVaR95 1.39% CVaR99 3.32% maxDD 4.8% worst 4.84% P(lose) 0.06 | years 2021:+124% 2022:+102% 2023:+85% 2024:+128% 2025:+92% 2026:+107% | E5 (+orv) ann -441% LB95 -489%
+  D=5 strict+M2 OOS: edge +0.875 B ($+17,491)/series | ann +317% LB95 +268% | wk sd 7.29% CVaR95 7.95% CVaR99 12.65% maxDD 15.9% worst 13.92% P(lose) 0.10 | years 2021:+321% 2022:+287% 2023:+258% 2024:+323% 2025:+298% 2026:+320% | E5 (+orv) ann -336% LB95 -417%
+  E5 D*_stress strict+M2: IS inf OOS inf
+== L2 t lam 0.5 M2 0.072 B/series
+  D=1 strict+M2 OOS: edge +0.090 B ($+1,796)/series | ann +33% LB95 +17% | wk sd 1.88% CVaR95 4.66% CVaR99 6.04% maxDD 20.0% worst 6.39% P(lose) 0.20 | years 2021:+53% 2022:+43% 2023:-16% 2024:+52% 2025:-4% 2026:+55% | E5 (+orv) ann -492% LB95 -545%
+  D=2 strict+M2 OOS: edge +0.289 B ($+5,784)/series | ann +105% LB95 +85% | wk sd 2.64% CVaR95 4.03% CVaR99 5.41% maxDD 7.1% worst 5.90% P(lose) 0.18 | years 2021:+125% 2022:+110% 2023:+65% 2024:+129% 2025:+63% 2026:+124% | E5 (+orv) ann -460% LB95 -516%
+  D=5 strict+M2 OOS: edge +0.780 B ($+15,607)/series | ann +283% LB95 +246% | wk sd 5.58% CVaR95 6.63% CVaR99 18.09% maxDD 20.5% worst 20.52% P(lose) 0.05 | years 2021:+312% 2022:+284% 2023:+205% 2024:+300% 2025:+253% 2026:+287% | E5 (+orv) ann -354% LB95 -431%
+  E5 D*_stress strict+M2: IS inf OOS inf
+== L1 normal lam 0.1 M2 0.096 B/series
+  D=1 strict+M2 OOS: edge +0.013 B ($+251)/series | ann +5% LB95 -52% | wk sd 9.97% CVaR95 17.03% CVaR99 20.81% maxDD 144.9% worst 20.90% P(lose) 0.40 | years 2021:+30% 2022:-154% 2023:-166% 2024:+30% 2025:+7% 2026:-33% | E5 (+orv) ann -679% LB95 -759%
+  D=2 strict+M2 OOS: edge +0.131 B ($+2,628)/series | ann +48% LB95 -10% | wk sd 10.15% CVaR95 17.03% CVaR99 20.97% maxDD 112.8% worst 21.74% P(lose) 0.35 | years 2021:+89% 2022:-80% 2023:-135% 2024:+92% 2025:+42% 2026:-8% | E5 (+orv) ann -695% LB95 -777%
+  D=5 strict+M2 OOS: edge +0.528 B ($+10,568)/series | ann +192% LB95 +129% | wk sd 10.72% CVaR95 16.48% CVaR99 20.93% maxDD 42.3% worst 21.95% P(lose) 0.29 | years 2021:+252% 2022:+34% 2023:-56% 2024:+262% 2025:+178% 2026:+105% | E5 (+orv) ann -706% LB95 -798%
+  E5 D*_stress strict+M2: IS inf OOS inf
+== L2 normal lam 0.5 M2 0.072 B/series
+  D=1 strict+M2 OOS: edge +0.119 B ($+2,378)/series | ann +43% LB95 +8% | wk sd 6.44% CVaR95 14.49% CVaR99 20.49% maxDD 38.8% worst 21.19% P(lose) 0.18 | years 2021:+54% 2022:-4% 2023:-132% 2024:+53% 2025:+44% 2026:+27% | E5 (+orv) ann -578% LB95 -648%
+  D=2 strict+M2 OOS: edge +0.308 B ($+6,169)/series | ann +112% LB95 +73% | wk sd 6.55% CVaR95 14.18% CVaR99 20.48% maxDD 35.4% worst 21.00% P(lose) 0.13 | years 2021:+127% 2022:+56% 2023:-96% 2024:+131% 2025:+113% 2026:+79% | E5 (+orv) ann -558% LB95 -633%
+  D=5 strict+M2 OOS: edge +0.829 B ($+16,575)/series | ann +301% LB95 +263% | wk sd 6.20% CVaR95 10.13% CVaR99 14.52% maxDD 14.9% worst 14.90% P(lose) 0.10 | years 2021:+323% 2022:+188% 2023:+23% 2024:+334% 2025:+314% 2026:+222% | E5 (+orv) ann -493% LB95 -572%
+  E5 D*_stress strict+M2: IS inf OOS inf

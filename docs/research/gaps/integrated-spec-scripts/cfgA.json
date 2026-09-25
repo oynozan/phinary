@@ -1,0 +1,1 @@
+[{"sig": "modeA", "kernel": "normal"}, {"sig": "modeA", "kernel": "t"}, {"sig": "modeB3", "kernel": "normal"}, {"sig": "modeB3", "kernel": "t"}, {"sig": "modeB1", "kernel": "normal"}, {"sig": "modeB1", "kernel": "t"}, {"sig": "ewma_live", "kernel": "normal"}, {"sig": "ewma_live", "kernel": "t"}, {"sig": "ewma_fixed", "kernel": "normal"}, {"sig": "ewma_fixed", "kernel": "t"}]

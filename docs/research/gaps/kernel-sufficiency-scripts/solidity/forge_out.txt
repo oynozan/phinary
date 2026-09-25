@@ -1,0 +1,91 @@
+[PASS] testFuzz_monotone(int256,int256) (runs: 100000, μ: 8125, ~: 7326)
+[PASS] testFuzz_monotone_hp(int256,int256) (runs: 100000, μ: 7391, ~: 6501)
+[PASS] testFuzz_symmetry(int256) (runs: 100000, μ: 5496, ~: 3791)
+[PASS] test_diff_cdf4() (gas: 131496979)
+  == t nu=4 variance-matched CDF
+     n / max abs err (1e-24 units): 29306 999304
+     at d (WAD): 682569018865358
+     gas min/avg/max: 2483 3044 3406
+[PASS] test_diff_cdf4hp() (gas: 134862669)
+  == t nu=4 CDF, hp variant
+     n / max abs err (1e-24 units): 29306 999971
+     at d (WAD): -7950000000000000000
+     gas min/avg/max: 2483 3159 3522
+[PASS] test_diff_cdf5() (gas: 151302797)
+  == t nu=5 variance-matched CDF (atan)
+     n / max abs err (1e-24 units): 29306 1010037
+     at d (WAD): -6534000000000000000
+     gas min/avg/max: 2483 3720 4056
+[PASS] test_diff_cdf6() (gas: 133244865)
+  == t nu=6 variance-matched CDF
+     n / max abs err (1e-24 units): 29306 999271
+     at d (WAD): 304346180033431
+     gas min/avg/max: 2483 3104 3133
+[PASS] test_diff_cdf6hp() (gas: 134424674)
+  == t nu=6 CDF, hp variant
+     n / max abs err (1e-24 units): 29306 999911
+     at d (WAD): -11086000000000000000
+     gas min/avg/max: 2483 3144 3174
+[PASS] test_diff_hart() (gas: 130851053)
+  == normal Phi, Hart/West (reference point)
+     n / max abs err (1e-24 units): 29306 41973672
+     at d (WAD): -20000000000000000
+     gas min/avg/max: 2472 3015 3306
+[PASS] test_diff_overhead() (gas: 79907782)
+  == identity (harness overhead)
+     n / max abs err (1e-24 units): 29306 0
+     at d (WAD): 0
+     gas min/avg/max: 2330 2330 2330
+[PASS] test_diff_pdf4() (gas: 128212305)
+  == t nu=4 density
+     n / max abs err (1e-24 units): 29306 999954
+     at d (WAD): -7422000000000000000
+     gas min/avg/max: 2449 2906 2934
+[PASS] test_diff_pdf5() (gas: 122141620)
+  == t nu=5 density
+     n / max abs err (1e-24 units): 29306 999992
+     at d (WAD): -11419000000000000000
+     gas min/avg/max: 2449 2698 2726
+[PASS] test_diff_pdf6() (gas: 129525019)
+  == t nu=6 density
+     n / max abs err (1e-24 units): 29306 1000000
+     at d (WAD): 1
+     gas min/avg/max: 2449 2951 2979
+[PASS] test_grid_monotone() (gas: 783682010)
+  grid 1e-4 on [-12,12], 240000 steps; violations nu4/5/6: 0 0 0
+[PASS] test_saturation_edges() (gas: 98479)
+[PASS] test_scan_cdf4() (gas: 800811410)
+  scan cdf4 on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 1185 1
+    at d: 3809814937580364650
+[PASS] test_scan_cdf4hp() (gas: 893450259)
+  scan cdf4hp on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+[PASS] test_scan_cdf5() (gas: 1355509151)
+  scan cdf5 on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+[PASS] test_scan_cdf6() (gas: 857919133)
+  scan cdf6 on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 2781 1
+    at d: 3809814937580364809
+[PASS] test_scan_cdf6hp() (gas: 890248615)
+  scan cdf6hp on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+[PASS] test_scan_hart() (gas: 826320688)
+  scan Hart Phi on [-12,12]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+[PASS] test_scan_wide() (gas: 3327855854)
+  scan cdf4hp on [-4e4,4e4]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+  scan cdf5 on [-6e3,6e3]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+  scan cdf6hp on [-2e3,2e3]
+    consecutive-wei pairs 800000, violations / worst decrease (wei): 0 0
+    at d: 0
+Suite result: ok. 22 passed; 0 failed; 0 skipped; finished in 65.17s (303.84s CPU time)

@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+test = "test"
+libs = ["lib"]
+solc = "/private/tmp/claude-501/-Users-oynozan-Desktop-Dev-Web3-UniswapPrediction/1b01c4fe-2032-47bf-9776-990202883598/scratchpad/foundry-bin/solc-0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 44444444
+via_ir = true
+dynamic_test_linking = false
+remappings = [
+  "forge-std/=lib/forge-std/src/",
+  "solmate/=lib/solmate/",
+  "v4-core/=lib/v4-core/",
+  "@uniswap/v4-core/=lib/v4-core/",
+  "v4-periphery/=lib/v4-periphery/",
+]
+[invariant]
+runs = 64
+depth = 64
+fail_on_revert = false

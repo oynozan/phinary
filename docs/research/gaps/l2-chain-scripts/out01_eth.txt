@@ -1,0 +1,22 @@
+=== eth: 15747 swaps, 8704 swap blocks, 8704 distinct swap timestamps, span 49.6 h, Delta = 12 s ===
+  y_v (virtual USDC reserve in active range) over swaps: mean $151.6M, median $152.1M, harmonic $151.4M, p5 $147.8M, p95 $153.4M
+  USDC volume $119M over span -> $58M/day; swaps/day 7,623
+  grid slots 14854; Binance 12-s return sd 3.19 bp -> sigma 0.517
+  basis (USDC/USDT etc.) mean -1.38 bp; de-meaned deviation sd 3.67 bp; |e|<=f 85.6%; |e|<=2f 99.6%; p1/p99 -6.9/7.2 bp
+  slot-to-slot oracle-sample moves: up 26.9%, down 31.6%, none 41.5%
+  lead-lag corr(pool Delta-return, Binance Delta-return lagged L s; L>0: Binance earlier):
+    L=-4:+0.415  L=-2:+0.492  L=-1:+0.529  L=+0:+0.544  L=+1:+0.536  L=+2:+0.488  L=+3:+0.473  L=+4:+0.445  L=+6:+0.399  L=+8:+0.325  L=+12:+0.249  L=+24:+0.133  L=+36:+0.084  L=+60:+0.055
+  same, 12 s returns: L=-12:+0.047  L=+0:+0.544  L=+12:+0.249  L=+24:+0.133  L=+36:+0.084  L=+60:+0.055
+    beta(pool 12s return on same-interval Binance return) = 0.447
+    beta(pool 12s return on same-interval Binance return) = 0.447
+    beta(pool 60s return on same-interval Binance return) = 0.725
+  SoB oracle error SD vs Binance, by oracle age (basis removed with 1 h rolling median):
+    age  0s: sd 3.67 bp, |.|>5bp 14.4%
+    age  1s: sd 3.76 bp, |.|>5bp 15.7%
+    age  2s: sd 3.86 bp, |.|>5bp 16.6%
+    age  4s: sd 4.08 bp, |.|>5bp 19.4%
+    age  6s: sd 4.29 bp, |.|>5bp 21.4%
+    age 12s: sd 4.85 bp, |.|>5bp 25.4%
+    age 60s: sd 8.11 bp, |.|>5bp 42.7%
+  pool vs 5 bp band-follower of Binance (1 s arbs): tracking error sd 2.17 bp
+  gaps between distinct swap timestamps: median 12s p90 36s p99 84s max 264s

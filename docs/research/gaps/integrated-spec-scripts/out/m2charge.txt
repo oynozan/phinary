@@ -1,0 +1,18 @@
+L1 w= 30m sigma 0.40 sd_G  21.3bp | Q=$10k net 14.77% gross 20.92% | Q=$40k net 27.53% gross 41.05% | Q=$100k net 41.00% gross 62.13%
+L1 w= 30m sigma 0.55 sd_G  29.3bp | Q=$10k net 10.84% gross 15.34% | Q=$40k net 20.33% gross 30.57% | Q=$100k net 31.70% gross 47.78%
+L1 w= 30m sigma 0.80 sd_G  42.6bp | Q=$10k net 7.50% gross 10.61% | Q=$40k net 14.14% gross 21.27% | Q=$100k net 22.47% gross 34.05%
+L1 w=120m sigma 0.40 sd_G  37.0bp | Q=$10k net 5.03% gross 6.81% | Q=$40k net 8.61% gross 12.27% | Q=$100k net 13.01% gross 19.18%
+L1 w=120m sigma 0.55 sd_G  50.8bp | Q=$10k net 3.67% gross 5.02% | Q=$40k net 6.31% gross 8.96% | Q=$100k net 9.49% gross 14.04%
+L1 w=120m sigma 0.80 sd_G  73.9bp | Q=$10k net 2.54% gross 3.47% | Q=$40k net 4.36% gross 6.22% | Q=$100k net 6.57% gross 9.67%
+L1 w=240m sigma 0.40 sd_G  50.8bp | Q=$10k net 2.87% gross 3.94% | Q=$40k net 4.76% gross 6.57% | Q=$100k net 6.93% gross 10.02%
+L1 w=240m sigma 0.55 sd_G  69.9bp | Q=$10k net 2.10% gross 2.87% | Q=$40k net 3.48% gross 4.78% | Q=$100k net 5.06% gross 7.29%
+L1 w=240m sigma 0.80 sd_G 101.7bp | Q=$10k net 1.47% gross 2.03% | Q=$40k net 2.41% gross 3.35% | Q=$100k net 3.50% gross 5.02%
+L2 w= 30m sigma 0.40 sd_G  21.4bp | Q=$10k net 11.33% gross 14.52% | Q=$40k net 18.21% gross 25.74% | Q=$100k net 27.16% gross 40.34%
+L2 w= 30m sigma 0.55 sd_G  29.4bp | Q=$10k net 8.28% gross 10.61% | Q=$40k net 13.35% gross 18.84% | Q=$100k net 20.05% gross 30.01%
+L2 w= 30m sigma 0.80 sd_G  42.7bp | Q=$10k net 5.72% gross 7.29% | Q=$40k net 9.21% gross 13.10% | Q=$100k net 13.95% gross 20.92%
+L2 w=120m sigma 0.40 sd_G  37.0bp | Q=$10k net 4.77% gross 5.74% | Q=$40k net 6.57% gross 8.48% | Q=$100k net 8.79% gross 12.03%
+L2 w=120m sigma 0.55 sd_G  50.9bp | Q=$10k net 3.49% gross 4.18% | Q=$40k net 4.79% gross 6.22% | Q=$100k net 6.44% gross 8.84%
+L2 w=120m sigma 0.80 sd_G  74.0bp | Q=$10k net 2.42% gross 2.87% | Q=$40k net 3.31% gross 4.30% | Q=$100k net 4.45% gross 6.10%
+L2 w=240m sigma 0.40 sd_G  50.9bp | Q=$10k net 2.95% gross 3.82% | Q=$40k net 4.03% gross 4.90% | Q=$100k net 5.12% gross 6.69%
+L2 w=240m sigma 0.55 sd_G  69.9bp | Q=$10k net 2.16% gross 2.75% | Q=$40k net 2.95% gross 3.59% | Q=$100k net 3.74% gross 4.90%
+L2 w=240m sigma 0.80 sd_G 101.7bp | Q=$10k net 1.52% gross 1.91% | Q=$40k net 2.05% gross 2.51% | Q=$100k net 2.59% gross 3.35%

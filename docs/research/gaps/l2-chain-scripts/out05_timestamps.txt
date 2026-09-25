@@ -1,0 +1,9 @@
+Arbitrum contiguous sample: blocks 508,793,894..508,805,893 (12000 blocks), ts span 3070 s -> 3.91 blocks/s
+  blocks sharing one timestamp: 1:0.0%, 2:0.1%, 3:10.3%, 4:89.3%, 5:0.0%, 8:0.1%, 9:0.1%, 10:0.0%, 11:0.0%; mean 3.91
+  gaps between successive distinct timestamps: 1s:3070
+  monotone non-decreasing: True
+  txs per block: median 6, mean 7.5; baseFee median 0.0200 gwei
+  block.number (= L1 block number) distinct values 198 over 3070 s -> advances every 15.5 s on average; L2 blocks per block.number value: median 59, max 122
+  block.number increments: +1:141, +2:56
+  L2 timestamp of first L2 block that reports block.number = N, minus L1 timestamp of N: median 9 s, min 3 s, max 24 s  (n=66)
+Arbitrum swap blocks: 23679; distinct swap timestamps 16998

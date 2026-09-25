@@ -1,0 +1,21 @@
+A ladder-min O(n) vs brute force: 20000 random ladders (n<=30), mismatches=0
+  union bound LB1<=exact always; mean slack exact-LB1 = 1564066 units
+B aligned ladder (vault sold YES at every strike): p = [0.996, 0.89, 0.483, 0.117, 0.013]
+  per-market worst loss = [410, 11001, 51657, 88270, 98732] (each <= q)
+  sum per-market = 250070; exact ladder loss D-min W = 250070 at region 5 (S>K_n)
+  traders long the range (5000,5500]: vault sold YES@K<=5000 and NO@K>=5500: sum per-market=76066, exact=76066 region 3
+  offsetting: vault sold NO@K<=4500 and YES@K>=5000 (trader positions cannot all win): sum per-market=427248, exact=227248 region 5
+C sequential pro-rata: 20000 random claim orders: sum(payouts)==final cash exactly, remaining pps non-decreasing; max |payout-fair| = 5.86 units
+D inflation [naive balanceOf, no offset]: attacker 1 unit + donate 10k USDC, victim 9,999.999999 USDC -> attacker P&L +9999.999999 USDC, victim loss 9999.999999 USDC
+D inflation [OZ virtual offset 0]: attacker 1 unit + donate 10k USDC, victim 9,999.999999 USDC -> attacker P&L -3333.333334 USDC, victim loss 3333.333332 USDC
+D inflation [OZ virtual offset 6]: attacker 1 unit + donate 10k USDC, victim 9,999.999999 USDC -> attacker P&L -4999.998751 USDC, victim loss 0.002499 USDC
+D inflation [internal ledger, 1:1 subscription]: attacker 1 unit + donate 10k USDC, victim 9,999.999999 USDC -> attacker P&L +0.000000 USDC, victim loss 0.000000 USDC
+E ATM digital tau=168h: dP/dlnS=4.80; 0.5% spot push moves 200k-unit net inventory by $4,797 = 0.5% of a $1M NAV
+E ATM digital tau=24h: dP/dlnS=12.70; 0.5% spot push moves 200k-unit net inventory by $12,701 = 1.3% of a $1M NAV
+E ATM digital tau=1h: dP/dlnS=62.23; 0.5% spot push moves 200k-unit net inventory by $62,231 = 6.2% of a $1M NAV
+  push 0.5% on V=$10,000,000 virtual liquidity, fee 5bp: round-trip fee cost ~ $25
+  push 0.5% on V=$10,000,000 virtual liquidity, fee 30bp: round-trip fee cost ~ $150
+  push 0.5% on V=$100,000,000 virtual liquidity, fee 5bp: round-trip fee cost ~ $250
+  push 0.5% on V=$100,000,000 virtual liquidity, fee 30bp: round-trip fee cost ~ $1,500
+F per-market form: max_o loss_m <= B_m  <=>  pnlCash_m + min(invY,invN) >= c_m - B_m (10k random cases); with c_m=0 and netting this is U0-U<=B_m
+G random two-sided flow, 9 strikes, 200 trades: exact worst-case loss / union bound: median 0.44, p10 0.17, p90 0.78 (n=1999)

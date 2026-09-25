@@ -1,0 +1,11 @@
+No files changed, compilation skipped
+
+
+
+
+
+
+Running 1 tests for test/QuoteHalmos.t.sol:QuoteHalmos
+[33m[TIMEOUT][0m check_lemmaS_sell_abstract(uint256,uint256,uint256,uint256) (paths: 23, time: 1801.03s, bounds: [])
+[36mTimeout queries saved in: /var/folders/dz/ynf4v1s13xb19q6w4f23xft80000gn/T/check_lemmaS_sell_abstract-y_rq_0le-timeout[0m
+Symbolic test result: 0 passed; 1 failed; time: 1801.07s

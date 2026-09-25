@@ -1,0 +1,16 @@
+=== arb (Delta 1 s, 181418 slots) ===
+  excess    1-    5 bp: n=  2017 (1.11%)  remaining excess median/mean  h=  1s:1.00/0.86  h=  2s:0.99/0.81  h= 12s:0.53/0.55  h= 30s:0.07/0.38  h= 60s:0.00/0.29  h=120s:0.00/0.18
+  excess    5-   20 bp: n=    27 (0.01%)  remaining excess median/mean  h=  1s:0.00/0.65  h=  2s:0.00/0.83  h= 12s:0.00/1.06  h= 30s:0.00/0.80  h= 60s:0.00/2.64  h=120s:0.00/4.95
+  excess   20-10000 bp: n=   420 (0.23%)  remaining excess median/mean  h=  1s:1.00/0.97  h=  2s:1.00/0.96  h= 12s:0.98/0.96  h= 30s:0.91/0.95  h= 60s:0.68/0.90  h=120s:0.32/0.82
+=== arb_ex (Delta 1 s, 181418 slots) ===
+  excess    1-    5 bp: n=  1726 (0.95%)  remaining excess median/mean  h=  1s:1.00/0.85  h=  2s:0.99/0.81  h= 12s:0.57/0.56  h= 30s:0.07/0.40  h= 60s:0.00/0.30  h=120s:0.00/0.19
+  excess    5-   20 bp: n=    17 (0.01%)  remaining excess median/mean  h=  1s:0.00/0.04  h=  2s:0.00/0.00  h= 12s:0.00/0.03  h= 30s:0.00/0.02  h= 60s:0.00/0.01  h=120s:0.00/0.00
+  excess   20-10000 bp: n=     2 (0.00%)  remaining excess median/mean  h=  1s:0.00/0.00  h=  2s:0.00/0.00  h= 12s:0.00/0.00  h= 30s:0.00/0.00  h= 60s:0.00/0.00  h=120s:0.00/0.00
+=== base7 (Delta 2 s, 302398 slots) ===
+  excess    1-    5 bp: n= 10188 (3.37%)  remaining excess median/mean  h=  2s:0.29/0.51  h=  4s:0.08/0.42  h= 12s:0.00/0.27  h= 30s:0.00/0.18  h= 60s:0.00/0.13  h=120s:0.00/0.09
+  excess    5-   20 bp: n=   410 (0.14%)  remaining excess median/mean  h=  2s:0.00/0.15  h=  4s:0.00/0.11  h= 12s:0.00/0.07  h= 30s:0.00/0.04  h= 60s:0.00/0.03  h=120s:0.00/0.03
+  excess   20-10000 bp: n=     3 (0.00%)  remaining excess median/mean  h=  2s:0.00/0.02  h=  4s:0.00/0.00  h= 12s:0.00/0.01  h= 30s:0.00/0.00  h= 60s:0.00/0.00  h=120s:0.00/0.00
+=== eth (Delta 12 s, 14854 slots) ===
+  excess    1-    5 bp: n=   751 (5.06%)  remaining excess median/mean  h= 12s:0.02/0.39  h= 12s:0.02/0.39  h= 12s:0.02/0.39  h= 30s:0.00/0.27  h= 60s:0.00/0.16  h=120s:0.00/0.13
+  excess    5-   20 bp: n=    49 (0.33%)  remaining excess median/mean  h= 12s:0.00/0.22  h= 12s:0.00/0.22  h= 12s:0.00/0.22  h= 30s:0.00/0.03  h= 60s:0.00/0.02  h=120s:0.00/0.05
+  excess   20-10000 bp: n=     8 (0.05%)  remaining excess median/mean  h= 12s:0.00/0.13  h= 12s:0.00/0.13  h= 12s:0.00/0.13  h= 30s:0.00/0.00  h= 60s:0.00/0.07  h=120s:0.00/0.00

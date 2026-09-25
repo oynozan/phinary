@@ -1,0 +1,3 @@
+Thales LP era 2023-05-09..2025-02-04 lat +0.0000(vol 0.00) tail -0.0008(vol 0.19) iv -0.0014(vol 0.10) orv -0.0023(vol 0.46) dir +0.1123(vol 3.63) jump -0.0008(vol 0.18) drift +0.0000(vol 0.00) noise +0.0186(vol 0.67)
+OOS 2024-01..2026-09 lat +0.0000(vol 0.00) tail -0.0004(vol 0.19) iv -0.0013(vol 0.11) orv -0.0025(vol 0.43) dir +0.1023(vol 3.47) jump -0.0008(vol 0.18) drift +0.0000(vol 0.00) noise +0.0186(vol 0.64)
+FULL lat +0.0000(vol 0.00) tail +0.0019(vol 0.18) iv -0.0002(vol 0.10) orv -0.0075(vol 0.51) dir +0.1033(vol 3.47) jump +0.0016(vol 0.18) drift +0.0000(vol 0.00) noise +0.0192(vol 0.65)

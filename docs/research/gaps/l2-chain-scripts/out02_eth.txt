@@ -1,0 +1,22 @@
+Installed 5 packages in 55ms
+=== eth: Delta=12s, n_w(30m)=150, y_v=$151.4M, realised sigma at Delta = 0.517, 196 real windows ===
+  s/f shift bp     real $  GBM0.52 $ kappa_real kappa_gbm
+ 0.25     0.61         11         14      0.132     0.163
+ 0.50     1.24         43         55      0.123     0.158
+ 1.00     2.51        166        217      0.116     0.154
+ 1.50     3.79        399        534      0.123     0.168
+ 2.00     5.04        900      1,178      0.156     0.208
+ 2.50     7.54      3,497      3,598      0.271     0.282
+ 3.50    12.54     11,775     11,744      0.330     0.331
+ 4.50    17.54     23,099     23,089      0.330     0.332
+
+C(delta) $ (real-path replay; GBM sigma 0.52 in brackets)
+     w                2.5bp                5.0bp               10.0bp               25.0bp
+  30m         165 [     220]        883 [   1,179]      7,154 [   7,205]     45,306 [  45,453]
+ 120m         661 [     880]      3,530 [   4,718]     28,616 [  28,819]    181,222 [ 181,811]
+ 240m       1,321 [   1,761]      7,060 [   9,435]     57,231 [  57,638]    362,444 [ 363,622]
+
+Q_safe $ (binary / ramp h=25bp / ramp h=100bp), committed attacker, spread 1c, sigma_G at 0.52; real-path curve [GBM curve]
+  w= 30m sd_G= 27.8bp k_w(real)=3.08e+09/log^2  closed form 8*pi*s*k_w*sd^2 = 5,966  |       5,618 [      7,241]        7,576 [      9,808]       45,015 [     61,665]
+  w=120m sd_G= 48.1bp k_w(real)=1.23e+10/log^2  closed form 8*pi*s*k_w*sd^2 = 71,588  |      61,618 [     82,124]       67,231 [     89,605]      195,514 [    268,545]
+  w=240m sd_G= 66.1bp k_w(real)=2.46e+10/log^2  closed form 8*pi*s*k_w*sd^2 = 270,442  |     249,238 [    340,305]      260,226 [    355,308]      496,894 [    688,796]

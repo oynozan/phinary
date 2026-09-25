@@ -1,0 +1,3 @@
+arb: price $2,670.21, L 3.263e+18, y_v $168.6M, cardinality 9000, ring span 46.9 h (oldest 2026-09-23 16:56 UTC), observations per hour 192
+base: price $2,670.24, L 1.302e+18, y_v $67.3M, cardinality 5000, ring span 26.4 h (oldest 2026-09-24 13:28 UTC), observations per hour 189
+eth: price $2,671.11, L 3.004e+18, y_v $155.3M, cardinality 723, ring span 6.9 h (oldest 2026-09-25 08:57 UTC), observations per hour 105

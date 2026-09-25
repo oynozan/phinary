@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+test = "test"
+libs = ["lib"]
+solc = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 44444444
+via_ir = true
+remappings = [
+  "forge-std/=lib/forge-std/src/",
+  "solmate/=lib/solmate/",
+  "v4-core/=lib/v4-core/",
+  "@uniswap/v4-core/=lib/v4-core/",
+  "v4-periphery/=lib/v4-periphery/",
+]
+[invariant]
+runs = 64
+depth = 64
+fail_on_revert = false

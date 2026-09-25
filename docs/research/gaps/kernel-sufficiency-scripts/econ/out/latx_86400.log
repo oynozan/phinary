@@ -1,0 +1,9 @@
+seconds 10022400 days 116.0
+tenor 86400s block 12s hook normal arb-belief normal: LP pnl/market vs latency arb -0.0030 ± 0.0129 (n=791) arb vol 1.89
+tenor 86400s block 12s hook normal arb-belief t(nu=5.0): LP pnl/market vs latency arb +0.0446 ± 0.1277 (n=791) arb vol 12.14
+tenor 86400s block 12s hook     t5 arb-belief normal: LP pnl/market vs latency arb +0.0212 ± 0.0143 (n=791) arb vol 2.45
+tenor 86400s block 12s hook     t5 arb-belief t(nu=5.0): LP pnl/market vs latency arb -0.0043 ± 0.0141 (n=791) arb vol 2.72
+tenor 86400s block  2s hook normal arb-belief normal: LP pnl/market vs latency arb +0.0015 ± 0.0104 (n=791) arb vol 0.69
+tenor 86400s block  2s hook normal arb-belief t(nu=5.0): LP pnl/market vs latency arb +0.1088 ± 0.1749 (n=791) arb vol 13.64
+tenor 86400s block  2s hook     t5 arb-belief normal: LP pnl/market vs latency arb +0.0217 ± 0.0144 (n=791) arb vol 2.08
+tenor 86400s block  2s hook     t5 arb-belief t(nu=5.0): LP pnl/market vs latency arb +0.0010 ± 0.0126 (n=791) arb vol 1.01

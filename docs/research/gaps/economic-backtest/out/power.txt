@@ -1,0 +1,2 @@
+1d: per-market LP pnl mean +0.1078B sd 0.3497B CV 3.2 -> paths for +-10% rel. precision (1.96*CV/0.1)^2 = 4,040; OOS weeks 143, weekly sd 2.22% (b=1%/mkt), SE(mean) 0.186%/wk; min detectable weekly mean (alpha 5% 1-sided, power 80%) 0.462%/wk
+4h: per-market LP pnl mean +0.0231B sd 0.0587B CV 2.5 -> paths for +-10% rel. precision (1.96*CV/0.1)^2 = 2,478; OOS weeks 143, weekly sd 1.33% (b=1%/mkt), SE(mean) 0.111%/wk; min detectable weekly mean (alpha 5% 1-sided, power 80%) 0.276%/wk

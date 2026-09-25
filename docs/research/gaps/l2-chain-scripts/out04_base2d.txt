@@ -1,0 +1,5 @@
+=== base: 50715 swaps, 1.99 days of 1 s grid ===
+  H=300s: n=573 returns; sigma_pool 0.4937, sigma_binance 0.4988; var ratio 0.9796 (day-block bootstrap 95% [0.984,0.984]); implied c = +0.19 (model c=0.5 -> ratio 0.9472); ratio after +beta 1.0324
+     per-day ratios: 0.984
+  H=900s: n=190 returns; sigma_pool 0.4700, sigma_binance 0.4686; var ratio 1.0058 (day-block bootstrap 95% [1.012,1.012]); implied c = -0.15 (model c=0.5 -> ratio 0.9801); ratio after +beta 1.0258
+     per-day ratios: 1.012

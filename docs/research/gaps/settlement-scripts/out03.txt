@@ -1,0 +1,17 @@
+=== in-window pricing: n=150 samples (30 min, 12 s), sigma=0.52, f=0 (pure math check) ===
+k left       MC      SE  discrete  continuous
+    75   0.3996  0.0005    0.4000      0.4010
+    25   0.4002  0.0005    0.4000      0.4029
+    10   0.4009  0.0005    0.4000      0.4074
+     5   0.4006  0.0005    0.4000      0.4149
+     2   0.4008  0.0005    0.4000      0.4383
+
+=== leverage of in-band manipulation inside the window (5 bp pool, L1) ===
+k left  sd of remaining mean (bp)  in-band reach f*k/n (bp)  reach/sd  max dP from reach (c)
+   150                     22.568                     5.000      0.22                    8.8
+    75                      7.939                     2.500      0.31                   12.5
+    25                      1.497                     0.833      0.56                   21.9
+    10                      0.361                     0.333      0.92                   35.6
+     5                      0.117                     0.167      1.42                   52.3
+     2                      0.021                     0.067      3.12                   88.1
+     1                      0.000                     0.033       inf                  100.0

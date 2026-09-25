@@ -1,0 +1,39 @@
+=== expWad / lnWad sanity vs mpmath ===
+expWad max rel err = 8.664e-04;  lnWad max abs err = 1.050 wei
+lnWad consecutive-integer decreases in 100k samples: 0
+
+=== CDF approximations: max |Phi_hat - Phi| on grid x in [-9,9] step 1e-3 ===
+Lyra Hart/West (f64)         max abs err = 2.220e-16 at x=+0.181
+Premia Choudhury             max abs err = 1.399e-04 at x=-0.000
+RMM A&S 7.1.26               max abs err = 6.969e-08 at x=+0.064
+NR erfcc (exact arith)       max abs err = 4.133e-08 at x=+0.060
+solstat cdf (bit-exact int)  max abs err = 4.151e-08 at x=+0.056
+
+=== Tail behaviour: Phi(x) and approximations for deep-OTM d2 ===
+x=-3.0: Phi=0.0013499  solstat=1.349898e-03 (relerr 3.08e-08)  hart=1.349898e-03  choud=1.347270e-03 (relerr 1.95e-03)
+x=-4.0: Phi=3.16712e-5  solstat=3.167124e-05 (relerr 8.08e-08)  hart=3.167124e-05  choud=3.167666e-05 (relerr 1.71e-04)
+x=-5.0: Phi=2.86652e-7  solstat=2.866516e-07 (relerr 1.15e-08)  hart=2.866516e-07  choud=2.874141e-07 (relerr 2.66e-03)
+x=-6.0: Phi=9.86588e-10  solstat=9.865876e-10 (relerr 9.02e-08)  hart=9.865876e-10  choud=9.915764e-10 (relerr 5.06e-03)
+x=-7.0: Phi=1.27981e-12  solstat=1.279812e-12 (relerr 4.25e-07)  hart=1.279813e-12  choud=1.289047e-12 (relerr 7.22e-03)
+x=-8.0: Phi=6.22096e-16  solstat=6.220000e-16 (relerr 1.54e-04)  hart=6.220961e-16  choud=6.277658e-16 (relerr 9.11e-03)
+x=-8.8: Phi=6.84081e-19  solstat=0.000000e+00 (relerr 1.00e+00)  hart=6.840808e-19  choud=6.912348e-19 (relerr 1.05e-02)
+x=-9.0: Phi=1.12859e-19  solstat=0.000000e+00 (relerr 1.00e+00)  hart=1.128588e-19  choud=1.140745e-19 (relerr 1.08e-02)
+
+=== Weak monotonicity of solstat cdf (bit-exact) ===
+grid step 1e-4 over [-9,9]: 180000 steps, decreases=0, max drop=0 wei
+fine steps (997 wei) near 10 centers: 50000 steps, decreases=1, max drop=14999999827 wei
+random pairs x<y: 100000, decreases=0, max drop=0 wei
+
+=== Parity/symmetry: cdf(x)+cdf(-x) - 1 (solstat) ===
+max |cdf(x)+cdf(-x)-1| = 1 wei  (=> compute NO := 1e18 - YES to get exact parity)
+
+=== End-to-end fixed-point pipeline error: P_hat = solstat_cdf(d2_hat), d2_hat from lnWad/isqrt/mulDiv ===
+max |P_hat - P| over 20k random (S,K,sig,T in [60s,1y]) = 4.151e-08 at S,K,sig,Tsec=(2187.317512984121, 2018.0619467261063, 0.7517043795539613, 6804872.767715607)
+
+=== Oracle input quantisation: using tick (1bp grid) instead of sqrtPriceX96 ===
+T= 1h sig=0.4: max d2 err (1 tick)=2.34e-02; max price err ~ n(0)*1tick/(sig sqrtT) = 9.33e-03
+T= 1h sig=0.8: max d2 err (1 tick)=1.17e-02; max price err ~ n(0)*1tick/(sig sqrtT) = 4.67e-03
+T= 1d sig=0.4: max d2 err (1 tick)=4.78e-03; max price err ~ n(0)*1tick/(sig sqrtT) = 1.91e-03
+T= 1d sig=0.8: max d2 err (1 tick)=2.39e-03; max price err ~ n(0)*1tick/(sig sqrtT) = 9.53e-04
+T= 7d sig=0.4: max d2 err (1 tick)=1.81e-03; max price err ~ n(0)*1tick/(sig sqrtT) = 7.20e-04
+T= 7d sig=0.8: max d2 err (1 tick)=9.03e-04; max price err ~ n(0)*1tick/(sig sqrtT) = 3.60e-04

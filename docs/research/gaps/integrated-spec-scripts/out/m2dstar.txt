@@ -1,0 +1,8 @@
+L1 normal B $20,000 M2 charge 0.096 B/series IS D* 0.61 strict 4.97 | OOS D* 0.59 strict 2.18 | strict D=2 OOS: edge $+2,628 LB95 -10%/yr CVaR95 17.03% CVaR99 20.97% maxDD 112.8%
+L1 t B $20,000 M2 charge 0.096 B/series IS D* 0.61 strict 0.68 | OOS D* 0.67 strict 0.68 | strict D=2 OOS: edge $+6,097 LB95 +102%/yr CVaR95 1.39% CVaR99 3.32% maxDD 4.8%
+L1 normal B $5,000 M2 charge 0.057 B/series IS D* 0.37 strict 3.62 | OOS D* 0.33 strict 0.33 | strict D=2 OOS: edge $+1,810 LB95 +122%/yr CVaR95 0.38% CVaR99 0.69% maxDD 0.7%
+L1 normal B $50,000 M2 charge 0.146 B/series IS D* 4.66 strict 6.24 | OOS D* inf strict inf | strict D=2 OOS: edge $-5,668 LB95 -120%/yr CVaR95 26.15% CVaR99 31.83% maxDD 204.5%
+L2 normal B $20,000 M2 charge 0.072 B/series IS D* 0.37 strict 3.20 | OOS D* 0.36 strict 0.89 | strict D=2 OOS: edge $+6,169 LB95 +73%/yr CVaR95 14.18% CVaR99 20.48% maxDD 35.4%
+L2 t B $20,000 M2 charge 0.072 B/series IS D* 0.38 strict 0.86 | OOS D* 0.85 strict 0.76 | strict D=2 OOS: edge $+5,784 LB95 +85%/yr CVaR95 4.03% CVaR99 5.41% maxDD 7.1%
+L2 normal B $5,000 M2 charge 0.055 B/series IS D* 0.25 strict 2.09 | OOS D* 0.25 strict 0.25 | strict D=2 OOS: edge $+3,413 LB95 +239%/yr CVaR95 -1.61% CVaR99 -1.19% maxDD 0.0%
+L2 normal B $50,000 M2 charge 0.098 B/series IS D* 0.59 strict 3.60 | OOS D* 0.60 strict 1.83 | strict D=2 OOS: edge $+10,797 LB95 +8%/yr CVaR95 18.19% CVaR99 22.11% maxDD 71.7%

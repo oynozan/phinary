@@ -1,0 +1,22 @@
+L1 w= 30 tau= 1440m sqrt(v/vEuro)=0.993 ATM gamma term Asian 1.15c (Euro 1.14c) Q_epoch ATM 5,539 tokens; ATM price diff Asian-Euro +0.002c; +1sd(Euro) diff +0.17c
+L1 w= 30 tau=  480m sqrt(v/vEuro)=0.979 ATM gamma term Asian 2.01c (Euro 1.97c) Q_epoch ATM 3,152 tokens; ATM price diff Asian-Euro +0.003c; +1sd(Euro) diff +0.52c
+L1 w= 30 tau=   35m sqrt(v/vEuro)=0.652 ATM gamma term Asian 11.19c (Euro 7.30c) Q_epoch ATM 567 tokens; ATM price diff Asian-Euro +0.012c; +1sd(Euro) diff +9.63c
+L1 w=120 tau= 1440m sqrt(v/vEuro)=0.972 ATM gamma term Asian 1.17c (Euro 1.14c) Q_epoch ATM 5,421 tokens; ATM price diff Asian-Euro +0.008c; +1sd(Euro) diff +0.71c
+L1 w=120 tau=  480m sqrt(v/vEuro)=0.913 ATM gamma term Asian 2.16c (Euro 1.97c) Q_epoch ATM 2,940 tokens; ATM price diff Asian-Euro +0.014c; +1sd(Euro) diff +2.23c
+L1 w=120 tau=  125m sqrt(v/vEuro)=0.599 ATM gamma term Asian 6.45c (Euro 3.86c) Q_epoch ATM 985 tokens; ATM price diff Asian-Euro +0.023c; +1sd(Euro) diff +11.17c
+L1 w=240 tau= 1440m sqrt(v/vEuro)=0.943 ATM gamma term Asian 1.21c (Euro 1.14c) Q_epoch ATM 5,259 tokens; ATM price diff Asian-Euro +0.016c; +1sd(Euro) diff +1.45c
+L1 w=240 tau=  480m sqrt(v/vEuro)=0.816 ATM gamma term Asian 2.42c (Euro 1.97c) Q_epoch ATM 2,629 tokens; ATM price diff Asian-Euro +0.027c; +1sd(Euro) diff +4.89c
+L1 w=240 tau=  245m sqrt(v/vEuro)=0.589 ATM gamma term Asian 4.69c (Euro 2.76c) Q_epoch ATM 1,354 tokens; ATM price diff Asian-Euro +0.032c; +1sd(Euro) diff +11.49c
+L2 w= 30 tau= 1440m sqrt(v/vEuro)=0.993 ATM gamma term Asian 0.92c (Euro 0.92c) Q_epoch ATM 2,387 tokens; ATM price diff Asian-Euro +0.002c; +1sd(Euro) diff +0.17c
+L2 w= 30 tau=  480m sqrt(v/vEuro)=0.979 ATM gamma term Asian 1.62c (Euro 1.59c) Q_epoch ATM 1,358 tokens; ATM price diff Asian-Euro +0.003c; +1sd(Euro) diff +0.52c
+L2 w= 30 tau=   35m sqrt(v/vEuro)=0.654 ATM gamma term Asian 8.98c (Euro 5.87c) Q_epoch ATM 245 tokens; ATM price diff Asian-Euro +0.011c; +1sd(Euro) diff +9.57c
+L2 w=120 tau= 1440m sqrt(v/vEuro)=0.972 ATM gamma term Asian 0.94c (Euro 0.92c) Q_epoch ATM 2,336 tokens; ATM price diff Asian-Euro +0.008c; +1sd(Euro) diff +0.71c
+L2 w=120 tau=  480m sqrt(v/vEuro)=0.913 ATM gamma term Asian 1.74c (Euro 1.59c) Q_epoch ATM 1,267 tokens; ATM price diff Asian-Euro +0.014c; +1sd(Euro) diff +2.23c
+L2 w=120 tau=  125m sqrt(v/vEuro)=0.600 ATM gamma term Asian 5.18c (Euro 3.11c) Q_epoch ATM 425 tokens; ATM price diff Asian-Euro +0.023c; +1sd(Euro) diff +11.16c
+L2 w=240 tau= 1440m sqrt(v/vEuro)=0.943 ATM gamma term Asian 0.97c (Euro 0.92c) Q_epoch ATM 2,266 tokens; ATM price diff Asian-Euro +0.016c; +1sd(Euro) diff +1.45c
+L2 w=240 tau=  480m sqrt(v/vEuro)=0.816 ATM gamma term Asian 1.94c (Euro 1.59c) Q_epoch ATM 1,133 tokens; ATM price diff Asian-Euro +0.027c; +1sd(Euro) diff +4.89c
+L2 w=240 tau=  245m sqrt(v/vEuro)=0.589 ATM gamma term Asian 3.77c (Euro 2.22c) Q_epoch ATM 584 tokens; ATM price diff Asian-Euro +0.032c; +1sd(Euro) diff +11.48c
+gamma_S L1 0.000821418843739122 L2 0.0006608062789561749
+ramp h 0.0025 Qsafe L1 w=30m h0=1c 2332.5 w=2h 9330.0  Q_epoch floor c*2h 386.5
+ramp h 0.005 Qsafe L1 w=30m h0=1c 9330.0 w=2h 37320.0  Q_epoch floor c*2h 773.0
+ramp h 0.01 Qsafe L1 w=30m h0=1c 37320.0 w=2h 149280.0  Q_epoch floor c*2h 1546.0

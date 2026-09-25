@@ -1,0 +1,6 @@
+hartU==hart on 3000: True
+gas hartU 0 1307
+gas hartU 500000000000000000 1319
+gas hartU -2000000000000000000 1307
+gas hartU 8000000000000000000 880
+quote pipeline (solady ln/sqrt + hartU) max |P-P_ref| over 3000: 9.278e-17 last gas 3098
