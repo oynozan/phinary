@@ -316,3 +316,33 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 | `script/rehearsal/` | Scripted rehearsal (`rehearse.ts`), its helpers and unit tests |
 | `deployments/<network>.json` | Addresses for bots, SDK and front ends. `local.json` is git-ignored |
 | `deployments/.run/<network>/` | Logs, pids and local broadcasts (git-ignored) |
+
+---
+
+## Live deployment notes (Unichain Sepolia, 2026-09-26)
+
+| Item | Value |
+|---|---|
+| Deployment | `deployments/unichain-sepolia.json` (block 63,521,900) |
+| PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` (vault funded with 35 USDC) |
+| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| PriceSteerer owner (mirror signer) | `0x642c95Ad042C32289687152EE838D14BC219eDAc` |
+| Hook keeper (keeper signer) | `0x7B7675a09801049C1D3296d76A29D69913Da3dF0` |
+
+- **RPC for bots and scripts:** `https://unichain-sepolia.drpc.org`. The load-balanced `https://sepolia.unichain.org` sometimes serves stale state (pending nonce 0) and causes `nonce too low`.
+- **Demo bot command:**
+
+  ```sh
+  RPC_URL=https://unichain-sepolia.drpc.org MARKET_BUDGET_USDC=10 QUOTE_H0=0.01 QUOTE_GAMMA_S=0.00002 MIRROR_THRESHOLD_BPS=1 script/bots.sh start unichain-sepolia
+  ```
+
+  - This gives an ATM spread of about ±4¢ at 60 s, widening toward the cutoff.
+  - The production values (h0 = 0.02, gammaS = 0.00005) quote ±10¢ at σ ≈ 20%, which is too wide for 60-second markets.
+- **Real-chain smoke test:**
+
+  ```sh
+  cd script/rehearsal && SMOKE_USDC=1 node smoke-real.ts
+  ```
+
+  It buys YES with the deployer's USDC and sells half back through UniversalRouter 2.0, and prints uniscan links. It passed on 2026-09-26.
+- **Gas:** the mirror and keeper each started with 0.015 ETH. At 0.0015 gwei that lasts about a day of continuous running. Top them up from the deployer with `cast send <addr> --value 0.01ether`.
