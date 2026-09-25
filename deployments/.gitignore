@@ -1,0 +1,8 @@
+# Runtime state of script/local-env.sh and script/bots.sh (logs, pids, local broadcasts)
+.run/
+# Anvil-fork deployments, rewritten by every local run
+local.json
+local.env
+# Simulations (forge script without --broadcast)
+*.dry-run.json
+sepolia-rehearsal.json

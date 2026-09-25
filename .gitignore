@@ -18,3 +18,10 @@ interface/
 
 # Claude Code worktrees
 /.claude/
+
+# Generated local env files, build output, broadcast logs
+*.env
+!.env.example
+/app/dist/
+/broadcast/
+/deployments/local*.json

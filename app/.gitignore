@@ -1,0 +1,5 @@
+node_modules/
+dist/
+deployments/local.json
+.env.local
+deployments/local.env
