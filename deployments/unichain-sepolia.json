@@ -1,0 +1,43 @@
+{
+  "chainId": 1301,
+  "demoLiquidity": "1000000000000000000",
+  "demoUsdc": "0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D",
+  "demoWeth": "0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5",
+  "deployBlock": 63521900,
+  "deployedAt": 1790374328,
+  "deployer": "0x2d1697607Cd75fb012114391c1320a0c3ed6b25C",
+  "explorer": "https://sepolia.uniscan.xyz",
+  "initialEthPriceUsd": "2684.93",
+  "initialSqrtPriceX96": "4105314865866007812399485",
+  "keeper": "0x2d1697607Cd75fb012114391c1320a0c3ed6b25C",
+  "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+  "network": "unichain-sepolia",
+  "oracleParams": {
+    "cardinality": 14400,
+    "fallbackVarE36": "11407711613050422085329682865",
+    "gridSeconds": 10,
+    "minWindows": 30,
+    "nWindows": 180,
+    "varMaxE36": "198050548837680938981418105305",
+    "varMinE36": "1267523512561158009481075873",
+    "winsorTicks": 100
+  },
+  "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "poolManager": "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
+  "predictionHook": "0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8",
+  "priceSteerer": "0x21C55279188072E6BfeF14c4920eA1cEFEd358a3",
+  "rpcUrl": "https://sepolia.unichain.org",
+  "stateView": "0xc199F1072a74D4e905ABa1A84d9a45E2546B6222",
+  "underlyingOracle": "0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080",
+  "underlyingPool": {
+    "currency0": "0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5",
+    "currency1": "0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D",
+    "fee": 500,
+    "hooks": "0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080",
+    "tickSpacing": 10
+  },
+  "underlyingPoolId": "0xb2b89f12e31fa12e75c4e85bd234fa5fdc5ee19d65e11a12c4f57dfe0e437331",
+  "universalRouter": "0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D",
+  "usdc": "0x31d0220469e10c4E71834a79b1f276d740d3768F",
+  "v4Quoter": "0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472"
+}

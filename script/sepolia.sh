@@ -6,7 +6,8 @@
 #   script/sepolia.sh market    CreateMarket.s.sol with the keeper defaults (MARKET_* and QUOTE_* env)
 #
 # Each command checks the RPC (chain 1301, not anvil), shows the signer's balances, simulates the script, and only then
-# asks for a typed confirmation before broadcasting. It refuses to run when CI is set or stdin is not a terminal.
+# asks for a typed confirmation before broadcasting (or takes CONFIRM=<command> for a non-interactive, explicit opt-in).
+# It refuses to run when CI is set.
 # RPC: UNICHAIN_SEPOLIA_RPC (from .env, default https://sepolia.unichain.org). Signer: DEPLOYER_PRIVATE_KEY in .env.
 # ALLOW_ANVIL=1 with UNICHAIN_SEPOLIA_RPC=<anvil fork> rehearses this exact flow into deployments/sepolia-rehearsal.json.
 set -euo pipefail
@@ -52,7 +53,7 @@ if [[ "$CLIENT" == *anvil* ]]; then
 fi
 NETWORK=unichain-sepolia
 if [[ "$ANVIL" == 1 ]]; then NETWORK=sepolia-rehearsal; fi
-[[ "$ANVIL" == 1 || -t 0 ]] || die "refusing to broadcast without an interactive terminal"
+[[ "$ANVIL" == 1 || -t 0 || "${CONFIRM:-}" == "$CMD" ]] || die "refusing to broadcast without an interactive terminal (or CONFIRM=$CMD)"
 DEPLOYMENTS="$ROOT/deployments/$NETWORK.json"
 RUN="$ROOT/deployments/.run/$NETWORK"
 mkdir -p "$RUN"
@@ -104,7 +105,12 @@ grep -E 'Estimated (total gas|amount)' "$SIM" || true
 rm -f "$ROOT/deployments/$NETWORK.dry-run.json"
 
 echo
-read -r -p "Broadcast '$CMD' to Unichain Sepolia (chain 1301)? Type $CMD to confirm: " answer
+if [[ "${CONFIRM:-}" == "$CMD" ]]; then
+  answer="$CMD"
+  echo "Broadcast '$CMD' confirmed by CONFIRM=$CMD"
+else
+  read -r -p "Broadcast '$CMD' to Unichain Sepolia (chain 1301)? Type $CMD to confirm: " answer
+fi
 [[ "$answer" == "$CMD" ]] || die "aborted, nothing was sent"
 
 cd "$ROOT"
