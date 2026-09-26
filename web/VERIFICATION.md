@@ -28,8 +28,10 @@ Regression tests cover these findings. Legacy records without a saved nonce atte
 
 ## Release boundaries
 
-Portfolio displays actual holdings; complete transaction history, acquisition cost and P&L remain unavailable. Activity requires a separately supplied compatible `/activity` service (documented in README); the frontend PR does not include that service. The production build retains the existing viem/ox dynamic-import warning.
+Portfolio displays actual holdings; complete transaction history, acquisition cost and P&L remain unavailable. Activity requires a separately supplied compatible `/activity` service (documented in README); the frontend PR does not include that service. The production build retains the existing viem/ox dynamic-import warning and an Akt font-override warning; the network-enabled production build completed successfully.
 
 Latest-main integration: its committed indexer only exposes SQL/GraphQL, while this frontend Activity adapter requires the separately verified `/activity` service. Keep the PR Draft until that service dependency is supplied for the target environment or a separately scoped integration is completed. Local `/api/activity` returned a validated live snapshot during read-only verification.
 
 Browser evidence includes pending approval reload/recovery, wrong-network handling and account isolation. A signature rejection left the form recoverable. Fork tests passed both partial and full sells for each side, winning redemption, invalid combined-side refund, and Vault balance deltas.
+
+Final integration candidate: 64 tests, typecheck, lint and production webpack build passed. The complete Chrome fork suite passed including pending reload, network/account isolation and all 15 route/viewport screenshot combinations.
