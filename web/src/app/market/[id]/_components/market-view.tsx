@@ -42,7 +42,7 @@ function MarketContent({ market, initialSide }: { market: Market; initialSide: S
             <div className="detail-overview-slot"><Overview market={market} /></div>
             <div className="detail-chart-slot"><ChartPanel market={market} /></div>
             <div className="detail-trade-slot"><TradeCard market={market} form={form} onFormChange={setForm} holdings={upBalance} />{isResolved(market.phase) && <SettlementCompanion />}</div>
-            <div className="detail-position-slot"><PositionPanel market={market} upBalance={upBalance} /></div>
+            <div className="detail-position-slot"><PositionPanel market={market} upBalance={upBalance} onSell={side => { setForm({ side, mode: "sell", amount: "", max: false }); document.getElementById("trade-amount")?.focus(); }} /></div>
             <div className="detail-pricing-slot"><PricingExplanation market={market} /></div>
         </div>
         <MarketRules market={market} />

@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCountdown, formatUsd } from "@/lib/format";
 import { payoutPerToken } from "@/lib/phase";
-import { portfolioUnitPrice, amountText, canSell, historyStatus, resultLabel, type PortfolioAvailability, type PortfolioRow, type PortfolioSection } from "@/lib/portfolio/view-model";
+import { claimPlan, portfolioUnitPrice, amountText, canSell, historyStatus, resultLabel, type PortfolioAvailability, type PortfolioRow, type PortfolioSection } from "@/lib/portfolio/view-model";
 
 export function displayMoney(value: number | null, signed = false) { return value === null ? "N/A" : formatUsd(value, { signed }); }
 function date(value: number | null) {
@@ -35,7 +35,7 @@ export function PositionsTable({ rows, section, availability, now, actionsEnable
             open ? <span className={`portfolio-side portfolio-${row.side}`} key="side">{row.side === "up" ? "▲ UP" : "▼ DOWN"}</span> : <span className={`portfolio-result ${payout === 0 ? "portfolio-negative" : ""}`} key="result">{resultLabel(row)}</span>,
             amountText(row.quantity), portfolioUnitPrice(row.avgCost), portfolioUnitPrice(open ? row.currentPrice : payout), displayMoney(row.value), <Profit row={row} key="profit" />,
             open ? deadline : date(row.settledAt),
-            section === "history" ? <span className="portfolio-history-status" key="status">{historyStatus(row)}</span> : <button type="button" key="action" className={open ? "portfolio-secondary" : "portfolio-claim"} disabled={!actionsEnabled || (open && !tradable)} onClick={() => open ? onSell(row) : onClaim(row)} aria-label={`${open ? "Sell" : "Claim"} ${row.side.toUpperCase()}, market ${row.marketId}`} title={!actionsEnabled ? "Not connected yet" : open && !tradable ? "Trading is closed" : undefined}>{open ? "Sell" : "Claim"}</button>,
+            section === "history" ? <span className="portfolio-history-status" key="status">{historyStatus(row)}</span> : <button type="button" key="action" className={open ? "portfolio-secondary" : "portfolio-claim"} disabled={!actionsEnabled || (open && !tradable) || (!open && !claimPlan(rows.filter(r => r.marketId === row.marketId)).marketIds.length)} onClick={() => open ? onSell(row) : onClaim(row)} aria-label={`${open ? "Sell" : "Claim"} ${row.side.toUpperCase()}, market ${row.marketId}`} title={!actionsEnabled ? "Not connected yet" : open && !tradable ? "Trading is closed" : undefined}>{open ? "Sell" : "Claim"}</button>,
         ];
     }
     return <section className="portfolio-section" aria-labelledby={`portfolio-${section}-heading`}>

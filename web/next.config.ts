@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+    distDir: process.env.PHINARY_E2E === "1" ? ".next-e2e" : ".next",
     reactCompiler: true,
     devIndicators: false,
     agentRules: false,

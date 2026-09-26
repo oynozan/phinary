@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+:root { --font-manrope: Manrope; --shell-top: 76px; }
+body { margin: 0; background: #080b12; color: #f5f5fa; font-family: Manrope,sans-serif; }
+a { color: inherit; } button,input,select { font-family: inherit; }
+main { padding-top: 76px; padding-bottom: 100px; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.preview-header { position: fixed; top: 0; width:100%; height:52px; z-index:40; display:flex; align-items:center; gap:56px; padding:0 max(48px,calc((100vw - 1440px)/2)); border-bottom:1px solid #282239; font-size:13px; }
+.preview-brand { display:flex; align-items:center; gap:11px; text-decoration:none; font-size:23px; font-weight:750; }
+.preview-header nav { display:flex; align-self:stretch; gap:34px; flex:1; }
+.preview-header nav a { display:flex; align-items:center; text-decoration:none; color:#aab6d1; }
+.preview-header nav a[aria-current] { border-bottom:2px solid #c13aff; color:#fff; }
+.preview-wallet { padding:7px 12px; border:1px solid #2a3143; border-radius:8px; background:#090d16; font-size:12px; }
+.preview-toolbar { position:fixed; z-index:40; bottom:0; left:0; right:0; background:#171329; border-top:1px solid #72558a; padding:10px 20px; display:flex; gap:16px; align-items:center; font-size:12px; flex-wrap:wrap; }
+.preview-toolbar strong { color:#e4b9ff; }
+.preview-toolbar select,.preview-toolbar button { background:#252034; border:1px solid #665274; color:#fff; padding:5px 8px; border-radius:5px; }
+.preview-toolbar span { color:#b4bdd3; }
+[data-slot=dialog-overlay] { position:fixed; inset:0; z-index:50; background:#000a; }
+[data-slot=table-container] { overflow:auto; }
+@media(max-width:1023px) { .preview-header { padding:0 20px; gap:24px; } .preview-header nav { gap:16px; } }
+@media(max-width:639px) { :root { --shell-top:68px; } main { padding-top:68px; padding-bottom:150px; } .preview-header { justify-content:space-between; gap:12px; } .preview-header nav { display:none; } .preview-brand { font-size:20px; } .preview-toolbar { gap:8px; padding:8px 12px; font-size:11px; } .preview-toolbar strong { flex-basis:100%; } }
+
+
+.preview-toolbar button,.preview-toolbar select { min-height:36px; }
+.preview-toolbar :focus-visible,.preview-header a:focus-visible { outline:2px solid #db9bff; outline-offset:3px; }
+@media(max-width:639px) { .preview-toolbar button,.preview-toolbar select { min-height:44px; } main { padding-bottom:190px; } }
+.preview-header{background:#101018eb;gap:30px}.preview-wallet{border-radius:24px;background:#ffffff04}.preview-header nav{margin-left:20px}.preview-header nav a[aria-current]{border-bottom-color:transparent}.vault-explanation{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:51;border-radius:12px;padding:24px;width:540px}.vault-explanation h2{font-size:20px}.vault-explanation>button{position:absolute;right:12px;top:12px;background:none;border:0;color:white}.vault-page{overflow:clip}.preview-toolbar{font-family:Arial,sans-serif}@media(max-width:639px){.preview-header{gap:8px;padding:0 14px}.preview-header>.preview-wallet:last-child{display:none}.preview-wallet{font-size:11px}}
+.preview-toolbar{position:relative;bottom:auto}.preview-sample-badge{position:fixed;right:12px;top:54px;z-index:40;border:1px solid #8e509a;background:#211327;color:#edb9ff;font:10px Arial,sans-serif;border-radius:4px;padding:3px 6px}main{padding-bottom:0}.preview-brand svg{flex-shrink:0}

@@ -10,3 +10,19 @@ test('wins and losses count resolved positions, exclude invalid and deduplicate'
 test('ranking uses only known realized profit, stable address ties and top ten', () => { const records = Array.from({ length: 14 }, (_, i) => ({ ...sampleRecord(5000, i), account: `0x${i.toString().padStart(40, '0')}`, profit: i === 13 ? null : 5 })); const r = aggregateActivity({ ...empty, realized: records }); assert.equal(r.ranking.length, 10); assert.equal(r.ranking[0].account, records[0].account); assert.ok(r.ranking.every(row => row.profit === 5)); });
 test('missing amounts propagate instead of creating plausible totals; stale data uses snapshot time', () => { const event = { ...sampleEvent(5000, 1), total: null }; const snapshot = { ...empty, events: [event], realized: [{ ...sampleRecord(5000, 1), profit: null }] }; const r = aggregateActivity(snapshot); assert.equal(r.volume, null); assert.equal(r.trades, 1); assert.equal(r.ranking.length, 0); assert.equal(aggregateActivity({ ...snapshot, asOf: 8600 }).feed.length, 0); });
 test("unknown outcome cannot inflate global or trader win rate", () => { const win = sampleRecord(5000, 1), unknown = { ...win, id: "unknown", outcome: null }; const r = aggregateActivity({ ...empty, realized: [win, unknown] }); assert.equal(r.wins, null); assert.equal(r.losses, null); assert.equal(r.winRate, null); assert.equal(r.ranking[0].winRate, null); });
+
+test('reference fixture produces screenshot totals and meaningful previous-hour deltas', async () => {
+ const {referenceActivity}=await import('../preview/activity/fixtures.ts');
+ const {activityMomentum}=await import('../src/lib/activity/display.ts');
+ const snapshot=referenceActivity(10000), data=aggregateActivity(snapshot), trend=activityMomentum(snapshot);
+ assert.equal(data.trades,1197); assert.ok(Math.abs(data.volume!-12500)<.00001);
+ assert.equal(data.wins,33); assert.equal(data.losses,25); assert.equal(Math.round(data.winRate!*100),57);
+ assert.equal(trend.volumeChange!.toFixed(1),'18.4'); assert.equal(trend.tradeChange!.toFixed(1),'12.1');
+ assert.equal(trend.tradeBars!.reduce((a,b)=>a+b,0),1197); assert.equal(data.feed.length,12); assert.equal(data.ranking.length,10);
+});
+test('momentum excludes claims and does not invent comparison or incomplete chart values', async()=>{
+ const {activityMomentum}=await import('../src/lib/activity/display.ts');
+ const result=activityMomentum({...empty,events:[{...sampleEvent(5000,1),action:'Claim'}],previousHour:{volume:0,trades:0}});
+ assert.equal(result.tradeChange,null);assert.equal(result.volumeChange,null);assert.equal(result.tradeBars!.reduce((a,b)=>a+b,0),0);
+ assert.equal(activityMomentum({...empty,tradesComplete:false}).volumeBars,null);
+});

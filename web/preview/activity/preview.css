@@ -19,3 +19,7 @@ main { padding-top: 76px; padding-bottom: 100px; }
 @media(max-width:1023px) { .preview-header { padding:0 20px; gap:24px; } .preview-header nav { gap:16px; } }
 @media(max-width:639px) { :root { --shell-top:68px; } main { padding-top:68px; padding-bottom:150px; } .preview-header { justify-content:space-between; gap:12px; } .preview-header nav { display:none; } .preview-brand { font-size:20px; } .preview-toolbar { gap:8px; padding:8px 12px; font-size:11px; } .preview-toolbar strong { flex-basis:100%; } }
 
+
+.preview-toolbar button,.preview-toolbar select { min-height:36px; }
+.preview-toolbar :focus-visible,.preview-header a:focus-visible { outline:2px solid #db9bff; outline-offset:3px; }
+@media(max-width:639px) { .preview-toolbar button,.preview-toolbar select { min-height:44px; } main { padding-bottom:190px; } }

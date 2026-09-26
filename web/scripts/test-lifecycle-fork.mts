@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import { erc20Abi } from 'viem';
+import { predictionHookAbi } from '@phinary/swap-sdk';
+import { startFixture } from './helpers/fork.mts';
+import { executeUpBuy, fetchBuyQuote } from '../src/lib/onchain/buy.ts';
+import { executeClaim } from '../src/lib/onchain/claim.ts';
+import { readPortfolio } from '../src/lib/portfolio/read.ts';
+import { executeVault } from '../src/lib/vault/transaction.ts';
+const fixture = await startFixture();
+try {
+    const { client, wallet, account, config, marketId, expiry, rpc } = fixture;
+    const ctx = { client, wallet, account: account.address, config, assertReady: async () => { assert.equal(await client.getChainId(), 1301); }, onPending() {}, onProgress() {} };
+    const balance = (address: `0x${string}`) => client.readContract({ address, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] });
+    for (const side of ['up', 'down'] as const) {
+        const quote = await fetchBuyQuote(client, marketId, 100000n, 100, account.address, config, side);
+        const before = await balance(config.usdc);
+        const buy = await executeUpBuy(quote, ctx);
+        assert.equal(before - await balance(config.usdc), quote.amountIn);
+        assert.equal(await balance(quote.token), buy.qty); assert.ok(buy.qty >= quote.minimumOut);
+        const sellQuote = await fetchBuyQuote(client, marketId, buy.qty / 2n, 100, account.address, config, side, 'sell');
+        const beforeSell = await balance(config.usdc);
+        const sell = await executeUpBuy(sellQuote, ctx);
+        assert.equal(await balance(config.usdc) - beforeSell, sell.usdc); assert.ok(sell.usdc >= sellQuote.minimumOut);
+        const remaining = await balance(quote.token);
+        const full = await fetchBuyQuote(client, marketId, remaining, 100, account.address, config, side, 'sell');
+        const sold = await executeUpBuy(full, ctx);
+        assert.ok(sold.usdc >= full.minimumOut); assert.equal(await balance(quote.token), 0n);
+        await executeUpBuy(await fetchBuyQuote(client, marketId, 100000n, 100, account.address, config, side), ctx);
+        console.log(`${side} buy, partial and full sell passed`);
+    }
+    const portfolio = await readPortfolio(account.address, client, config);
+    assert.equal(portfolio.rows.filter(r => r.marketId === marketId).length, 2);
+    const deposit = await executeVault('deposit', 1000000n, ctx);
+    const withdrawal = await executeVault('withdraw', deposit.shares, ctx);
+    assert.ok(withdrawal.assets > 0n); console.log('Vault deposit and withdrawal passed');
+    const snapshot = await rpc('evm_snapshot');
+    await rpc('evm_setNextBlockTimestamp', [expiry]); await rpc('evm_mine');
+    const hash = await wallet.writeContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'settle', args: [BigInt(marketId)] });
+    assert.equal((await client.waitForTransactionReceipt({ hash })).status, 'success');
+    const beforeClaim = await balance(config.usdc);
+    const claimed = await executeClaim(marketId, ctx);
+    assert.ok(claimed.usdc > 0n); assert.equal(await balance(config.usdc) - beforeClaim, claimed.usdc);
+    console.log('Settlement and winning claim passed');
+    await rpc('evm_revert', [snapshot]);
+    await rpc('anvil_setCode', [fixture.oracle, '0x60006000fd']);
+    await rpc('evm_setNextBlockTimestamp', [expiry + 3601]); await rpc('evm_mine');
+    const invalidHash = await wallet.writeContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'settleInvalid', args: [BigInt(marketId)] });
+    assert.equal((await client.waitForTransactionReceipt({ hash: invalidHash })).status, 'success');
+    const beforeRefund = await balance(config.usdc);
+    const refunded = await executeClaim(marketId, ctx);
+    const expectedRefund = portfolio.rows.filter(r => r.marketId === marketId).reduce((sum, r) => sum + r.quantity, 0n) / 2n;
+    assert.equal(refunded.usdc, expectedRefund); assert.equal(await balance(config.usdc) - beforeRefund, expectedRefund);
+    console.log('Invalid combined-side refund passed');
+} finally { fixture.stop(); }

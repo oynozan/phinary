@@ -23,7 +23,7 @@ export function PortfolioScreen({ display, now, actions, notice, marketBase = ""
     return <div className="portfolio-page"><div className="portfolio-container">
         <header className="portfolio-heading"><h1 ref={heading} tabIndex={-1}>Portfolio</h1><p>Your positions, claims and history.</p></header>
         {notice && <div className="portfolio-notice">{notice}</div>}
-        <PortfolioSummary display={display} claimEnabled={actionEnabled && claimable.length > 0 && claimPlan(claimable).amount !== null} onClaimAll={() => { captureFocus(); setMessage(""); setClaimRows(claimable); }} />
+        <PortfolioSummary display={display} claimEnabled={actionEnabled && claimPlan(claimable).marketIds.length > 0 && claimPlan(claimable).amount !== null} onClaimAll={() => { captureFocus(); setMessage(""); setClaimRows(claimable); }} />
         {message && <div className="portfolio-toast" role="status">{message}<button type="button" aria-label="Dismiss notification" onClick={() => setMessage("")}>Dismiss</button></div>}
         <PositionsTable {...shared} rows={open} section="open" /><PositionsTable {...shared} rows={claimable} section="claimable" /><HistoryTable {...shared} rows={history} />
         {!actions && <p className="portfolio-availability-note">Selling and claiming are not connected yet.</p>}

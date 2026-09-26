@@ -1,6 +1,6 @@
 {
   "name": "phinary-web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE next dev -p 3100",
@@ -13,7 +13,11 @@
     "test": "node --import tsx --test test/*.test.mts",
     "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts",
     "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts",
-    "preview:activity": "node --import tsx scripts/preview-activity.mts"
+    "preview:activity": "node --import tsx scripts/preview-activity.mts",
+    "preview:vault": "node --import tsx scripts/preview-vault.mts",
+    "test:vault:fork": "node --import tsx scripts/test-vault-fork.mts",
+    "test:lifecycle:fork": "node --import tsx scripts/test-lifecycle-fork.mts",
+    "test:browser:fork": "node --import tsx scripts/test-browser-fork.mjs"
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.81",
@@ -41,6 +45,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

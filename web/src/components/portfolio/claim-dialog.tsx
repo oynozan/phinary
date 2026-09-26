@@ -13,7 +13,7 @@ function ClaimConfirmation({ rows, actions, onDone, onBusy }: { rows: PortfolioR
         setBusy(true); onBusy(true);
         const result = await claimSequentially(plan.marketIds, actions.claimMarket, setProgress);
         setBusy(false); onBusy(false);
-        onDone(`Claimed ${formatUsd(result.paid)}${result.failed ? `. ${result.failed} ${result.failed === 1 ? "claim" : "claims"} failed.` : "."}`);
+        onDone(`Claimed ${formatUsd(result.paid)}${result.failed ? `. Stopped after ${result.completed}/${result.total} claims; refresh to retry remaining positions.` : "."}`);
     }
     return <>
         <DialogTitle>{progress ? busy ? "Claiming positions" : "Claim results" : "Confirm claim"}</DialogTitle>

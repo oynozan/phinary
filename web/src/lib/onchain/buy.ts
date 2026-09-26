@@ -1,3 +1,4 @@
+import { submittedNonce } from "./recover-receipt.ts";
 import type { createChainClient } from "./client.ts";
 type ChainClient = ReturnType<typeof createChainClient>;
 import {
@@ -17,6 +18,7 @@ export function parseUsdc(value: string): bigint {
     return amount;
 }
 export interface BuyQuote {
+    side?: "up" | "down"; mode?: "buy" | "sell"; account?: Address;
     marketId: number; amountIn: bigint; amountOut: bigint; minimumOut: bigint;
     slippageBps: number; cutoff: number; quotedAt: number; blockTime: number;
     token: Address; poolKey: PoolKey;
@@ -28,7 +30,7 @@ export function validateReview(q: BuyQuote, now: number) {
     if (Date.now() - q.quotedAt > 30_000) throw new Error("Quote expired. Review a fresh quote.");
 }
 export async function fetchBuyQuote(client: ChainClient, marketId: number, amount: bigint, slippageBps: number, account?: Address,
-    config = getConnectionConfig()): Promise<BuyQuote> {
+    config = getConnectionConfig(), side: "up" | "down" = "up", mode: "buy" | "sell" = "buy"): Promise<BuyQuote> {
     if (!Number.isSafeInteger(marketId) || marketId < 1) throw new Error("Invalid market");
     if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 1000) throw new Error("Invalid slippage tolerance");
     const [chainId, head] = await Promise.all([client.getChainId(), client.getBlock()]);
@@ -40,19 +42,21 @@ export async function fetchBuyQuote(client: ChainClient, marketId: number, amoun
     ]);
     const cutoff = Number(info.expiry) - info.window - info.cutoffBuffer;
     if (info.status !== 1 || head.timestamp < info.openTime || Number(head.timestamp) >= cutoff) throw new Error("Trading has closed for this market");
-    const poolKey = keys[0];
+    const poolKey = keys[side === "up" ? 0 : 1];
+    const token = side === "up" ? info.yes : info.no;
+    const input = mode === "buy" ? config.usdc : token;
     const currencies = [poolKey.currency0.toLowerCase(), poolKey.currency1.toLowerCase()];
     if (usdc.toLowerCase() !== config.usdc.toLowerCase() || !currencies.includes(usdc.toLowerCase()) ||
-        !currencies.includes(info.yes.toLowerCase()) || poolKey.hooks.toLowerCase() !== config.predictionHook.toLowerCase()) throw new Error("Market route does not match this deployment");
+        !currencies.includes(token.toLowerCase()) || poolKey.hooks.toLowerCase() !== config.predictionHook.toLowerCase()) throw new Error("Market route does not match this deployment");
     const quote = await quoteExactIn(client, {
-        poolKey, zeroForOne: zeroForOneFor(poolKey, config.usdc), amount,
+        poolKey, zeroForOne: zeroForOneFor(poolKey, input), amount,
         account, quoter: config.v4Quoter, extraErrors: hookErrorsAbi,
     });
-    return { marketId, amountIn: amount, amountOut: quote.amountOut, minimumOut: minOutWithSlippage(quote.amountOut, slippageBps),
-        slippageBps, cutoff, quotedAt: Date.now(), blockTime: Number(head.timestamp), token: info.yes, poolKey };
+    return { account, side, mode, marketId, amountIn: amount, amountOut: quote.amountOut, minimumOut: minOutWithSlippage(quote.amountOut, slippageBps),
+        slippageBps, cutoff, quotedAt: Date.now(), blockTime: Number(head.timestamp), token, poolKey };
 }
-export type BuyStep = "approve" | "sign" | "swap";
-export interface PendingTransaction { hash: Hex; kind: "approve" | "swap"; account: Address; marketId: number }
+export type BuyStep = "approve" | "sign" | "swap" | "claim";
+export interface PendingTransaction { hash: Hex; kind: "approve" | "swap" | "claim"; account: Address; marketId: number; side?: "up" | "down"; mode?: "buy" | "sell"; cancelled?: boolean; nonce?: number; submittedBlock?: string; scanBlock?: string }
 export interface BuyProgress { step: BuyStep; message: string; hash?: Hex }
 export class PendingReceiptError extends Error {
     constructor() { super("Transaction sent; confirmation is still unknown. Check its status before retrying."); }
@@ -72,27 +76,36 @@ interface BuyContext {
     config?: ReturnType<typeof getConnectionConfig>;
 }
 
-/** Existing app/src/trade.ts execution path, narrowed to UP exact-input buys. */
+/** Exact-input buy/sell execution. Optional side/mode preserve old UP-buy callers. */
 export async function executeUpBuy(q: BuyQuote, ctx: BuyContext) {
     const { client, wallet, account, onProgress, onPending, assertReady } = ctx;
     const config = ctx.config ?? getConnectionConfig();
+    if (q.account && q.account.toLowerCase() !== account.toLowerCase()) throw new Error("Wallet changed. Review a fresh quote.");
+    const side = q.side ?? "up", mode = q.mode ?? "buy";
+    const input = mode === "buy" ? config.usdc : q.token;
     const fresh = async () => {
         await assertReady();
         const head = await client.getBlock();
         validateReview(q, Number(head.timestamp));
+        const balance = await client.readContract({ address: input, abi: erc20Abi, functionName: "balanceOf", args: [account] });
+        if (balance < q.amountIn) throw new Error("Insufficient input balance");
         return Number(head.timestamp);
     };
     const send = async (kind: "approve" | "swap", tx: { to: Address; data: Hex; value?: bigint; gas?: bigint }) => {
         await fresh();
+        const submittedBlock = String(await client.getBlockNumber());
+        await assertReady();
         const hash = await wallet.sendTransaction({ account: wallet.account ?? account, chain: unichainSepolia, ...tx });
-        const pending: PendingTransaction = { hash, kind, account, marketId: q.marketId };
-        onPending(pending); onProgress({ step: kind, message: "Waiting for confirmation", hash });
+        const pending: PendingTransaction = { hash, kind, account, marketId: q.marketId, side, mode, submittedBlock };
+        onPending(pending);
+        pending.nonce = await submittedNonce(client, wallet, hash); onPending(pending);
+        onProgress({ step: kind, message: "Waiting for confirmation", hash });
         let receipt;
         let replaced = false;
         try {
             receipt = await client.waitForTransactionReceipt({ hash, timeout: 90_000, onReplaced: (replacement) => {
-                replaced = replacement.reason !== "repriced";
-                onPending({ ...pending, hash: replacement.transaction.hash });
+                replaced ||= replacement.reason !== "repriced";
+                onPending({ ...pending, hash: replacement.transaction.hash, cancelled: replaced });
                 onProgress({ step: kind, message: "Waiting for replacement confirmation", hash: replacement.transaction.hash });
             } });
         } catch { throw new PendingReceiptError(); }
@@ -103,20 +116,20 @@ export async function executeUpBuy(q: BuyQuote, ctx: BuyContext) {
     };
     const now = await fresh();
     const [balance, gasBalance, allowance] = await Promise.all([
-        client.readContract({ address: config.usdc, abi: erc20Abi, functionName: "balanceOf", args: [account] }),
+        client.readContract({ address: input, abi: erc20Abi, functionName: "balanceOf", args: [account] }),
         client.getBalance({ address: account }),
-        readAllowances(client, { owner: account, token: config.usdc, amount: q.amountIn, spender: config.universalRouter, permit2: config.permit2, now }),
+        readAllowances(client, { owner: account, token: input, amount: q.amountIn, spender: config.universalRouter, permit2: config.permit2, now }),
     ]);
-    if (balance < q.amountIn) throw new Error("Not enough USDC");
+    if (balance < q.amountIn) throw new Error("Not enough input tokens");
     if (gasBalance === 0n) throw new Error("Test ETH is required for gas");
     if (allowance.needsErc20Approval) {
-        onProgress({ step: "approve", message: "Approve USDC in your wallet" });
-        await send("approve", erc20ApproveTx({ token: config.usdc, spender: config.permit2, amount: q.amountIn }));
+        onProgress({ step: "approve", message: "Approve input token in your wallet" });
+        await send("approve", erc20ApproveTx({ token: input, spender: config.permit2, amount: q.amountIn }));
     }
     let permit;
     if (allowance.needsPermit) {
         const at = await fresh();
-        const single = buildPermitSingle({ token: config.usdc, nonce: allowance.permit2Nonce, spender: config.universalRouter,
+        const single = buildPermitSingle({ token: input, nonce: allowance.permit2Nonce, spender: config.universalRouter,
             amount: q.amountIn, now: at, expiration: q.cutoff, sigDeadline: BigInt(q.cutoff - 1) });
         onProgress({ step: "sign", message: "Sign the trading permission in your wallet" });
         const signature = await wallet.signTypedData({ account: wallet.account ?? account, ...permitTypedData(single, { chainId: config.chainId, permit2: config.permit2 }) });
@@ -124,16 +137,17 @@ export async function executeUpBuy(q: BuyQuote, ctx: BuyContext) {
     }
     await fresh();
     onProgress({ step: "swap", message: "Checking the latest price" });
-    const updated = await fetchBuyQuote(client, q.marketId, q.amountIn, q.slippageBps, account, config);
+    const updated = await fetchBuyQuote(client, q.marketId, q.amountIn, q.slippageBps, account, config, side, mode);
+    if (updated.token.toLowerCase() !== q.token.toLowerCase() || JSON.stringify(updated.poolKey) !== JSON.stringify(q.poolKey)) throw new Error("Market route changed. Review a fresh quote.");
     if (updated.amountOut < q.minimumOut) throw new Error("Price changed beyond your minimum. Review a fresh quote.");
-    const tx = buildSwap({ poolKey: q.poolKey, zeroForOne: zeroForOneFor(q.poolKey, config.usdc), tradeType: "EXACT_INPUT",
+    const tx = buildSwap({ poolKey: q.poolKey, zeroForOne: zeroForOneFor(q.poolKey, input), tradeType: "EXACT_INPUT",
         amount: q.amountIn, limit: q.minimumOut, deadline: BigInt(q.cutoff - 1), permit, router: config.universalRouter });
     const gas = await estimateSwapGas(client, { tx, account, extraErrors: hookErrorsAbi });
     await fresh();
-    onProgress({ step: "swap", message: "Confirm UP purchase in your wallet" });
+    onProgress({ step: "swap", message: `Confirm ${side.toUpperCase()} ${mode} in your wallet` });
     const receipt = await send("swap", { ...tx, gas: gasWithHeadroom(gas) });
     const fill = parseEventLogs({ abi: predictionHookAbi, logs: receipt.logs, eventName: "Trade" }).find((log) =>
-        log.address.toLowerCase() === config.predictionHook.toLowerCase() && log.args.marketId === BigInt(q.marketId) && log.args.isYes && log.args.isBuy);
-    if (!fill) throw new Error("Transaction confirmed, but a purchase event was not found. Check the explorer and your balance before retrying.");
+        log.address.toLowerCase() === config.predictionHook.toLowerCase() && log.args.marketId === BigInt(q.marketId) && log.args.isYes === (side === "up") && log.args.isBuy === (mode === "buy"));
+    if (!fill) throw new Error("Transaction confirmed, but a trade event was not found. Check the explorer and your balance before retrying.");
     return { hash: receipt.transactionHash, qty: fill.args.qty, usdc: fill.args.usdcAmount };
 }

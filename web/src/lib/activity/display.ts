@@ -14,7 +14,7 @@ export interface RealizedRecord {
     timestamp: number;
     account: string;
     profit: number | null;
-    outcome: 'win' | 'loss' | 'invalid' | null;
+    outcome: 'win' | 'loss' | 'invalid' | 'none' | null;
 }
 export interface ActivitySnapshot {
     events: ActivityEvent[];
@@ -22,11 +22,13 @@ export interface ActivitySnapshot {
     tradesComplete: boolean;
     accountingComplete: boolean;
     asOf: number;
+    previousHour?: { volume: number | null; trades: number | null };
 }
 export type ActivityStatus = 'ready' | 'loading' | 'unavailable' | 'error' | 'paused';
 export interface ActivityDisplay {
     status: ActivityStatus;
     snapshot: ActivitySnapshot | null;
+    nextUpdateAt?: number;
 }
 const known = (n: number | null): n is number => n !== null && Number.isFinite(n);
 function sum(values: (number | null)[]) { return values.every(known) ? values.reduce((a, b) => a + b, 0) : null; }
@@ -49,4 +51,22 @@ export function aggregateActivity(snapshot: ActivitySnapshot) {
         return [{ account, profit, volume: snapshot.tradesComplete ? sum(trades.filter(row => row.account.toLowerCase() === account).map(row => row.total)) : null, winRate: own.every(row => row.outcome !== null) && w + l ? w / (w + l) : null }];
     }).sort((a, b) => b.profit - a.profit || a.account.localeCompare(b.account)).slice(0, 10) : [];
     return { volume: snapshot.tradesComplete ? sum(trades.map(row => row.total)) : null, trades: snapshot.tradesComplete ? trades.length : null, wins: outcomesKnown ? wins : null, losses: outcomesKnown ? losses : null, winRate: outcomesKnown && wins + losses ? wins / (wins + losses) : null, feed: events.sort((a, b) => b.timestamp - a.timestamp || a.id.localeCompare(b.id)).slice(0, 12), ranking };
+}
+
+/** Chart bins use the same hour as the totals. No previous hour means no delta. */
+export function activityMomentum(snapshot: ActivitySnapshot) {
+    const trades = recent(snapshot.events, snapshot.asOf).filter(r => r.action !== 'Claim');
+    const counts = Array<number>(18).fill(0), amounts = Array<number>(18).fill(0);
+    for (const trade of trades) {
+        const bin = Math.min(17, Math.floor((trade.timestamp - (snapshot.asOf - 3600)) / 200));
+        counts[bin]++; amounts[bin] += trade.total ?? 0;
+    }
+    const complete = snapshot.tradesComplete;
+    const volumeKnown = complete && trades.every(r => known(r.total));
+    const change = (current: number, previous: number | null | undefined) => previous != null && previous > 0 ? (current / previous - 1) * 100 : null;
+    return {
+        volumeBars: volumeKnown ? amounts : null, tradeBars: complete ? counts : null,
+        volumeChange: volumeKnown ? change(amounts.reduce((a,b) => a+b, 0), snapshot.previousHour?.volume) : null,
+        tradeChange: complete ? change(trades.length, snapshot.previousHour?.trades) : null,
+    };
 }

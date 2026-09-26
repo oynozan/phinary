@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-26T07:10:28.084774+00:00",
+  "generatedAt": "2026-09-26T10:34:01.589906+00:00",
   "title": "Design System: Phinary",
   "extensions": {
     "scope": [
@@ -8,7 +8,8 @@
       "Market Detail route /market/[id]",
       "shared header",
       "Portfolio route /portfolio and isolated local UI preview",
-      "Activity route /activity and isolated local UI preview"
+      "Activity route /activity and isolated local UI preview",
+      "Vault route /vault and isolated local UI preview"
     ],
     "sources": [
       "src/app/markets.css",
@@ -22,7 +23,10 @@
       "src/components/portfolio/portfolio-view.tsx",
       "src/components/activity/activity.css",
       "src/components/activity/activity-screen.tsx",
-      "src/components/activity/activity-view.tsx"
+      "src/components/activity/activity-view.tsx",
+      "src/components/vault/vault.css",
+      "src/components/vault/vault-screen.tsx",
+      "src/components/vault/vault-view.tsx"
     ],
     "breakpoints": [
       {
@@ -383,6 +387,72 @@
         "role": "neutral",
         "scope": "Activity only",
         "purpose": "Table row hover surface; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-background": {
+        "displayName": "Background",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-foreground": {
+        "displayName": "Foreground",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-muted": {
+        "displayName": "Muted",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-line": {
+        "displayName": "Line",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-primary-start": {
+        "displayName": "Primary Start",
+        "role": "primary",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-primary-end": {
+        "displayName": "Primary End",
+        "role": "primary",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-primary-disabled": {
+        "displayName": "Primary Disabled",
+        "role": "primary",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-primary-disabled-text": {
+        "displayName": "Primary Disabled Text",
+        "role": "primary",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-focus": {
+        "displayName": "Focus",
+        "role": "primary",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-panel-start": {
+        "displayName": "Panel Start",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "vault-panel-end": {
+        "displayName": "Panel End",
+        "role": "neutral",
+        "scope": "Vault only",
+        "purpose": "Implemented Vault tonal state; normative value is in DESIGN.md frontmatter."
       }
     },
     "typographyMeta": {
@@ -441,6 +511,26 @@
       "detail-amount": {
         "displayName": "Detail Amount",
         "purpose": "Scoped Market Detail amount role."
+      },
+      "vault-heading": {
+        "displayName": "Vault heading",
+        "purpose": "Vault-only heading role; normative values are in DESIGN.md frontmatter."
+      },
+      "vault-metric": {
+        "displayName": "Vault metric",
+        "purpose": "Vault-only metric role; normative values are in DESIGN.md frontmatter."
+      },
+      "vault-section": {
+        "displayName": "Vault section",
+        "purpose": "Vault-only section role; normative values are in DESIGN.md frontmatter."
+      },
+      "vault-label": {
+        "displayName": "Vault label",
+        "purpose": "Vault-only label role; normative values are in DESIGN.md frontmatter."
+      },
+      "vault-action": {
+        "displayName": "Vault action",
+        "purpose": "Vault-only action role; normative values are in DESIGN.md frontmatter."
       }
     },
     "portfolio": {
@@ -477,6 +567,46 @@
       "staleState": "Retain the last successful snapshot and its original As of time; label updates paused.",
       "isolation": "Separate local entry; no wallet, RPC, indexer or real execution.",
       "unknownData": "N/A and unavailable notices, never synthetic zeros or inferred accounting."
+    },
+    "vault": {
+      "scope": ".vault-page and .vault-explanation only",
+      "breakpoints": [
+        {
+          "name": "wide",
+          "value": "1550px"
+        },
+        {
+          "name": "compact",
+          "value": "1400px"
+        },
+        {
+          "name": "dense",
+          "value": "1100px"
+        },
+        {
+          "name": "stacked",
+          "value": "1023px"
+        },
+        {
+          "name": "mobile",
+          "value": "540px"
+        }
+      ],
+      "motion": [
+        {
+          "name": "control transition",
+          "value": "background .15s, border-color .15s",
+          "purpose": "Removed with reduced-motion preference."
+        }
+      ],
+      "effects": {
+        "panel": "linear-gradient(125deg,#13131bdd,#0e1016ed)",
+        "primary": "linear-gradient(100deg,#bc00f2,#d000fa)",
+        "focus": "2px solid #e492ff; outline-offset: 3px",
+        "hero": "drop-shadow(0 0 12px #ad36e660)"
+      },
+      "preview": "preview/vault/README.md",
+      "documentationBoundary": "Vault additions only; incumbent sidecar narrative and token drift preserved."
     }
   },
   "components": [
@@ -560,6 +690,29 @@
         "mobile": 112
       },
       "mobileLayout": "horizontal"
+    },
+    {
+      "name": "Vault primary action",
+      "kind": "button",
+      "description": "Vault-only deposit or withdrawal action with explicit disabled fill.",
+      "html": "<button class=\"ds-vault-primary\">Deposit USDC</button>",
+      "css": ".ds-vault-primary{font-family:var(--font-manrope),Manrope,sans-serif;width:100%;height:40px;border:0;border-radius:22px;font-size:14px;font-weight:600;background:linear-gradient(100deg,#bc00f2,#d000fa);color:white;box-shadow:inset 0 1px 1px #ffffff24;cursor:pointer;transition:background .15s,border-color .15s}.ds-vault-primary:focus-visible{outline:2px solid #e492ff;outline-offset:3px}.ds-vault-primary:disabled{background:#612178;color:#eadff0;opacity:1;box-shadow:none;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-vault-primary{transition:none}}"
+    },
+    {
+      "name": "Vault disabled action",
+      "kind": "button",
+      "refersTo": "vault-primary-disabled",
+      "description": "Opaque muted purple Vault action.",
+      "html": "<button class=\"ds-vault-disabled\" disabled>Enter an amount</button>",
+      "css": ".ds-vault-disabled{font-family:var(--font-manrope),Manrope,sans-serif;width:100%;height:40px;border:0;border-radius:22px;background:#612178;color:#eadff0;font-size:14px;font-weight:600;cursor:not-allowed}"
+    },
+    {
+      "name": "Vault panel",
+      "kind": "card",
+      "refersTo": "vault-panel",
+      "description": "Fine-bordered Vault container with restrained tonal depth.",
+      "html": "<section class=\"ds-vault-panel\"><h2>Vault Composition</h2></section>",
+      "css": ".ds-vault-panel{font-family:var(--font-manrope),Manrope,sans-serif;background:linear-gradient(125deg,#13131bdd,#0e1016ed);color:#f5f3fa;border:1px solid #ffffff1c;border-radius:13px;padding:18px}.ds-vault-panel h2{margin:0;font-size:16px;font-weight:600;line-height:1.4;letter-spacing:-.2px}"
     }
   ],
   "narrative": {
@@ -585,7 +738,8 @@
       "Do's and Don'ts": "\n- Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.\n- Do keep the shared header offset consistent across every route.\n- Do keep Detail controls and tonal extensions scoped to `.market-detail-page`, with route-conditioned body background/noise handling only.\n- Do use text and UP/DOWN triangles for detail hierarchy; avoid decorative icons.\n- Don't apply this refresh to other route bodies without a separate decision.\n- Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.\n\n",
       "Legacy body reference": "\nThe following rules apply only to other route bodies and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.\n\n### Hard rules\n\n- **No gradients anywhere.** No `linear-` / `radial-` / `conic-gradient` in CSS or inline styles, no Tailwind `bg-linear-*` / `bg-gradient-*` / `from-` / `via-` / `to-`, no SVG `<linearGradient>` / `<radialGradient>`, no gradient chart fills, masks or text. Flat solid colours only. Charts are a line, no area fill.\n- **Buttons are solid.** Every button, pill button, segmented / tab item, dock icon, menu trigger and the LiquidMetal Trade button has an opaque fill. No `bg-x/NN` alpha fills, no transparent ghost fills, no `backdrop-blur`, no `opacity-*` on a button surface. Tinted buttons use the opaque tint tokens (`bg-up-soft`, `bg-primary-soft`, ...). Outline buttons sit on `bg-surface-2`. Disabled is an opaque muted fill (`bg-primary-disabled` for primary, `bg-surface-2` + `text-subtle` for the rest), never reduced opacity.\n- **No labels on or above headings.** No status pill, eyebrow, kicker, overline or tag above, on or attached to a heading or market question. Status is the countdown itself (a live market shows its countdown), disabled / closed actions, or the value in a result line (\"Resolved ▲ UP\", \"Settled $2,696.45\").\n- **No mock logos.** The header shows the plain \"Phinary\" wordmark in Akt, no mark. The favicon is a solid orchid \"P\" on carbon. No generated token discs: where a side needs an indicator use plain inline \"▲ UP\" / \"▼ DOWN\" text in the side colour (`SideMark`).\n\n### Copy rules\n\n- No em dashes anywhere (UI, code, comments, docs). Avoid en dashes in UI copy. Use a hyphen, colon or comma.\n- No eyebrow / kicker / overline text or status pill above, on or beside headings. Headings stand alone.\n- Minimal: numbers and actions. No helper paragraphs, no explanatory labels, no marketing copy. Empty states are one line plus at most one button.\n- Sides are always **UP** / **DOWN** (never YES / NO). Prices as cents (`63¢`) or chance (`62%`). Tickers `ETHUP` / `ETHDOWN`.\n\n### Tokens (`src/app/globals.css`)\n\n| Token (Tailwind) | Value | Use |\n|---|---|---|\n| `bg-background` | `#191919` Carbon Black | page |\n| `bg-surface` | `#201f21` | panels, cards, top section of a stacked card |\n| `bg-surface-2` / `bg-secondary` | `#282629` | lower stacked section, inputs on panels |\n| `bg-surface-3` | `#312e32` | hover on surface-2 |\n| `text-foreground` | `#f4f2f5` | primary text |\n| `text-muted-foreground` | `#a19ea4` | labels, secondary numbers |\n| `text-subtle` | `#8a8790` | tertiary (4.6:1 on carbon) |\n| `primary` / `accent` / `orchid` | `#C828D6` Vivid Orchid | primary buttons, active pills, accent word, focus |\n| `accent-2` / `amethyst` | `#9C30A5` | hover of primary, depth, Averaging phase |\n| `up` | `#e070ea` | UP side, ▲ (lighter and pinker than the brand orchid, so chrome never reads as a side) |\n| `down` | `#e5604f` | DOWN side, ▼ |\n| `up-soft` / `up-soft-hover` | up 16% / 26% mixed into surface (opaque) | Buy UP button, UP pill, active UP selector |\n| `down-soft` / `down-soft-hover` | down 16% / 26% into surface (opaque) | Buy DOWN, DOWN pill, destructive |\n| `primary-soft` / `primary-soft-hover` | orchid 16% / 26% into surface (opaque) | active dock icon, \"You\" rows and pills, icon discs, menu focus |\n| `primary-disabled` | orchid 32% into carbon (opaque) | disabled primary button |\n| `warn-soft` | warn 14% into surface (opaque) | Closed phase pill |\n| `wash` | orchid 12% into surface (opaque) | `Panel highlight`, `EmptyState` |\n| `warn` | `#e0a64a` | Closed phase, warnings |\n| `border` | white 10% | every border (atomic.cash) |\n| `border-strong` | white 16% | chart guides, emphasis |\n\nAlways pair UP / DOWN colours with ▲ / ▼ or the words UP / DOWN. Profit is not a side: positive profit is `foreground` with a `+`, losses are `down` (use `Profit`). Tints are always the opaque `*-soft` tokens (a colour mixed into a surface with `color-mix`), never `bg-up/15`-style alpha.\n\nUtilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash` (flat `wash` colour for highlight and empty panels), `animate-live` (pulsing dot), `no-scrollbar`.\n\n### Fonts\n\n| Class | Font | When |\n|---|---|---|\n| `font-heading` | Akt 400/500 | h1-h4 (automatic), big numbers (chance %, totals), market questions |\n| `font-sans` (default) | Lexend Deca | body, buttons, inputs |\n| `font-secondary` | Manrope | small UI text: pills, badges, table numbers, axis ticks, captions |\n| `font-mono` | Ubuntu Mono | addresses and tx hashes only, rarely |\n\n### Layout\n\n- Shell: the shared translucent header and existing floating dock live in `app/layout.tsx`. `<main>` provides the shared top offset described above and existing bottom padding (`--shell-bottom`), with `overflow-x-clip` so sticky content works; pages start directly with content.\n- The dock is mobile and tablet navigation only (hidden from 1024 px, where the header nav takes over). Keep primary actions clear of it below 1024 px.\n- Containers (`@/components/layout/page`): `PageWide` (1200px, header gutters) for grids and tables; `PageNarrow` (`size=\"sm\"` 575px for trade box and forms, `size=\"md\"` 720px for lists and detail). Everything is centered.\n- Headings: `PageHeading` (centered h1, 3xl to 5xl) for section pages; `HeroHeading` + `Accent` (one accent word) for the home hero. Every page hero is centered on the page, above any two-column grid (the market page puts its question, its countdown and the timeline in a full-width row, then the grid). Titles of panels in a column sit inside the panel (`h2 text-xl` in the panel's padding); `SectionHeading` is for centered section titles in a single column.\n- Spacing: generous. Panels `p-5 sm:p-6`, grids `gap-5`, sections `space-y-10` or more. Large type.\n\n### Radii and shapes\n\n- `rounded-3xl` (24px): panels, cards, stacked trade card, dialogs. `rounded-4xl` (32px) for a big hero panel.\n- `rounded-full`: every button, pill, segmented control, input, badge, the round arrow between stacked sections.\n- `rounded-2xl`: menu popovers, list rows inside dialogs, chart tooltip.\n\n### Components\n\nLayout and wallet:\n\n| Import | What |\n|---|---|\n| `@/components/layout/page` | `PageWide`, `PageNarrow`, `PageHeading`, `HeroHeading`, `Accent`, `SectionHeading` |\n| `@/components/layout/panel` | `Panel` (rounded-3xl bordered surface; `highlight` for the orchid wash, `flush` for no padding), `EmptyState` (one line + action) |\n| `@/components/layout/logo` | `Logo` (the \"Phinary\" wordmark, no mark) |\n| `@/components/wallet/*` | `ConnectButton`, `BalancePill`, `WalletDialog`, `WrongNetworkBanner` (already in the shell) |\n| `@/config/brand` | `BRAND_NAME`, `DISPLAY_TIMEZONE` (UTC, matches token names), `CHAIN` |\n\nPrimitives (`@/components/ui/*`, shadcn, themed): `button` (variants `default` orchid, `outline` (surface-2), `secondary`, `ghost` (surface), `up`, `down`, `destructive`, all opaque; sizes `xs sm default lg xl`; `xl` = 56px full-width CTA), `card`, `tabs`, `input`, `badge`, `dialog`, `sheet`, `tooltip`, `separator`, `table`, `skeleton`, `dropdown-menu`, `toggle-group`, `progress`, `slider`, `scroll-area`, `sonner` (`toast` from `sonner`), `chart`.\n\n`@/components/ui/liquid-metal-button`: `LiquidMetalButton` (`label`, `fullWidth`, `disabled`, `onClick`, `type`, `href`). The Trade CTA in the trade box only; every other primary action is `<Button size=\"xl\">`. The shader draws only the rim; the rim backing and the inner surface are flat opaque colours, and disabled swaps both for a muted opaque fill and hides the shader.\n\nMarket (`@/components/market`):\n\n| Component | Props |\n|---|---|\n| `MarketQuestion` | `strike`, `expiry`, `as`, `accentStrike`: \"ETH > $2,684.53 at 00:48?\" |\n| `PhaseBadge` | `phase`: opaque phase pill for table cells only (e.g. an invalid outcome in the feed). Never on, above or beside a heading |\n| `Countdown` | `to` (unix s): live `m:ss`, client-only |\n| `ProbabilityBar` | `up` (0..1), `labels` |\n| `SideMark` | `side`: plain inline \"▲ UP\" / \"▼ DOWN\" text in the side colour, the side indicator wherever a logo would go |\n| `PriceTag` | `side`, `price?`: \"▲ UP 63¢\", or just \"▲ UP\" without a price. The one UP / DOWN pill everywhere (tables, feed, portfolio) |\n| `Chance` | `value`, `className` (number size): big \"48% ▲ UP\" |\n| `Money` | `value`, `dimCents`: $1,234 with small muted cents for hero numbers |\n| `Profit` | `value`: signed USD, foreground / coral / muted when flat |\n| `AssetChip` | `asset` (`{kind:\"usdc\"}`, `{kind:\"shares\"}`, `{kind:\"outcome\", side}`), `title`: the token pill of stacked cards; plain ticker text with no logo; outcome chips lead with a ▲ / ▼. `Balance` (wallet icon + amount) sits beside it |\n| `SwapStack` | `top`, `bottom`, `onFlip?` (arrow becomes a spinning button), `flipLabel`: the atomic.cash stacked card, focus ring on the card when its input has focus |\n| `SwapOutput` | `chip`, `value` (string or null for the grey 0), `htmlFor`, `label`: the \"You receive\" half |\n| `Sparkline` | `data` (0..1), `domain`, `color`: a line, no fill |\n| `ProbabilityChart` | `points` (`usePriceHistory`), `domain` (`[openTime, cutoff]` to show the full life), `height`: a line, no area fill |\n| `MarketCard` | `market`, `onBuy?` (defaults to linking `/market/[id]?side=up`). Question first, no phase pill. Live: Buy UP / DOWN and the countdown in the footer row; closed, averaging, settling: countdown row; resolved: winner and a \"Settled\" average row |\n| `AmountInput` | `value` (string), `onChange`, `label`, `adornment`, `quick` (default 1/5/10), `max`: 48px input + pills; the pill matching the value is filled orchid |\n| `SegmentedPills` | `options` (`activeClassName` per option, e.g. `bg-up text-white`), `value`, `onChange`, `size` `xs`/`sm`/`md`, `fullWidth`. Radio group with arrow keys and a focus ring |\n\nAlso exported: `PHASE_DOT` (status dot classes per phase) from `phase-badge`. Trade (`@/components/trade`): `TradeCard` (swaps to an outcome card with Claim once resolved), `useClaims` (`claimOne`, `claimAll`, switches network first; the only claim hook).\n\n### atomic.cash patterns to reuse\n\n- **Stacked trade card**: always `SwapStack` + `SwapOutput` + `AssetChip`, never a hand-rolled copy. One card, not a card inside a card: selectors (pills, outcome buttons) above it, the summary line and CTA below it.\n- **Settings row under a card**: `mt-3 flex justify-between px-1 text-xs text-muted-foreground` with `SegmentedPills size=\"xs\"`.\n- **Full-width CTA** under the card: `mt-3`, 56px, rounded-full.\n- **Stat tiles**: `Panel`, centered, `font-heading text-2xl` value with the `text-xs text-muted-foreground` label under it (never above: that reads as a kicker), in `grid gap-5 md:grid-cols-3`.\n- **Tables**: shadcn `Table` inside `<Panel flush>`; numbers right-aligned in `font-secondary num`; on mobile switch to stacked rows (`rounded-2xl border bg-surface-2 p-3`) with CSS breakpoints (`hidden lg:block` / `lg:hidden`), not JS media queries.\n- **Tabs**: `SegmentedPills size=\"sm\"` above the content, not underlined tabs.\n- **Empty / connect states**: `EmptyState` (flat orchid-tinted surface) with one line and one pill button.\n- **Disabled CTAs**: the label stays readable; the surface switches to an opaque muted fill (`LiquidMetalButton` uses its muted rim and surface, the default `Button` goes `bg-primary-disabled`), never reduced opacity.\n- **Error panels**: `rounded-3xl border border-down bg-down-soft text-down text-sm` centered one-liner.\n\n### Data\n\nPages read data only through `@/lib/data`: `useMarkets(tab?)` (rolling 90-minute window), `useMarket(id)`, `useLiveMarketId(exclude?)`, `useQuote(id)`, `usePriceHistory(id)`, `useMarketTrades(id)`, `useEthPrice()`, `usePortfolio()`, `useActivity(limit?)`, `useLeaderboard(limit?)`, `useVault()`, `useWallet()` (state + `connect`, `disconnect`, `switchNetwork`, `requestTestFunds`, `buy`, `sell`, `claim`, `vaultDeposit`, `vaultWithdraw`). Each returns `{ data, isLoading }` (`useWallet` returns state + actions + `isLoading`). `data` is `undefined` on the server and during hydration: render `Skeleton`s, never clock-dependent values. `useNow()` gives the ticking clock.\n\nHelpers: `@/lib/format` (`formatUsd`, `formatCents`, `formatPercent`, `formatCountdown`, `formatTime`, `shortAddress`, `tokenName`, `tokenTicker`, `formatTokens`, `formatAgo`), `@/lib/phase` (`phaseOf`, `PHASE_LABEL`, `DEADLINE_LABEL`, `tabOf`, `nextDeadline`, `isTradable`, `isResolved`, `payoutPerToken`), `@/lib/trade` (`previewBuy`, `previewSell`), `@/lib/pricing` (Black-Scholes port, `midAt` for what-if). Types in `@/lib/types`.\n\nMock start states: `?wallet=disconnected`, `?wallet=wrong-network`, `?wallet=empty`.",
       "Portfolio scope": "\nPortfolio is a design-first extension, scoped to `.portfolio-page` and `.portfolio-dialog` in `src/components/portfolio/portfolio.css`. It does not restyle Markets, Market Detail, Activity, Vault or the shared header. The existing transparent header reveals the page-owned `/markets/orbit.webp` backdrop, extended above the shell offset. Its static 350px art uses 0.48 opacity and a fade mask. The summary and primary actions may use scoped violet gradients; no continuously animated effects, decorative icons, characters, promotional labels or slogans are added.\n\nUse Manrope and tabular numerals on the near-black `#080b12` ground, `#f5f5fa` text, `#b4bdd3` secondary text, fine borders and 8–12px corners. The heading is 30px (27px below 640px), section headings 23px (21px below 640px), and table text 13px. The container caps at 1536px with 48px gutters, 28px below 1280px and 20px below 640px. Below 1024px, tables become compact cards in a container capped at 780px. The five-metric summary wraps to three columns, then two below 640px with its total spanning both. Preserve the production mobile dock clearance.\n\nThe compact title and “Your positions, claims and history.” lead into one summary band: Total portfolio value, Unrealised P&L, Realised P&L, Open positions, Claimable balance, then Claim all. Open Positions, Claimable Positions and History always follow vertically, without tabs or a separate claim banner. Open rows sort by expiry ascending; claimable rows by receivable value descending; history by settlement time descending with missing times last. Result means market outcome; Status means the user's processing state. Losing positions belong in History, and an unclaimed Invalid payout is not labelled Refunded.\n\nProduction currently has no Portfolio accounting source or Sell/Claim integration. Disconnected wallets use the existing wallet dialog, wrong networks use the existing switch action, and correctly connected wallets see an unavailable-data notice. Summary values remain N/A and sections explain missing data instead of suggesting zero balances. No sample positions or preview execution callbacks enter the production route. Total portfolio value excludes wallet USDC and equals unsettled value plus claimable value only when all required values are available. Unit prices preserve 2–4 decimal places; amounts use two. No acquisition costs or realised P&L are inferred.\n\nSell and Claim dialogs are exercisable only in the isolated sample preview. Sell has token quantities, 25/50/75/Max controls, quote states and explicit validation. Claim confirmation counts distinct markets, processes them sequentially and preserves successful sample claims after partial failure. Existing Radix dialogs provide focus trapping; close restores the opener or the Portfolio heading when the row disappears. Visible 2px violet focus outlines and reduced-motion overrides are mandatory. Disabled actions remain readable. Empty states use text and a necessary link only.\n\nRun `npm run preview:portfolio` from `web/` for the loopback-only preview at `http://localhost:3102`. It always labels itself “UI preview · Sample data”, uses isolated ETH fixtures and never connects wallets, calls RPC or submits transactions. See `preview/portfolio/README.md` for scenarios, operational limits and verification notes.\n\n",
-      "Activity scope": "\nActivity is a design-first, public read-only screen scoped to `.activity-page` in `src/components/activity/activity.css`. It does not require wallet connection. The production hooks have no indexed source yet: totals remain N/A and the feed and ranking explain that data is not connected. Do not turn unavailable data into a zero-valued successful result or import preview fixtures into the production route.\n\nUse the existing near-black ground, Manrope, tabular numbers, violet UP, coral DOWN and green positive/live text. Metric panels use `activity-metric`, feed/ranking panels use `activity-panel`, and row hover uses `activity-hover`; these are local extensions, not replacements for global tokens. The transparent shared header remains unchanged and reveals the page-owned static `/markets/orbit.webp` at 0.48 opacity behind the top 350px. Keep the 30px title, 23px panel headings, fine borders and 10px panel corners. No animated artwork or new illustrations are introduced.\n\nThe container caps at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Summary metrics are Volume 1h, Trades 1h, Wins/Losses 1h and Win rate 1h. Below 1024px the four summary panels use two columns, the 3:2 feed/ranking layout stacks and tables become readable cards. At mobile widths the title is 27px and panel headers wrap. Preserve existing production dock clearance and reduced-motion handling.\n\nEvery metric uses the same snapshot boundary: `asOf - 3600 < timestamp <= asOf`. Buy and Sell count toward traded volume and trade count; Claim does not. Wins and losses represent user-position outcomes, not market counts, and exclude Invalid refunds. Rank up to ten traders by known realised profit, and show the newest twelve feed events. Missing accounting remains unavailable; no realised profit is inferred from trade totals. Preserve the last successful snapshot and its original As of time when updates pause or fail, rather than silently replacing it with zeros or advancing its time window.\n\n`npm run preview:activity` launches the loopback-only sample preview at `http://localhost:3103`. It prominently labels sample data, generates local updates every five seconds and includes pause, failure, recovery and missing-data scenarios. No wallet, RPC, indexer or real transaction is connected. See `preview/activity/README.md` for startup and scenario details. Other route designs and the shared header remain governed by their existing rules.\n\n"
+      "Activity scope": "\nActivity is a design-first, public read-only screen scoped to `.activity-page` in `src/components/activity/activity.css`. It does not require wallet connection. The production hooks have no indexed source yet: totals remain N/A and the feed and ranking explain that data is not connected. Do not turn unavailable data into a zero-valued successful result or import preview fixtures into the production route.\n\nUse the existing near-black ground, Manrope, tabular numbers, violet UP, coral DOWN and green positive/live text. Metric panels use `activity-metric`, feed/ranking panels use `activity-panel`, and row hover uses `activity-hover`; these are local extensions, not replacements for global tokens. The transparent shared header remains unchanged and reveals the page-owned static `/markets/orbit.webp` at 0.48 opacity behind the top 350px. Keep the 30px title, 23px panel headings, fine borders and 10px panel corners. No animated artwork or new illustrations are introduced.\n\nThe container caps at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Summary metrics are Volume 1h, Trades 1h, Wins/Losses 1h and Win rate 1h. Below 1024px the four summary panels use two columns, the 3:2 feed/ranking layout stacks and tables become readable cards. At mobile widths the title is 27px and panel headers wrap. Preserve existing production dock clearance and reduced-motion handling.\n\nEvery metric uses the same snapshot boundary: `asOf - 3600 < timestamp <= asOf`. Buy and Sell count toward traded volume and trade count; Claim does not. Wins and losses represent user-position outcomes, not market counts, and exclude Invalid refunds. Rank up to ten traders by known realised profit, and show the newest twelve feed events. Missing accounting remains unavailable; no realised profit is inferred from trade totals. Preserve the last successful snapshot and its original As of time when updates pause or fail, rather than silently replacing it with zeros or advancing its time window.\n\n`npm run preview:activity` launches the loopback-only sample preview at `http://localhost:3103`. It prominently labels sample data, generates local updates every five seconds and includes pause, failure, recovery and missing-data scenarios. No wallet, RPC, indexer or real transaction is connected. See `preview/activity/README.md` for startup and scenario details. Other route designs and the shared header remain governed by their existing rules.\n\n",
+      "Vault scoped extension": "Vault (`/vault`) is a scoped extension following the approved `.impeccable/vault.md` reference: near-black panels, vivid magenta actions, static violet orbital artwork and an Ethereum hero motif. Its body and explanation dialog use scoped Vault styles; the shared header and other route bodies are unchanged.\n\nVault uses the `vault-*` tokens from `src/components/vault/vault.css`. Its magenta action gradient and translucent panel gradient are reference-approved local treatments. Disabled primary actions use the opaque muted purple and readable pale foreground tokens; they never rely on reduced opacity.\n\nVault inherits the loaded `var(--font-manrope)` family with Manrope and sans-serif fallbacks, and tabular numerals. Its scoped heading, metric, section, label and action roles are in the frontmatter. The heading reduces to 43px below 1024px and 40px below 541px. Amount entry is 40px, reducing to 36px on mobile; estimates are 30px. Compact table text is 12px, with 10px column labels.\n\nVault caps its container at 1488px. Wide viewports use 92px gutters from 1550px; the base gutter is 32px, falling to 24px below 1401px and 14px below 541px. Six summary metrics precede a 38:30:32 grid for the form, explanation and composition, followed by full-width exposure. Reused grid gaps are 12px. Below 1024px the main grid stacks and summary metrics use three columns; below 541px summary metrics use two columns with 8px gaps. Exposure remains a horizontally scrollable table with a 980px minimum width on stacked layouts and a 440px maximum scroll height. Mobile retains bottom dock clearance.\n\nVault depth comes from subtle panel gradients, thin borders and static orbital glows. Its Ethereum motif has a restrained violet drop shadow. Selected controls have a fine inset highlight; amount focus adds a translucent ring. Button color and border transitions last 150ms; reduced-motion mode removes transitions and animations. These are Vault-only effects.\n\nVault panels use the scoped panel radius; inner amount and estimate containers use 12px corners. Primary actions and segmented tabs use the scoped action and tab radii. Composition and exposure bars are rounded; the reference-approved donut, small SVG symbols and circular step illustrations remain specific to Vault.\n\nVault composes six metrics, a Deposit/Withdraw segmented form, quick amounts and Max, an estimate and full-width CTA, a three-step explanation with a keyboard-accessible dialog, a composition donut/legend and filtered, sortable exposure table. Selected segments use the primary gradient. The main CTA preserves an opaque readable disabled state. Keyboard focus uses the Vault focus token with a 2px outline and 3px offset; amount-field focus additionally changes its border. Hover preserves layout. SVG diagrams support the reference, while unavailable historical data leaves charts absent. Data semantics and execution constraints belong in PRODUCT.md and preview/vault/README.md.\n\n- Do keep Vault visual extensions scoped to `.vault-page` and `.vault-explanation`.\n- Do preserve readable disabled actions, visible keyboard focus, tabular values and mobile dock clearance on Vault.\n- Don't promote Vault's reference-specific artwork, gradients or composition into rules for other surfaces."
     }
   }
 }

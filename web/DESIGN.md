@@ -1,5 +1,5 @@
 ---
-name: Phinary Markets, Market Detail, Portfolio, Activity and shared header
+name: Phinary Markets, Market Detail, Portfolio, Activity, Vault and shared header
 description: Compact near-black financial interface with violet atmosphere.
 colors:
   background: "#080b12"
@@ -57,6 +57,17 @@ colors:
   detail-divider: "#202635"
   detail-link-underline: "#626a80"
   detail-scrollbar: "#43445a"
+  vault-background: "#0d0e15"
+  vault-foreground: "#f5f3fa"
+  vault-muted: "#bbb5cf"
+  vault-line: "#ffffff1c"
+  vault-primary-start: "#bc00f2"
+  vault-primary-end: "#d000fa"
+  vault-primary-disabled: "#612178"
+  vault-primary-disabled-text: "#eadff0"
+  vault-focus: "#e492ff"
+  vault-panel-start: "#13131bdd"
+  vault-panel-end: "#0e1016ed"
 typography:
   display:
     fontFamily: "Manrope, sans-serif"
@@ -149,6 +160,31 @@ typography:
     fontSize: "24px"
     fontWeight: 400
     lineHeight: 1.5
+  vault-heading:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "50px"
+    fontWeight: 650
+    lineHeight: 1.08
+    letterSpacing: "-1.5px"
+  vault-metric:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "25px"
+    fontWeight: 600
+    lineHeight: 1.1
+    letterSpacing: "-0.7px"
+  vault-section:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "16px"
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "-0.2px"
+  vault-label:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "12px"
+  vault-action:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "14px"
+    fontWeight: 600
 rounded:
   card: "12px"
   control: "8px"
@@ -158,6 +194,9 @@ rounded:
   detail-segment: "5px"
   detail-tooltip: "6px"
   detail-status: "24px"
+  vault-panel: "13px"
+  vault-action: "22px"
+  vault-tabs: "24px"
 spacing:
   compact: "12px"
   card-mobile: "16px"
@@ -167,6 +206,7 @@ spacing:
   detail-grid-row: "12px"
   detail-grid-column: "24px"
   detail-panel-inline: "18px"
+  vault-panel: "18px"
 components:
   featured-card:
     backgroundColor: "{colors.featured}"
@@ -196,6 +236,17 @@ components:
     textColor: "{colors.foreground}"
     rounded: "{rounded.control}"
     height: "48px"
+  vault-primary-disabled:
+    backgroundColor: "{colors.vault-primary-disabled}"
+    textColor: "{colors.vault-primary-disabled-text}"
+    typography: "{typography.vault-action}"
+    rounded: "{rounded.vault-action}"
+    height: "40px"
+    width: "100%"
+  vault-panel:
+    textColor: "{colors.vault-foreground}"
+    rounded: "{rounded.vault-panel}"
+    padding: "{spacing.vault-panel}"
 ---
 
 # Design System: Phinary
@@ -204,15 +255,21 @@ components:
 
 This refresh applies to Markets, Market Detail (`/market/[id]`), Portfolio (`/portfolio`), Activity (`/activity`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; Portfolio scope is defined below and in `preview/portfolio/README.md`. Product and data constraints remain in `PRODUCT.md`.
 
+Vault (`/vault`) is a scoped extension following the approved `.impeccable/vault.md` reference: near-black panels, vivid magenta actions, static violet orbital artwork and an Ethereum hero motif. Its body and explanation dialog use scoped Vault styles; the shared header and other route bodies are unchanged.
+
 ## Colors
 
 Violet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css`, `src/app/market/[id]/_components/market-detail.css` and the shared-header rules in `src/app/globals.css`. The `detail-*` primitives are intentional local tonal states for inputs, selectors, status, focus and disabled actions; they do not replace legacy global tokens. Violet gradients mark the primary purchase action, coral identifies DOWN selection, and green is reserved for positive/live/success states.
+
+Vault uses the `vault-*` tokens from `src/components/vault/vault.css`. Its magenta action gradient and translucent panel gradient are reference-approved local treatments. Disabled primary actions use the opaque muted purple and readable pale foreground tokens; they never rely on reduced opacity.
 
 ## Typography
 
 Markets, Market Detail and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
 
 Market Detail adds a compact hierarchy: responsive question, section heading, trade title, metric value, model output, amount and action roles. The exact observed sizes are in the `detail-*` typography tokens. Labels, notes and table cells use the label role; controls and secondary values use the control role. Question headings use tighter tracking and wrap to fit; their mobile role applies below 640px. These are intentional terminal-density steps, not new global heading defaults.
+
+Vault inherits the loaded `var(--font-manrope)` family with Manrope and sans-serif fallbacks, and tabular numerals. Its scoped heading, metric, section, label and action roles are in the frontmatter. The heading reduces to 43px below 1024px and 40px below 541px. Amount entry is 40px, reducing to 36px on mobile; estimates are 30px. Compact table text is 12px, with 10px column labels.
 
 ## Layout
 
@@ -222,15 +279,21 @@ Markets, Market Detail and header containers cap at 1536px, with 48px gutters, 2
 
 Market Detail uses an approximately 65/35 desktop split: `minmax(0, 1.95fr) minmax(340px, 1fr)`, with 12px row and 24px column gaps. Below 1280px the ratio becomes 1.75:1 and the column gap 16px. The trade panel sticks at the shared shell offset. Below 1024px it returns to normal flow in a container capped at 780px, ordered overview, chart, trade, position, pricing, then settlement rules, recent trades and onchain information. Charts reserve 235px height, reduced to 220px below 640px. The lower desktop pair uses 1.4:1 columns and stacks below 1024px.
 
+Vault caps its container at 1488px. Wide viewports use 92px gutters from 1550px; the base gutter is 32px, falling to 24px below 1401px and 14px below 541px. Six summary metrics precede a 38:30:32 grid for the form, explanation and composition, followed by full-width exposure. Reused grid gaps are 12px. Below 1024px the main grid stacks and summary metrics use three columns; below 541px summary metrics use two columns with 8px gaps. Exposure remains a horizontally scrollable table with a 980px minimum width on stacked layouts and a 440px maximum scroll height. Mobile retains bottom dock clearance.
+
 ## Elevation & Depth
 
 Thin borders and tonal surfaces establish depth. The header has a transparent background and no artwork of its own. The page artwork extends beneath the fixed header, so the same background remains continuous across it; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets and Market Detail honor reduced motion. Detail uses the same static orbital asset at 0.45 opacity behind its upper 380px, translucent panels and fine separators. Detail controls transition colors/borders over 150ms and shift 1px on press; reduced motion removes transitions and the press transform. No new panel shadows are introduced.
+
+Vault depth comes from subtle panel gradients, thin borders and static orbital glows. Its Ethereum motif has a restrained violet drop shadow. Selected controls have a fine inset highlight; amount focus adds a translucent ring. Button color and border transitions last 150ms; reduced-motion mode removes transitions and animations. These are Vault-only effects.
 
 ## Shapes
 
 Cards and table containers use the card radius. Search, select and featured actions use the control radius. Filter buttons use the smaller filter radius; filter groups, row actions and header wallet controls use the control-group radius. Status labels and ETH symbols are rounded independently.
 
 Detail panels use their own smaller panel radius; its segment buttons, chart tooltips and status capsule use the corresponding detail radius tokens. Trade controls retain the shared control radius, and quick amounts retain the filter radius.
+
+Vault panels use the scoped panel radius; inner amount and estimate containers use 12px corners. Primary actions and segmented tabs use the scoped action and tab radii. Composition and exposure bars are rounded; the reference-approved donut, small SVG symbols and circular step illustrations remain specific to Vault.
 
 ## Components
 
@@ -240,6 +303,8 @@ Market Detail includes a question/date/status header, overview metrics, chart mo
 
 The user-approved settlement companion is a static orbital robot below the resolved/invalid Settlement panel. It uses the existing palette and a secondary Explore markets link, with a 260px image on desktop, 150px below 1024px and 112px below 640px. Stacked layouts place the image and copy side by side. This character is a scoped exception to the earlier no-decoration direction; trading screens and other route bodies are unchanged.
 
+Vault composes six metrics, a Deposit/Withdraw segmented form, quick amounts and Max, an estimate and full-width CTA, a three-step explanation with a keyboard-accessible dialog, a composition donut/legend and filtered, sortable exposure table. Selected segments use the primary gradient. The main CTA preserves an opaque readable disabled state. Keyboard focus uses the Vault focus token with a 2px outline and 3px offset; amount-field focus additionally changes its border. Hover preserves layout. SVG diagrams support the reference, while unavailable historical data leaves charts absent. Data semantics and execution constraints belong in PRODUCT.md and preview/vault/README.md.
+
 ## Do's and Don'ts
 
 - Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.
@@ -248,6 +313,10 @@ The user-approved settlement companion is a static orbital robot below the resol
 - Do use text and UP/DOWN triangles for detail hierarchy; avoid decorative icons.
 - Don't apply this refresh to other route bodies without a separate decision.
 - Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.
+
+- Do keep Vault visual extensions scoped to `.vault-page` and `.vault-explanation`.
+- Do preserve readable disabled actions, visible keyboard focus, tabular values and mobile dock clearance on Vault.
+- Don't promote Vault's reference-specific artwork, gradients or composition into rules for other surfaces.
 
 ## Portfolio scope
 
@@ -265,15 +334,13 @@ Run `npm run preview:portfolio` from `web/` for the loopback-only preview at `ht
 
 ## Activity scope
 
-Activity is a design-first, public read-only screen scoped to `.activity-page` in `src/components/activity/activity.css`. It does not require wallet connection. The production hooks have no indexed source yet: totals remain N/A and the feed and ranking explain that data is not connected. Do not turn unavailable data into a zero-valued successful result or import preview fixtures into the production route.
+Activity is a public read-only screen scoped to `.activity-page`. The latest user reference explicitly supersedes the earlier minimal/no-chart direction for this surface. Match the reference with four summary panels: Volume, Trades, combined Wins/Losses, and a small numeric win-rate ring. Use purple SVG bar sparklines, green/red previous-hour change pills, violet metric icons, an Ethereum mark and orbital accent, address avatars, and gold/silver/bronze ranking medals. UP is green and DOWN coral on Activity, following this specific reference; other routes retain their own color semantics. These are scoped exceptions, not global token replacements.
 
-Use the existing near-black ground, Manrope, tabular numbers, violet UP, coral DOWN and green positive/live text. Metric panels use `activity-metric`, feed/ranking panels use `activity-panel`, and row hover uses `activity-hover`; these are local extensions, not replacements for global tokens. The transparent shared header remains unchanged and reveals the page-owned static `/markets/orbit.webp` at 0.48 opacity behind the top 350px. Keep the 30px title, 23px panel headings, fine borders and 10px panel corners. No animated artwork or new illustrations are introduced.
+The desktop container caps at 1536px with 48px gutters, a 44px title and 23px panel headings. Four 106px summary panels lead into an approximately 59/41 feed/ranking split. Tables use 13px body text, 12px labels, compact rows, and right-aligned numeric columns. Below 1440px, gutters and type compact; below 1024px summary panels use two columns and tables become stacked cards. Mobile uses 16px gutters and a 32px title. Existing app header, wallet behavior, and dock clearance are retained. The page ends with the reference's compact branded footer.
 
-The container caps at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Summary metrics are Volume 1h, Trades 1h, Wins/Losses 1h and Win rate 1h. Below 1024px the four summary panels use two columns, the 3:2 feed/ranking layout stacks and tables become readable cards. At mobile widths the title is 27px and panel headers wrap. Preserve existing production dock clearance and reduced-motion handling.
+The production screen polls `/api/activity` every five seconds. Chart bars are eighteen 200-second bins of actual indexed Buy/Sell events. Changes compare current totals with the preceding hour; an unknown or zero previous total has no percentage badge. Claims are excluded. The ring is wins divided by wins plus losses; without outcomes it shows N/A. Failed/delayed updates retain the last snapshot and timestamp, and are not labelled Live. No preview fixture enters the production route.
 
-Every metric uses the same snapshot boundary: `asOf - 3600 < timestamp <= asOf`. Buy and Sell count toward traded volume and trade count; Claim does not. Wins and losses represent user-position outcomes, not market counts, and exclude Invalid refunds. Rank up to ten traders by known realised profit, and show the newest twelve feed events. Missing accounting remains unavailable; no realised profit is inferred from trade totals. Preserve the last successful snapshot and its original As of time when updates pause or fail, rather than silently replacing it with zeros or advancing its time window.
-
-`npm run preview:activity` launches the loopback-only sample preview at `http://localhost:3103`. It prominently labels sample data, generates local updates every five seconds and includes pause, failure, recovery and missing-data scenarios. No wallet, RPC, indexer or real transaction is connected. See `preview/activity/README.md` for startup and scenario details. Other route designs and the shared header remain governed by their existing rules.
+`npm run preview:activity` shows an explicitly labelled sample world, including illustrative multi-asset names. Its normal scenario starts at $12.5K, 1,197 trades, 33 wins, 25 losses, +18.4% volume and +12.1% trades, with live local updates. The sample financial values are derived from fixture events and recorded comparison totals. Other scenarios cover empty, loading, unavailable, failure, recovery and missing accounting. The sample wallet label has no live wallet connection. See `preview/activity/README.md` and `../indexer/README.md`.
 
 ## Legacy body reference
 

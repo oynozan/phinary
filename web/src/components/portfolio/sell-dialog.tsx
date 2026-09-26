@@ -1,4 +1,5 @@
 "use client";
+import { formatUnits } from "viem";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatUsd } from "@/lib/format";
@@ -28,7 +29,7 @@ function SellForm({ row, now, actions, onDone, onBusy }: { row: PortfolioRow; no
         event.preventDefault();
         if (reason || !quote || units === null || submitting) return;
         setSubmitting(true); onBusy(true); setError("");
-        try { await actions.sell(row, units, quote); onDone(`Sold ${amountText(units)} ${row.side.toUpperCase()} for ${formatUsd(quote.usdc)}`); }
+        try { const paid = await actions.sell(row, units, quote); onDone(`Sold ${amountText(units)} ${row.side.toUpperCase()}${typeof paid === "number" ? ` for ${formatUsd(paid)}` : ""}`); }
         catch (e) { setError(e instanceof Error ? e.message : "Sale failed. Try again."); }
         finally { setSubmitting(false); onBusy(false); }
     }
@@ -38,6 +39,7 @@ function SellForm({ row, now, actions, onDone, onBusy }: { row: PortfolioRow; no
         <label htmlFor="portfolio-sell-amount">Amount in tokens</label><input id="portfolio-sell-amount" value={amount} inputMode="decimal" autoComplete="off" disabled={submitting || !tradable} onChange={(e) => { setAmount(e.target.value); setError(""); }} aria-describedby="portfolio-sell-status" />
         <div className="portfolio-percentages">{[25, 50, 75, 100].map((percent) => <button type="button" key={percent} disabled={submitting || !tradable} onClick={() => setAmount(amountText(row.quantity * BigInt(percent) / 100n))}>{percent === 100 ? "Max" : `${percent}%`}</button>)}</div>
         <dl className="portfolio-dialog-quote"><div><dt>Expected USDC received</dt><dd>{quote && !reason ? formatUsd(quote.usdc) : "N/A"}</dd></div><div><dt>Average sell price</dt><dd>{quote && !reason ? portfolioUnitPrice(quote.averagePrice) : "N/A"}</dd></div></dl>
+        {quote?.review && <p className="portfolio-dialog-note">Minimum receive: {formatUnits(quote.review.minimumOut, 6)} USDC · Slippage: {quote.review.slippageBps / 100}%</p>}
         <p id="portfolio-sell-status" role="status" className="portfolio-dialog-note">{reason}</p>{error && <p role="alert" className="portfolio-negative">{error}</p>}
         <button type="submit" className="portfolio-primary" disabled={submitting || Boolean(reason)}>{submitting ? "Selling…" : `Sell ${row.side.toUpperCase()}`}</button>
     </form>;

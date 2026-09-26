@@ -39,11 +39,19 @@ test('token input preserves six-decimal precision and rejects invalid input',()=
  for(const value of ['-1','1e3','1.0000001','NaN','']) assert.equal(tokenAmount(value),null);
  assert.equal(tokenAmount(amountText(24_390_000n*25n/100n)),6_097_500n);
 });
-test('sequential claims preserve successful payouts and continue after failure',async()=>{
+test('sequential claims preserve successful payouts and stop after failure',async()=>{
  const calls:number[]=[]; const progress:number[]=[];
  const result=await claimSequentially([5,6,5,8],async id=>{calls.push(id);if(id===6)throw Error('sample failure');return id===5?160:50;},p=>progress.push(p.completed));
- assert.deepEqual(calls,[5,6,8]); assert.deepEqual(progress,[0,1,2,3]);
- assert.deepEqual(result,{completed:3,total:3,paid:210,failed:1});
+ assert.deepEqual(calls,[5,6]); assert.deepEqual(progress,[0,1,2]);
+ assert.deepEqual(result,{completed:2,total:3,paid:160,failed:1,stopped:true});
 });
 
 test("unit prices preserve precision independently from currency totals",()=>{ assert.equal(portfolioUnitPrice(.365),"$0.365"); assert.equal(portfolioUnitPrice(.584),"$0.584"); assert.equal(portfolioUnitPrice(null),"N/A"); });
+
+test('invalid dust is excluded from Claim All unless combined sides produce a nonzero payout', () => {
+ const invalid = { ...rows[5], marketId: 100, phase: 'invalid' as const, quantity: 1n, value: .0000005 };
+ assert.deepEqual(claimPlan([invalid]).marketIds, []);
+ const combined = claimPlan([invalid, { ...invalid, id: '100:up', side: 'up' as const }]);
+ assert.deepEqual(combined.marketIds, [100]); assert.equal(combined.amount, .000001);
+ assert.deepEqual(claimPlan([invalid, rows[4]]).marketIds, [5]);
+});

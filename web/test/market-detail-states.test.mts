@@ -18,6 +18,7 @@ export function retryMarkets() {}
 export async function refreshWalletBalances() {}
 export async function switchWalletNetwork() {}
 export async function connectWallet() { throw Error("Fixture cannot connect"); }
+export async function claimMarket() { throw Error("Fixture cannot transact"); }
 export async function buyUp() { throw Error("Fixture cannot transact"); }
 export async function checkPendingTransaction() {}
 `;
@@ -60,9 +61,9 @@ export function render(market, state = {}, side = "up", amount = "10") {
         const wrong = render(market, { wallet: { chainId: 1 } });
         assert.match(wrong.trade, />Switch to Unichain Sepolia<\/button>/); assert.match(wrong.position, /Switch to Unichain/);
         for (const [state, expected] of [
-            [{ wallet: { usdc: 0n }, quoteQuery }, "Not enough USDC"],
+            [{ wallet: { usdc: 0n }, quoteQuery }, "Not enough input tokens"],
             [{ wallet: { eth: 0n }, quoteQuery }, "Test ETH required for gas"],
-            [{ wallet: { usdc: null }, quoteQuery }, "USDC balance unavailable"],
+            [{ wallet: { usdc: null }, quoteQuery }, "Input balance unavailable"],
             [{ quoteQuery: { error: "Quote unavailable. Retrying automatically." } }, "Quote unavailable"],
             [{ now: 1040, quoteQuery }, "Refreshing quote"],
             [{ transaction: { busy: true, progress: { step: "sign", message: "Awaiting signature" } }, quoteQuery }, "Awaiting signature"],
@@ -72,11 +73,11 @@ export function render(market, state = {}, side = "up", amount = "10") {
             assert.equal(enabled(html), false, expected); assert.ok(html.includes(expected), expected);
         }
         const down = render(market, { quoteQuery }, "down").trade;
-        assert.equal(enabled(down), false); assert.match(down, /DOWN is preview only/); assert.doesNotMatch(down, /24.39 UP/);
+        assert.equal(enabled(down), false); assert.match(down, /Buy DOWN/); assert.doesNotMatch(down, /24.39 UP/);
         for (const phase of ["upcoming", "closed", "averaging", "awaiting", "resolved-up", "resolved-down", "invalid"]) {
             const html = render({ ...market, phase, quote: null }, { quoteQuery }).trade;
             assert.equal(enabled(html), false, phase);
-            if (phase.startsWith("resolved") || phase === "invalid") assert.match(html, /Claim unavailable/);
+            if (phase.startsWith("resolved") || phase === "invalid") assert.match(html, />Claim<\/button>/);
         }
         const position = render(market, { upBalance: { data: 24390000n } }).position;
         assert.match(position, /24.39 tokens/); assert.match(position, /37.0¢/); assert.match(position, /\$9.02/);
@@ -84,6 +85,6 @@ export function render(market, state = {}, side = "up", amount = "10") {
         const error = render(market, { upBalance: { data: undefined, error: new Error("RPC failed") } }).position;
         assert.match(error, /UP balance unavailable/); assert.doesNotMatch(error, /No tokens held/);
         const invalid = render({ ...market, phase: "invalid", quote: null }, { upBalance: { data: 2000000n } }).position;
-        assert.match(invalid, /\$1.00/); assert.match(invalid, /Claiming is not connected/);
+        assert.match(invalid, /\$1.00/); assert.match(invalid, /Claim from the Settlement panel/);
     } finally { await rm(dir, { recursive: true, force: true }); }
 });

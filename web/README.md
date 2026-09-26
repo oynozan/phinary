@@ -1,8 +1,7 @@
 # Phinary dashboard
 
 Next.js 16 front end for Phinary markets (PredictionHook). Market reads use the
-Unichain Sepolia RPC through `src/lib/data`. Wallet and transaction actions are
-not connected yet. The original mock comparison lives on the main worktree.
+Unichain Sepolia RPC through `src/lib/data`. Wallet connection, UP/DOWN buys and sells, redemption, and Vault actions are connected. The original mock comparison lives on the main worktree.
 
 ```bash
 npm install
@@ -74,7 +73,7 @@ Do not edit the installed package copy.
 - RPC failures show a Retry action and discard stale display data. A failed quote
   does not hide market rules/status, and is shown as unavailable rather than 0%.
 - Phase 2 enables wallet connection and UP purchases on market detail.
-  Portfolio, Activity and Vault still show their unconnected state.
+  Portfolio now reads complete registry balances; Vault reads deployed balances and supports deposits/withdrawals. Activity now has a separate Ponder integration described below.
 - History, volume, trade count and creation/settlement timestamps are not invented.
   `null` represents data that needs the team's history service.
 
@@ -99,8 +98,7 @@ switch to Unichain Sepolia (1301). The wallet needs test USDC and test ETH for g
 Enter a USDC amount; review the real quote, minimum ETHUP received and slippage
 (default 1%). Buy UP requests the required USDC approval, Permit2 signature and
 purchase confirmation. Confirmed purchases refresh USDC and market UP balances.
-No private key is stored by the web app. DOWN, selling, claiming and history are
-outside this phase; no backend or contract changes are required.
+No private key is stored by the web app. The v1.0 extension below adds DOWN, selling and claiming; complete history remains unavailable. no backend or contract changes are required.
 
 Quotes refresh every five seconds and execution rejects reviews older than 30
 seconds or after the trading cutoff. Price checks never lower the reviewed
@@ -128,3 +126,37 @@ funding uses this deployment's storage slot 9; the test asserts the funded balan
 Browser quote rendering and the disconnected wallet dialog were checked locally;
 actual extension signature prompts and public Sepolia submission still need a
 manual end-to-end check with your test wallet.
+
+## Activity: live indexed history
+
+Activity uses the Ponder service in [`../indexer`](../indexer/README.md). Start it
+with `npm run dev` from `indexer/`, then use `npm run dev:onchain` here. Local
+development defaults to `http://127.0.0.1:42069`; production requires server-only
+`PHINARY_INDEXER_URL`. No indexer URL or credential is sent to the browser.
+
+The fixed last-hour summary, newest 12 events and top 10 traders share a single
+snapshot. The read-only proxy and five-second refresh are independent of wallet
+and execution paths. Failed refreshes retain the last snapshot; missing or
+ambiguous accounting shows N/A. UI-only sample scenarios remain available via
+`npm run preview:activity`. See the indexer README for exact realisation,
+transfer, settlement and deployment limitations.
+
+## Frontend v1.0
+
+UP/DOWN exact-input purchases and sales use the existing SDK, Permit2 and UniversalRouter. Quotes expire after 30 seconds; reviewed minimum output is never lowered. Portfolio scans the entire market registry in chunks at a pinned block, including markets older than the home page window. Partial reads fail visibly rather than reporting an empty wallet. This full scan trades latency for completeness; the history service is not required for execution.
+
+Winning balances redeem through `redeem`; invalid markets combine UP and DOWN balances before the contract floors the half payout. Claim All submits sequentially and stops on a failure or unknown outcome, preserving successful claims. Pending receipts persist across reloads. A shared in-page operation guard prevents concurrent market/Portfolio/Vault submissions and blocks new submissions while a stored transaction awaits confirmation. Wallet extension prompts on public Sepolia are not part of the automated acceptance test.
+
+Current holdings come from RPC. Complete transaction history, historical acquisition costs and P&L are unavailable in this release and remain N/A. Activity uses the separately supplied indexer API; that backend is not included in this frontend PR. Set server-only `PHINARY_INDEXER_URL` to an existing compatible service. Local development assumes port 42069. Missing service shows an unavailable state and does not prevent trading or Vault actions.
+
+Validation commands:
+
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm run build -- --webpack
+npm run test:lifecycle:fork
+```
+
+The lifecycle fixture starts loopback Anvil at deployment block + 200, funds a generated test-only account, and creates an isolated test market with a deterministic test oracle. All modifications occur on the disposable fork, never public Sepolia. Existing deployed contracts and SDK sources are unchanged. Anvil must be installed or supplied with `ANVIL_BIN`.
