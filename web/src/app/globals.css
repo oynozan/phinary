@@ -277,3 +277,11 @@
 @media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 24px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
 
 @media (max-width: 380px) { .app-header .header-wallet { font-size: 10px; padding: 0 8px; gap: 6px; } .app-header .wallet-chevron { display: none; } .app-header .wallet-address { max-width: 70px; overflow: hidden; text-overflow: ellipsis; } }
+
+/* Stable, labelled touch navigation; no hover is needed to identify a route. */
+.app-dock { position: fixed; z-index: 50; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(360px, calc(100% - 24px)); grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; border: 1px solid #303144; border-radius: 20px; background: #0d111a; color: #b4bdd3; font-family: var(--font-manrope), sans-serif; }
+.app-dock-link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 56px; min-width: 0; border-radius: 14px; font-size: 11px; font-weight: 600; line-height: 1.2; }
+.app-dock-link[aria-current="page"] { color: #e1b1ff; background: #2d173e; }
+.app-dock-link:hover { color: #f5f5fa; background: #151925; }
+.app-dock-link:focus-visible { outline: 2px solid #db9bff; outline-offset: 1px; }
+@media (max-width: 1023px) { .app-dock { display: grid; } }
