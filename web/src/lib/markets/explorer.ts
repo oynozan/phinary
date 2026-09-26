@@ -15,6 +15,39 @@ export interface ExplorerFilters {
   search: string;
   sort: MarketSort;
 }
+/** Asset and duration picked on the home page, shared by the featured market and the list */
+export interface TrackFilter {
+  underlying: string;
+  track: string;
+}
+export const ALL_TRACKS: TrackFilter = { underlying: "all", track: "all" };
+/** Reads ?asset=eth&track=1m; a missing or malformed value matches every market */
+export function trackFilterFrom(params: { get(name: string): string | null }): TrackFilter {
+  const asset = params.get("asset")?.toUpperCase() ?? "";
+  const track = params.get("track")?.toLowerCase() ?? "";
+  return {
+    underlying: /^[A-Z0-9]{2,10}$/.test(asset) ? asset : "all",
+    track: /^\d{1,4}[smhd]$/.test(track) ? track : "all",
+  };
+}
+/** Home URL for a filter: "/?asset=sol&track=15m", or "/" when nothing is picked */
+export function trackFilterHref(filter: TrackFilter): string {
+  const params = new URLSearchParams();
+  if (filter.underlying !== "all") params.set("asset", filter.underlying.toLowerCase());
+  if (filter.track !== "all") params.set("track", filter.track);
+  const query = params.toString();
+  return query ? `/?${query}` : "/";
+}
+export function matchesTrack(
+  market: Market,
+  filter: Partial<TrackFilter>,
+  registry: UnderlyingRegistry = {},
+): boolean {
+  return (
+    (!filter.underlying || filter.underlying === "all" || underlyingOf(market, registry).symbol === filter.underlying) &&
+    (!filter.track || filter.track === "all" || market.track === filter.track)
+  );
+}
 const ASSET_NAMES: Record<string, string> = { ETH: "Ethereum", SOL: "Solana" };
 /** The market's own asset from its track or oracle, then the registry, never a silent ETH */
 export function underlyingOf(
@@ -59,9 +92,7 @@ export function selectMarkets(
     .filter(
       (m) =>
         tabOf(m.phase) === filters.tab &&
-        (filters.underlying === "all" ||
-          underlyingOf(m, registry).symbol === filters.underlying) &&
-        (!filters.track || filters.track === "all" || m.track === filters.track) &&
+        matchesTrack(m, filters, registry) &&
         (!query ||
           `${m.id} ${questionOf(m, registry)} ${underlyingOf(m, registry).name}`
             .toLowerCase()

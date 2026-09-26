@@ -7,6 +7,7 @@ import { BRAND_NAME } from "@/config/brand";
 import { useMarket } from "@/lib/data";
 import { useTokenBalance } from "@/lib/onchain/balances";
 import { isResolved } from "@/lib/phase";
+import { useMarketsHref } from "@/lib/markets/home-href";
 import { SettlementCompanion } from "./settlement-companion";
 import type { Market, Side } from "@/lib/types";
 import { ChartPanel } from "./chart-panel";
@@ -51,7 +52,8 @@ function MarketContent({ market, initialSide, stale }: { market: Market; initial
 }
 export function MarketView({ id, initialSide }: { id: number; initialSide: Side }) {
     const market = useMarket(id);
+    const marketsHref = useMarketsHref();
     return <div className="market-detail-page"><div className="detail-container">
-        {market.error && market.data === undefined ? <section className="detail-panel detail-error"><Link href="/">Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href="/">Back to Markets</Link></section> : <MarketContent key={id} market={market.data} initialSide={initialSide} stale={!!market.error} />}
+        {market.error && market.data === undefined ? <section className="detail-panel detail-error"><Link href={marketsHref}>Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href={marketsHref}>Back to Markets</Link></section> : <MarketContent key={id} market={market.data} initialSide={initialSide} stale={!!market.error} />}
     </div></div>;
 }

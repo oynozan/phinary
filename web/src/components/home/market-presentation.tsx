@@ -9,7 +9,6 @@ import {
   isTradable,
 } from "@/lib/phase";
 import {
-  underlyingOf,
   questionOf,
   type UnderlyingRegistry,
 } from "@/lib/markets/explorer";
@@ -22,30 +21,8 @@ export function MarketIdentity({
   market: Market;
   registry: UnderlyingRegistry;
 }) {
-  const asset = underlyingOf(market, registry);
   return (
     <span className="market-identity">
-      <span className="asset-symbol" aria-hidden>
-        {asset.symbol === "ETH" ? (
-          <svg viewBox="0 0 24 32" fill="none">
-            <path
-              d="m12 1 11 17-11 6L1 18 12 1Z"
-              fill="currentColor"
-              opacity=".9"
-            />
-            <path d="M12 1v23l11-6L12 1Z" fill="#a49bfa" />
-            <path d="m1 20 11 11 11-11-11 6-11-6Z" fill="currentColor" />
-          </svg>
-        ) : asset.symbol === "SOL" ? (
-          <svg viewBox="0 0 24 20" fill="currentColor">
-            <path d="M5 1h18l-4 4H1l4-4Z" />
-            <path d="M1 8h18l4 4H5L1 8Z" fill="#a49bfa" />
-            <path d="M5 15h18l-4 4H1l4-4Z" />
-          </svg>
-        ) : (
-          "?"
-        )}
-      </span>
       <span>
         <span className="market-question">{questionOf(market, registry)}</span>
         <span className="market-date">

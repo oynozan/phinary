@@ -5,31 +5,32 @@ import {
   selectMarkets,
   hasVolume,
   type ExplorerFilters,
+  type TrackFilter,
   type UnderlyingRegistry,
 } from "@/lib/markets/explorer";
-import type { MarketSnapshot } from "@/lib/onchain/read-markets";
 import type { Market } from "@/lib/types";
-import { MarketControls, TrackFilter } from "./market-controls";
+import { MarketControls } from "./market-controls";
 import { MarketTable } from "./market-table";
 const PAGE = 12;
 export function MarketBrowser({
   markets,
-  tracks,
+  filter,
   registry,
   error,
 }: {
   markets: Market[] | undefined;
-  tracks: MarketSnapshot["tracks"] | undefined;
+  filter: TrackFilter;
   registry: UnderlyingRegistry;
   error: boolean;
 }) {
-  const [filters, setFilters] = useState<ExplorerFilters>({
+  const [state, setFilters] = useState<ExplorerFilters>({
     tab: "live",
     underlying: "all",
     track: "all",
     search: "",
     sort: "deadline",
   });
+  const filters = { ...state, ...filter };
   const [limit, setLimit] = useState(PAGE);
   const candidates = markets
     ? selectMarkets(markets, { ...filters, sort: "deadline" }, registry)
@@ -42,14 +43,6 @@ export function MarketBrowser({
         registry,
       )
     : undefined;
-  const assets = [...new Set(tracks?.map((t) => t.asset) ?? [])];
-  const durations = [
-    ...new Set(
-      tracks
-        ? [...tracks].sort((a, b) => a.period - b.period).map((t) => t.label)
-        : [],
-    ),
-  ];
   const change = (next: ExplorerFilters) => {
     setFilters(next);
     setLimit(PAGE);
@@ -57,12 +50,6 @@ export function MarketBrowser({
   return (
     <section aria-label="Market explorer">
       <div className="market-toolbar">
-        <TrackFilter
-          filters={filters}
-          assets={assets}
-          durations={durations}
-          onChange={change}
-        />
         <MarketControls
           filters={filters}
           volumeAvailable={volumeAvailable}
