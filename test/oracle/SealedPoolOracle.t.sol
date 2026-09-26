@@ -11,7 +11,8 @@ import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
+import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 import {IUnderlyingOracle} from "../../src/interfaces/IUnderlyingOracle.sol";
 import {ISealedPoolOracle} from "../../src/interfaces/ISealedPoolOracle.sol";
@@ -120,8 +121,10 @@ abstract contract SealedTestBase is OracleTestBase {
         return oracle.blockTimeOf(n);
     }
 
+    /// @dev Ends one wei above the target tick's price, since a snapshot on an exact tick price never seals
     function _swapTicks(int256 d) internal {
-        _swapToNormTick(pk, _normTick(pk) + d);
+        int256 norm = _normTick(pk) + d;
+        _swapToSqrtPrice(pk, TickMath.getSqrtPriceAtTick(int24(sign > 0 ? norm : -norm - 1)) + 1);
     }
 
     /// @dev An idle block sealed between two pokes starts the oracle with frontier b0
@@ -149,6 +152,8 @@ contract SealedPoolOracleTest is SealedTestBase {
         Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
             | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG | Hooks.BEFORE_DONATE_FLAG
     );
+
+    int24 internal constant EDGE = -197340;
 
     function usdcIsCurrency0() internal pure override returns (bool) {
         return false;
@@ -466,6 +471,87 @@ contract SealedPoolOracleTest is SealedTestBase {
         assertEq(oracle.cumulativeAt(_t(b0 + 1)), k0);
     }
 
+    function test_spotFromQueueTail() public {
+        uint256 b0 = _startWithGap();
+        _roll(5);
+        assertTrue(oracle.poke(), "run [b0 + 2, b0 + 6] seals");
+        assertEq(oracle.queueLength(), 1, "queued behind the gap");
+        _swapTicks(-25);
+        uint256 n = vm.getBlockNumber();
+        assertLt(b0 + 1 + maxStale, n, "E_K alone would be stale");
+
+        (int24 k,) = oracle.sobTick();
+        assertEq(k, _endNorm(n - 1), "the queue tail holds E_(n-1)");
+        assertApproxEqAbs(oracle.lnSpotSoBWad(), _lnUsd(endSp[n - 1]), LN_TOL);
+
+        _roll(1);
+        vm.expectRevert(abi.encodeWithSelector(ISealedPoolOracle.StaleSpot.selector, b0, n + 1));
+        oracle.sobTick();
+    }
+
+    /* Liquidity edges */
+
+    function test_lowerTickEdgeCannotForgeSeal() public {
+        PoolKey memory k = _edgeKey();
+        manager.initialize(k, TickMath.getSqrtPriceAtTick(EDGE));
+        modifyLiquidityRouter.modifyLiquidity(k, ModifyLiquidityParams(EDGE, EDGE + 6000, 5e16, 0), ZERO_BYTES);
+        (, int24 t0,,) = manager.getSlot0(k.toId());
+        assertEq(t0, EDGE, "parked on P(T) with tick T, nothing below T");
+        _assertEdgeCannotForge(k, EDGE - 2000);
+    }
+
+    function test_upperTickEdgeCannotForgeSeal() public {
+        PoolKey memory k = _edgeKey();
+        manager.initialize(k, TickMath.getSqrtPriceAtTick(EDGE + 1020));
+        modifyLiquidityRouter.modifyLiquidity(k, ModifyLiquidityParams(EDGE - 6000, EDGE, 5e16, 0), ZERO_BYTES);
+        _edgeSwap(k, TickMath.getSqrtPriceAtTick(EDGE));
+        (uint160 sp0, int24 t0,,) = manager.getSlot0(k.toId());
+        assertEq(t0, EDGE - 1, "parked on P(T) with tick T - 1, nothing above T");
+        assertTrue(sp0 != TickMath.getSqrtPriceAtTick(t0), "sqrtP == P(tick) alone would miss this edge");
+        _assertEdgeCannotForge(k, EDGE + 3000);
+    }
+
+    /// @dev Documents the precondition that no single party controls all in-range liquidity
+    function test_preconditionSoleInRangeLpCanForgeSeal() public {
+        PoolKey memory k = _edgeKey();
+        uint160 sp0 = TickMath.getSqrtPriceAtTick(EDGE + 5) + 1;
+        manager.initialize(k, sp0);
+        ModifyLiquidityParams memory pos = ModifyLiquidityParams(EDGE - 600, EDGE + 600, 5e16, 0);
+        modifyLiquidityRouter.modifyLiquidity(k, pos, ZERO_BYTES);
+        SealedPoolOracleHarness o = _deploy(k);
+        uint256 a = vm.getBlockNumber();
+        o.applyProven(a - 1, sp0, EDGE + 5);
+        o.poke();
+
+        _roll(1);
+        pos.liquidityDelta = -5e16;
+        modifyLiquidityRouter.modifyLiquidity(k, pos, ZERO_BYTES);
+        _edgeSwap(k, TickMath.getSqrtPriceAtTick(EDGE - 400));
+        (, int24 t1,,) = manager.getSlot0(k.toId());
+        _roll(1);
+        _edgeSwap(k, sp0);
+        pos.liquidityDelta = 5e16;
+        modifyLiquidityRouter.modifyLiquidity(k, pos, ZERO_BYTES);
+
+        assertTrue(o.poke(), "the sole in-range LP restored every compared word");
+        assertEq(o.frontier(), a + 1);
+        int256 credited = int256(o.cumulativeAt(o.blockTimeOf(a + 2))) - o.cumulativeAt(o.blockTimeOf(a + 1));
+        assertTrue(credited != t1, "E_(a+1) is forged, hence the precondition");
+    }
+
+    function test_blockTimeOfOutOfRange() public {
+        vm.roll(2_000_000_000);
+        SealedPoolOracleHarness o = _deploy(pk);
+        assertEq(o.blockTimeOf(2_000_000_000 - 7), vm.getBlockTimestamp() - 7);
+        vm.expectRevert(abi.encodeWithSelector(SealedPoolOracle.BlockTimeOutOfRange.selector, 0));
+        o.blockTimeOf(0);
+        uint256 far = 2_000_000_000 + (uint256(1) << 33);
+        vm.expectRevert(abi.encodeWithSelector(SealedPoolOracle.BlockTimeOutOfRange.selector, far));
+        o.blockTimeOf(far);
+        vm.expectRevert(abi.encodeWithSelector(SealedPoolOracle.BlockTimeOutOfRange.selector, type(uint256).max));
+        o.blockTimeOf(type(uint256).max);
+    }
+
     /* Constructor */
 
     function test_constructorRejectsHookedOrDynamicOrZeroFee() public {
@@ -529,6 +615,23 @@ contract SealedPoolOracleTest is SealedTestBase {
         assertLt(drainGas, 80_000);
     }
 
+    function test_gasDrainFullQueue() public {
+        uint256 b0 = _startWithGap();
+        for (uint256 i; i < 256; i++) {
+            _roll(1);
+            oracle.poke();
+        }
+        assertEq(oracle.queueLength(), 256);
+        vm.cool(address(oracle));
+        uint256 g = gasleft();
+        oracle.applyProven(b0 + 1, endSp[b0 + 1], endRaw[b0 + 1]);
+        uint256 used = g - gasleft();
+        emit log_named_uint("execution gas of one proof that drains 256 one-block runs", used);
+        assertEq(oracle.queueLength(), 0);
+        assertEq(oracle.frontier(), b0 + 257);
+        assertLt(used, 10_000_000, "worst-case drain");
+    }
+
     /* Helpers */
 
     /// @dev Tx gas with 21k intrinsic, cooled accounts approximate a fresh transaction
@@ -538,6 +641,59 @@ contract SealedPoolOracleTest is SealedTestBase {
         oracle.poke();
         used = vm.lastFrameGas().gasTotalUsed;
         emit log_named_uint(label, used);
+    }
+
+    function _edgeKey() internal view returns (PoolKey memory k) {
+        k = _key(address(0));
+        (k.fee, k.tickSpacing) = (3000, 60);
+    }
+
+    /// @dev Exact input of 1 wei toward `limit`, enough to cross ticks and move through empty ranges for free
+    function _edgeSwap(PoolKey memory k, uint160 limit) internal {
+        (uint160 sp,,,) = manager.getSlot0(k.toId());
+        swapRouter.swap(
+            k,
+            SwapParams({zeroForOne: limit < sp, amountSpecified: -1, sqrtPriceLimitX96: limit}),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ZERO_BYTES
+        );
+    }
+
+    /// @dev Block a + 1 ends `away` at zero fee, block a + 2 restores every compared word, and nothing may seal
+    function _assertEdgeCannotForge(PoolKey memory k, int24 away) internal {
+        maxStale = 0;
+        SealedPoolOracleHarness o = _deploy(k);
+        uint256 a = vm.getBlockNumber();
+        (uint160 sp0, int24 t0,,) = manager.getSlot0(k.toId());
+        (uint256 f0, uint256 f1) = manager.getFeeGrowthGlobals(k.toId());
+        uint128 l0 = manager.getLiquidity(k.toId());
+        assertGt(l0, 0, "the snapshot has liquidity");
+        o.applyProven(a - 1, sp0, t0);
+        o.poke();
+
+        _roll(1);
+        _edgeSwap(k, TickMath.getSqrtPriceAtTick(away));
+        (uint160 sp1, int24 t1,,) = manager.getSlot0(k.toId());
+        (uint256 g0, uint256 g1) = manager.getFeeGrowthGlobals(k.toId());
+        assertEq(sp1, TickMath.getSqrtPriceAtTick(away), "block a + 1 ends far away");
+        assertEq(manager.getLiquidity(k.toId()), 0);
+        assertTrue(g0 == f0 && g1 == f1, "at zero fee");
+        assertTrue(t1 != t0);
+
+        _roll(1);
+        _edgeSwap(k, sp0);
+        (uint160 sp2, int24 t2,,) = manager.getSlot0(k.toId());
+        (g0, g1) = manager.getFeeGrowthGlobals(k.toId());
+        assertTrue(sp2 == sp0 && t2 == t0 && g0 == f0 && g1 == f1, "every compared word restored");
+        assertEq(manager.getLiquidity(k.toId()), l0);
+
+        uint32 tn = o.blockTimeOf(a + 2);
+        vm.expectRevert(abi.encodeWithSelector(ISealedPoolOracle.StaleSpot.selector, a - 1, a + 2));
+        o.sobTick();
+        vm.expectRevert(abi.encodeWithSelector(IUnderlyingOracle.ObservationUnavailable.selector, tn));
+        o.cumulativeAt(tn);
+        assertFalse(o.poke(), "a snapshot on an exact tick price never seals");
+        assertEq(o.frontier(), a - 1);
     }
 
     function _deployPredictionHook() internal returns (PredictionHook hook) {

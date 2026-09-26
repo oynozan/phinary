@@ -142,9 +142,23 @@ earlier in the same block. It also keeps a complete history with no gaps.
 1. **Seal.**
    - In a pool with `L > 0` and `lpFee > 0`, every price-moving swap step charges at least 1 wei of LP fee and raises
      `feeGrowthGlobal0/1`. See `lib/v4-core/src/libraries/SwapMath.sol` (fee rounded up) and `Pool.sol:401-406`.
-   - Suppose the tuple `(sqrtPriceX96, feeGrowthGlobal0X128, feeGrowthGlobal1X128)` read in block `b` equals a snapshot taken in
-     an earlier block `a`, and the snapshot had `L > 0`. Then no swap happened in between, so the pool's end state for every block
-     from `a` to `b − 1` is that snapshot.
+   - With `L == 0` a swap step is free: `Pool.sol` skips the fee-growth update. The seal therefore rests on a
+     **precondition**: the pool's in-range liquidity never reaches zero between two pokes and is not controlled by one party.
+     - A sole in-range LP can remove its liquidity, move the price for free, then restore the price and re-add the
+       liquidity.
+     - Liquidity added and removed around a poke inside one unlock fakes the snapshot's `L`.
+     - No pool state reveals either. So the oracle is only for a deep pool with many independent LPs, like the 5 bp pool
+       above.
+   - A snapshot whose `sqrtPriceX96` is exactly a tick price never seals.
+     - From a tick boundary, the first swap step can cross that tick at zero cost. If the far side has no liquidity, the
+       rest of the move is free too, and a limit swap back re-crosses the tick and restores every word.
+     - The reviewer's probes confirmed this at both the lower and upper edge, where the pool's tick is `T` or `T − 1` at
+       `P(T)`. So checking `sqrtPriceX96 == P(tick)` alone misses the upper edge.
+     - Strictly inside a tick, the first step of any price-moving swap has the snapshot's `L > 0`.
+   - Suppose the tuple `(sqrtPriceX96, tick, feeGrowthGlobal0X128, feeGrowthGlobal1X128)` read in block `b` equals a
+     snapshot taken in an earlier block `a`, the snapshot had `L > 0` and a price strictly inside a tick, and the
+     precondition holds. Then no swap happened in between, so the pool's end state for every block from `a` to `b − 1` is
+     that snapshot.
    - `sqrtPriceX96` alone is not enough: an attacker can restore it exactly with a price limit.
 2. **Proof.**
    - A block header whose `keccak256` equals Unichain's own hash for block `k` gives that block's `stateRoot`.
@@ -179,8 +193,8 @@ and no setters; everything is immutable.
 
 **`poke()`**, callable by anyone and at most once per block:
 - It reads `slot0`, both fee-growth words and `liquidity` with one `extsload`.
-- If the stored snapshot comes from an earlier block `a`, its tuple is unchanged, and its `L > 0`, then the run `E_a … E_{b−1}` is
-  proven.
+- If the stored snapshot comes from an earlier block `a`, its tuple is unchanged, its `L > 0` and its `sqrtPriceX96` is not
+  exactly a tick price, then the run `E_a … E_{b−1}` is proven.
 - A proven run is applied if it starts at or before `K + 1`. Otherwise it is appended to a FIFO queue.
 - The snapshot is then replaced with the live state at block `b`.
 
@@ -195,7 +209,7 @@ and no setters; everything is immutable.
 
 | View | Behaviour |
 |---|---|
-| `lnSpotSoBWad()` / `sobTick()` | The SoB of the current block comes from one of: `E_{number−1}` when `K == number − 1`; the snapshot, when the live tuple still equals it and it was taken in an earlier block (a sealed view that needs no write); or `E_K` when `K ≥ number − 1 − maxStaleBlocks`. Otherwise the call reverts, and trading halts because `quote()` returns zeros. |
+| `lnSpotSoBWad()` / `sobTick()` | The SoB of the current block comes from the first of: `E_{number−1}` when `K == number − 1`; the queued run at the tail of the queue when it ends at `number − 1` (a poke in this block sealed it behind a gap); the snapshot, when the live tuple still equals it, it was taken in an earlier block and it passes the seal rules (a sealed view that needs no write); or `E_K` when `K ≥ number − 1 − maxStaleBlocks`. Otherwise the call reverts with `StaleSpot`, and trading halts because `quote()` returns zeros. |
 | `cumulativeAt(t)` | Answers only for `t ≤ time(K + 1)`, or beyond that when the sealed view proves the live state has held since the frontier. It **never extrapolates across a gap**, so settlement waits for proofs. |
 | `varianceE36()` | The same TWAP-return realised-variance estimator and policy as today, over contiguous history. |
 | `frontier()`, `snapshot()`, `queueLength()` | Exposed for the bot. |
@@ -210,8 +224,12 @@ and no setters; everything is immutable.
   `src/vendor/optimism/` with the pinned commit.
 - `src/oracle/PoolStateProof.sol` holds the header decode (fields 3 `stateRoot`, 8 `number` and 11 `timestamp` of the 21-field
   Isthmus header) and the account and slot0 proofs.
-- Measured cost is about 0.47M gas per proven block: header ~37k, account ~250k, slot ~180k. That is about $0.002 at Unichain gas
-  prices.
+- Measured cost per proven block:
+  - about 0.61M gas of execution: header decode ~42k, account and storage proofs ~525k, applying the state ~42k;
+  - about 0.72M per transaction once the 21k intrinsic cost and ~108k of proof calldata are added.
+  - That is still a fraction of a cent at Unichain gas prices.
+- One proof that drains a full queue of 256 one-block runs costs about 8.6M gas of execution. The bot sizes `proveMany`
+  batches with this in mind.
 
 ### Prover and poker bot
 
@@ -268,6 +286,18 @@ every second.
   - If a protocol fee is ever turned on, a dust swap (below about 2,000 wei of input) can carry zero LP fee. Moving the price 1%
     that way takes about 4e7 swaps.
   - A 1-wei `donate` can break a seal. That only forces a proof, costing about $0.002 per block.
+  - The seal needs the liquidity precondition from fact 1: the in-range liquidity never reaches zero and is not controlled
+    by one party. A pool where one party holds all in-range liquidity, or can flash it in and out around a poke, can
+    have its seals forged. Nothing on-chain detects this, so the pool choice is the defence.
+  - A snapshot on an exact tick price is refused, because of a free tick crossing into an empty range. This only costs a
+    proof when the price happens to end a block exactly on a tick.
+- **A block-time change halts the oracle for good.**
+  - `poke` and `prove` both require `block.timestamp == anchorTs + (n − anchorBlock) * blockTime`.
+  - If Unichain ever changes its block time, both revert from then on and the frontier stops. The spot goes stale, so
+    trading halts, and open markets fall to `settleInvalid` after `GRACE`.
+  - The oracle must then be redeployed with a new anchor.
+  - Tests and rehearsals must advance the timestamp by `blockTime` with every block: `vm.warp` with every `vm.roll`,
+    and one-second Anvil blocks in Tasks 8 and 9.
 - **Proof liveness.** If no one proves within the 1 h `GRACE` after expiry, anyone can call `settleInvalid`, which pays 50/50. The
   bot keeps the frontier within a few blocks of the head. `checkpointHeaders` recovers from outages, so proofs are always
   possible.

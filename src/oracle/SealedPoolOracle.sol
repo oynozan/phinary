@@ -4,10 +4,10 @@ pragma solidity ^0.8.26;
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
-import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
 import {ISealedPoolOracle} from "../interfaces/ISealedPoolOracle.sol";
 import {BlockHashes} from "./BlockHashes.sol";
 import {PoolStateProof} from "./PoolStateProof.sol";
@@ -20,10 +20,16 @@ import {TickAccumulator} from "./TickAccumulator.sol";
 /// @dev Applying E_j credits its normalised tick over (time(j), time(j + 1)], so the start-of-block tick of block j + 1
 ///      is E_j, as in UnderlyingOracleHook. The frontier K is the last applied block and every E_j with j <= K is
 ///      applied. A poke in block b whose (sqrtPriceX96, tick, feeGrowthGlobal0, feeGrowthGlobal1) equals the snapshot
-///      of an earlier poke in block a, taken with liquidity, proves E_a..E_{b-1}, because with L > 0 and lpFee > 0
-///      every price-moving swap step charges at least 1 wei of LP fee and raises fee growth. A run that starts past
-///      K + 1 waits in a FIFO ring of 256 runs and is applied once proofs make it contiguous. Block times are
-///      anchorTimestamp + (n - anchorBlock) * blockTime, and pokes and proofs that disagree with the chain revert.
+///      of an earlier poke in block a proves E_a..E_{b-1} when the snapshot had liquidity and a price strictly inside
+///      a tick, because with L > 0 and lpFee > 0 every price-moving swap step charges at least 1 wei of LP fee and
+///      raises fee growth. On an exact tick price the first step can cross that tick for free into an empty range, so
+///      such a snapshot never seals. Precondition, the seal is sound only while the pool's in-range liquidity never
+///      reaches zero and is not controlled by one party. A sole in-range LP can remove it, move the price for free and
+///      restore both, liquidity added and removed around a poke inside one unlock fakes the snapshot's L, and no pool
+///      state reveals either. Deploy only on a deep pool with many independent LPs. A run that starts past K + 1
+///      waits in a FIFO ring of 256 runs and is applied once proofs make it contiguous. Block times are
+///      anchorTimestamp + (n - anchorBlock) * blockTime, and pokes and proofs that disagree with the chain revert, so a
+///      change of the chain's block time halts the oracle for good.
 contract SealedPoolOracle is TickAccumulator, BlockHashes, ISealedPoolOracle {
     using LPFeeLibrary for uint24;
 
@@ -31,6 +37,8 @@ contract SealedPoolOracle is TickAccumulator, BlockHashes, ISealedPoolOracle {
     /// (18 ln10 - 96 ln2) * 1e18, so ln(sqrtPriceX96 / 2^96) = lnWad(sqrtPriceX96) + LN_WAD_TO_Q96
     int256 internal constant LN_WAD_TO_Q96 = -25095597659861927392;
     uint256 internal constant QUEUE_SIZE = 256;
+
+    error BlockTimeOutOfRange(uint256 n);
 
     /// @dev Live or snapshotted pool state, tick raw
     struct Snapshot {
@@ -202,7 +210,16 @@ contract SealedPoolOracle is TickAccumulator, BlockHashes, ISealedPoolOracle {
     function blockTimeOf(uint256 n) public view returns (uint32) {
         uint256 a = anchorBlock;
         uint256 t = anchorTimestamp;
-        return SafeCastLib.toUint32(n >= a ? t + (n - a) * blockTime : t - (a - n) * blockTime);
+        if (n >= a) {
+            if (n - a > type(uint32).max) revert BlockTimeOutOfRange(n);
+            t += (n - a) * blockTime;
+        } else {
+            uint256 back = (a - n) * blockTime;
+            if (back > t) revert BlockTimeOutOfRange(n);
+            t -= back;
+        }
+        if (t > type(uint32).max) revert BlockTimeOutOfRange(n);
+        return uint32(t);
     }
 
     /* Internals */
@@ -296,11 +313,16 @@ contract SealedPoolOracle is TickAccumulator, BlockHashes, ISealedPoolOracle {
         (_qHead, _qLen) = (uint16(head), uint16(len));
     }
 
-    /// @dev The start-of-block state of this block from E_{number-1}, the sealed view or E_K within the limit
+    /// @dev SoB from E_K at K = n - 1, then a queued run ending at n - 1, the sealed view, then E_K within the limit
     function _sob() internal view returns (uint160 sqrtPriceX96, int24 normTick) {
         Frontier memory f = _started();
         uint256 n = block.number;
         if (uint256(f.number) + 1 == n) return (f.sqrtPriceX96, f.normTick);
+        uint256 len = _qLen;
+        if (len != 0) {
+            Run memory tail = _queue[(uint256(_qHead) + len - 1) % QUEUE_SIZE];
+            if (uint256(tail.toBlock) + 1 == n) return (tail.sqrtPriceX96, tail.normTick);
+        }
         (bool ok, Snapshot memory s) = _sealedView();
         if (ok) return (s.sqrtPriceX96, _norm(s.tick));
         if (uint256(f.number) + 1 + maxStaleBlocks >= n) return (f.sqrtPriceX96, f.normTick);
@@ -316,7 +338,13 @@ contract SealedPoolOracle is TickAccumulator, BlockHashes, ISealedPoolOracle {
 
     function _sealed(Snapshot memory s, Snapshot memory live) internal pure returns (bool) {
         return s.liquidity != 0 && s.sqrtPriceX96 == live.sqrtPriceX96 && s.tick == live.tick
-            && s.feeGrowth0 == live.feeGrowth0 && s.feeGrowth1 == live.feeGrowth1;
+            && s.feeGrowth0 == live.feeGrowth0 && s.feeGrowth1 == live.feeGrowth1 && !_onTickPrice(s.sqrtPriceX96);
+    }
+
+    /// @dev True for an exact tick price, where either tick above or below may be the pool's tick
+    function _onTickPrice(uint160 sqrtPriceX96) internal pure returns (bool) {
+        if (sqrtPriceX96 < TickMath.MIN_SQRT_PRICE || sqrtPriceX96 >= TickMath.MAX_SQRT_PRICE) return true;
+        return TickMath.getSqrtPriceAtTick(TickMath.getTickAtSqrtPrice(sqrtPriceX96)) == sqrtPriceX96;
     }
 
     /// @dev slot0, both fee-growth words and liquidity in one extsload

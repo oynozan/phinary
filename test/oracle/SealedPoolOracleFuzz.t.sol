@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
 import {IUnderlyingOracle} from "../../src/interfaces/IUnderlyingOracle.sol";
 import {ISealedPoolOracle} from "../../src/interfaces/ISealedPoolOracle.sol";
 import {SealedTestBase} from "./SealedPoolOracle.t.sol";
 import {TickAccumulatorHarness} from "./TickAccumulatorDiff.t.sol";
 
-/// @notice Random blocks of poke, swap, push-restore, donate, liquidity and harness-proof events, then a roll of one or
-///         more blocks. Every view is checked against a brute-force reference built from the pool's end-of-block
-///         states, recorded as each block ends.
+/// @notice Random blocks of poke, swap, exact-tick-price swap, push-restore, donate, liquidity and harness-proof
+///         events, then a roll of one or more blocks. Every view is checked against a brute-force reference built from
+///         the pool's end-of-block states, recorded as each block ends.
 abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     uint256 internal constant BLOCKS = 40;
 
@@ -22,6 +23,10 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     int24 internal posHi;
     int128 internal posL;
 
+    // Raw tick of the pool when the oracle last replaced its snapshot, which snapshot() does not expose
+    int24 internal snapTick;
+    uint256 internal lastQueuedTo;
+
     uint256 internal nSealed;
     uint256 internal nQueued;
     uint256 internal nDrained;
@@ -29,6 +34,8 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     uint256 internal nExtended;
     uint256 internal nStaleWithin;
     uint256 internal nStaleRevert;
+    uint256 internal nTickPriceRefused;
+    uint256 internal nTailSpot;
 
     function setUp() public {
         cfg = _exactParams(5, 12, 400, 4096);
@@ -56,6 +63,8 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
         emit log_named_uint("sealed-view cumulatives", nExtended);
         emit log_named_uint("stale E_K spots", nStaleWithin);
         emit log_named_uint("StaleSpot reverts", nStaleRevert);
+        emit log_named_uint("seals refused on an exact tick price", nTickPriceRefused);
+        emit log_named_uint("queue-tail spots", nTailSpot);
         assertGt(nSealed, 0, "runs applied by pokes");
         assertGt(nQueued, 0, "runs queued behind a gap");
         assertGt(nDrained, 0, "queues drained by proofs");
@@ -63,6 +72,8 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
         assertGt(nExtended, 0, "sealed-view cumulative");
         assertGt(nStaleWithin, 0, "stale E_K spot");
         assertGt(nStaleRevert, 0, "stale spot reverts");
+        assertGt(nTickPriceRefused, 0, "exact tick price refused");
+        assertGt(nTailSpot, 0, "queue-tail spot");
     }
 
     function _run(uint256 seed) internal {
@@ -84,12 +95,14 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     /* Actions */
 
     function _act(uint256 r) internal {
-        uint256 a = r % 16;
+        uint256 a = r % 17;
         r >>= 8;
         if (a < 6) {
             _poke();
         } else if (a < 8) {
             _swapTicks(int256(r % 121) - 60);
+        } else if (a == 16) {
+            _swapToNormTick(pk, _normTick(pk) + int256(r % 41) - 20);
         } else if (a == 8) {
             (uint160 sp,) = _slot0();
             _swapTicks(int256(r % 81) - 40);
@@ -105,11 +118,22 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     }
 
     function _poke() internal {
+        uint256 n = vm.getBlockNumber();
+        (bool expected,, bool refused) = _sealedNow(n);
+        (uint64 snapBlock,,,,) = oracle.snapshot();
         uint256 k0 = oracle.frontier();
         uint256 q0 = oracle.queueLength();
-        if (!oracle.poke()) return;
-        if (oracle.queueLength() > q0) nQueued++;
-        else if (oracle.frontier() > k0) nSealed++;
+        bool sealedRun = oracle.poke();
+        assertEq(sealedRun, expected, "poke seals exactly when the independent predicate holds");
+        if (snapBlock != n) (, snapTick) = _slot0();
+        if (refused) nTickPriceRefused++;
+        if (!sealedRun) return;
+        if (oracle.queueLength() > q0) {
+            nQueued++;
+            lastQueuedTo = n - 1;
+        } else if (oracle.frontier() > k0) {
+            nSealed++;
+        }
     }
 
     function _prove(uint256 r) internal {
@@ -180,8 +204,9 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     }
 
     function _checkSpot(uint256 k, uint256 n) internal {
-        (bool sealedView,) = _sealedNow(n);
-        bool fresh = k + 1 == n || sealedView;
+        (bool sealedView,,) = _sealedNow(n);
+        bool tail = oracle.queueLength() > 0 && lastQueuedTo + 1 == n;
+        bool fresh = k + 1 == n || tail || sealedView;
         try oracle.sobTick() returns (int24 tick, uint32 w) {
             uint256 src = fresh ? n - 1 : k;
             assertEq(tick, _endNorm(src), "SoB is E_(n-1), or E_K within the limit");
@@ -189,7 +214,8 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
             assertEq(w, _t(k + 1));
             assertApproxEqAbs(oracle.lnSpotSoBWad(), _lnUsd(endSp[src]), LN_TOL);
             if (k + 1 != n) {
-                if (sealedView) nFreshBySeal++;
+                if (tail) nTailSpot++;
+                else if (sealedView) nFreshBySeal++;
                 else nStaleWithin++;
             }
         } catch (bytes memory err) {
@@ -203,7 +229,7 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
     function _checkExtension(uint256 s, uint256 k, uint256 n) internal {
         if (k + 1 == n) return;
         uint32 tn = _t(n);
-        (bool sealedView, uint256 snapBlock) = _sealedNow(n);
+        (bool sealedView, uint256 snapBlock,) = _sealedNow(n);
         if (sealedView && snapBlock <= k + 1) {
             assertEq(oracle.cumulativeAt(tn), _ref(s, tn), "sealed extension equals the true history");
             nExtended++;
@@ -248,12 +274,17 @@ abstract contract SealedPoolOracleFuzzTest is SealedTestBase {
         if (rem > 0) c += _endNorm(m) * int256(rem);
     }
 
-    function _sealedNow(uint256 n) internal view returns (bool sealedView, uint256 snapBlock) {
+    /// @dev The seal rule, written independently of the contract, and whether only the exact-tick-price rule refused it
+    function _sealedNow(uint256 n) internal view returns (bool sealedView, uint256 snapBlock, bool refused) {
         (uint64 b, uint160 ssp, uint256 s0, uint256 s1, uint128 sl) = oracle.snapshot();
-        (uint160 sp,) = _slot0();
+        (uint160 sp, int24 raw) = _slot0();
         (uint256 g0, uint256 g1) = _fg();
         snapBlock = b;
-        sealedView = b < n && sl > 0 && sp == ssp && g0 == s0 && g1 == s1;
+        bool same = b < n && sl > 0 && sp == ssp && raw == snapTick && g0 == s0 && g1 == s1;
+        bool onTick = sp == TickMath.getSqrtPriceAtTick(raw)
+            || (raw < TickMath.MAX_TICK && sp == TickMath.getSqrtPriceAtTick(raw + 1));
+        sealedView = same && !onTick;
+        refused = same && onTick;
     }
 }
 
