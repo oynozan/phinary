@@ -1,13 +1,15 @@
+import { useId } from 'react';
 import { compactUsd, pct, type VaultPresentation } from '@/lib/vault/display';
 export function MiniLine({ values, label }: {
     values: number[] | null;
     label: string;
 }) {
+    const id = useId();
     if (!values || values.length < 2)
         return null;
     const min = Math.min(...values), span = Math.max(...values) - min || 1;
     const points = values.map((n, i) => `${i / (values.length - 1) * 240},${36 - (n - min) / span * 30}`).join(' ');
-    return <svg className="vault-mini-line" viewBox="0 0 240 40" preserveAspectRatio="none" role="img" aria-label={label}><polyline points={points} fill="none" stroke="#d84bf1" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/></svg>;
+    return <svg className="vault-mini-line" viewBox="0 0 240 40" preserveAspectRatio="none" role="img" aria-label={label}><defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#d83af5" stopOpacity=".18"/><stop offset="1" stopColor="#d83af5" stopOpacity="0"/></linearGradient></defs><polygon points={`0,40 ${points} 240,40`} fill={`url(#${id})`}/><polyline points={points} fill="none" stroke="#d84bf1" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/></svg>;
 }
 export function ThinBar({ value, label }: {
     value: number | null;

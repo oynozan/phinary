@@ -263,7 +263,7 @@
 body { background: #080b12; }
 body::before { display: none; }
 .page-container { width: 100%; max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }
-.page-head { padding: var(--page-top) 0 24px; text-align: center; }
+.page-head { padding: var(--page-top) 0 24px; }
 .page-head h1 { margin: 0; font-family: var(--font-heading); font-size: 40px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; color: #f5f5fa; }
 @media (max-width: 639px) { .page-head h1 { font-size: 32px; } }
 .page-action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 22px; border: 1px solid #b431e9; border-radius: 8px; background: #a50cdf; color: #fff; font-family: var(--font-secondary); font-size: 14px; font-weight: 600; }
@@ -272,7 +272,7 @@ body::before { display: none; }
 
 /* Type roles: Akt headings, Lexend Deca body, Manrope for labels, table heads and controls */
 :where(.app-header, .app-dock, .markets-page, .market-detail-page, .portfolio-page, .portfolio-dialog, .activity-page, .vault-page, .vault-explanation) :where(th, dt, label, legend, small, button, select, input, summary) { font-family: var(--font-secondary); }
-.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: rgb(8 11 18 / var(--header-background-alpha, 0)); border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
+.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: rgb(8 11 18 / var(--header-background-alpha, 0)); backdrop-filter: blur(var(--header-background-blur, 0px)); -webkit-backdrop-filter: blur(var(--header-background-blur, 0px)); border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
 .app-header-inner { width: 100%; height: 100%; max-width: var(--page-max); margin: auto; padding: 0 var(--page-gutter); display: flex; align-items: center; gap: 56px; justify-content: space-between; }
 .header-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
 .header-brand-mark { flex-shrink: 0; }

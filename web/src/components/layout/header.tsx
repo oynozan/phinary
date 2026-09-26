@@ -26,7 +26,8 @@ export function Header() {
             frame = 0;
             // Only the backdrop fades; navigation and wallet controls stay opaque.
             const progress = Math.min(1, Math.max(0, window.scrollY) / 96);
-            header.current?.style.setProperty("--header-background-alpha", String(progress));
+            header.current?.style.setProperty("--header-background-alpha", String(progress * 0.96));
+            header.current?.style.setProperty("--header-background-blur", `${progress * 12}px`);
         };
         const onScroll = () => {
             if (!frame) frame = requestAnimationFrame(update);
