@@ -18,7 +18,7 @@ import {
 import { marketSchedulerAbi, predictionHookAbi } from "../src/abi.ts";
 import { makeClients, readSlot0, type Clients } from "../src/chain.ts";
 import { loadMirrorConfig } from "../src/config.ts";
-import { invalidAfterFor, isAlreadyOpened, Keeper, keeperTick, schedulerPeriodFor } from "../src/keeper.ts";
+import { invalidAfterFor, isAlreadyOpened, Keeper, keeperGasLimit, keeperTick, schedulerPeriodFor } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
 import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
@@ -216,6 +216,9 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       fromBlock: 0n,
     });
     const openBlock = await c.publicClient.getBlock({ blockNumber: openedLog!.blockNumber });
+    const openTx = await c.publicClient.getTransaction({ hash: openedLog!.transactionHash });
+    const openReceipt = await c.publicClient.getTransactionReceipt({ hash: openedLog!.transactionHash });
+    assert.ok(openTx.gas >= keeperGasLimit(openReceipt.gasUsed), "open() gas is padded");
     const cents = strikeCentsFromLnSpot(lnSpot);
     const stored = await read<{
       oracle: Address;

@@ -5,6 +5,7 @@ import { marketSchedulerAbi, MarketStatus, predictionHookAbi } from "../src/abi.
 import type { Clients } from "../src/chain.ts";
 import {
   idsToScan,
+  keeperGasLimit,
   isAlreadyOpened,
   isRevert,
   Keeper,
@@ -139,7 +140,7 @@ interface Fake {
   infoFails: Map<bigint, number>;
   /** Generic (non-revert) failures `open()`'s simulate should throw before it succeeds, e.g. an RPC error. */
   openFails: number;
-  /** When set, every `open()` simulate throws this instead of succeeding. */
+  /** When set, every `open()` simulate throws this instead of succeeding */
   openError?: () => Error;
   blockTimes: bigint[];
   /** Args recorded on each `open()` simulate that was accepted (i.e. did not throw). */
@@ -333,3 +334,23 @@ test("schedulerPeriodFor reads the scheduler's own period, else keeps the config
   const old = fakeKeeper(fake());
   assert.equal(await schedulerPeriodFor(old.opts.clients.publicClient, SCHEDULER, 60), 60);
 });
+
+test("keeperGasLimit pads the estimate by 30% plus 30k, as swap-sdk's gasWithHeadroom does", () => {
+  assert.equal(keeperGasLimit(1_670_860n), 2_202_118n);
+  assert.equal(keeperGasLimit(100_000n), 160_000n);
+});
+
+test("open, settle and sweep are sent with the padded estimate, not viem's bare one", async () => {
+  const f = fake({ count: 1n, expiry: 1000n, estimate: 1_670_860n, sent: [] });
+  const k = fakeKeeper(f, { dryRun: false });
+  await k.createMarket(2000n, undefined, 2000);
+  await k.refresh();
+  await k.settleAndSweep(2000n);
+  assert.deepEqual(
+    f.sent!.map((s) => s.functionName),
+    ["open", "settle"],
+    "the fake's market stays Trading after settle, so there is nothing to sweep",
+  );
+  for (const s of f.sent!) assert.equal(s.gas, keeperGasLimit(1_670_860n), `${s.functionName} gas`);
+});
+

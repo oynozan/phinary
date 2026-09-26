@@ -376,9 +376,9 @@ It needs Node 24 and `npm ci` in `bot/` and `script/rehearsal/` (section 1). It 
 
 Two details of the script:
 - `anvil_setCode` rewrites the latest block's state in place, so anvil can never prove that block. The script etches EIP-2935 while the pool is idle, so the next poke seals that block.
-- Markets open, and Alice and Bob trade, while the pool is idle and the bot is paused on a valid snapshot. The keeper sends `open()` with viem's gas estimate unpadded, and the oracle's start-of-block read costs different gas depending on how far the frontier trails the block. On an idle pool that read takes the same path at the estimate and in the block.
+- Markets open, and Alice and Bob trade, while the random swaps run and the bot pokes and proves. The oracle's start-of-block read costs different gas depending on how far the frontier trails the block, so the keeper pads every gas estimate by 30 % plus 30k (swap-sdk's `gasWithHeadroom`) before it sends `open()`, `settle` or `sweep`.
 
-**Results.** On 2026-09-26 two runs in a row passed, with seeds 503634050 and 696076038, about 3 minutes each. This is the second run, with tx hashes trimmed:
+**Results.** On 2026-09-26 two runs in a row passed, with seeds 503634050 and 696076038, about 3 minutes each, while markets still opened on an idle pool. Once the keeper padded its gas, a run that opens both markets while the swaps run passed with seed 739513192. This is the second run, with tx hashes trimmed:
 
 ```text
 Sealed oracle end to end on a plain anvil (seed 696076038)

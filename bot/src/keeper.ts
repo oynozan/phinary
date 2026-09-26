@@ -40,6 +40,11 @@ export function nextCreateTime(nowSec: number, periodSec: number, align: boolean
   return first && floor === nowSec ? nowSec : floor + periodSec;
 }
 
+/** swap-sdk's `gasWithHeadroom`, as the oracle's start-of-block read can cost more in the block than at estimate */
+export function keeperGasLimit(estimate: bigint): bigint {
+  return (estimate * 13n) / 10n + 30_000n;
+}
+
 /** Market ids to (re)read after marketCount moved from `last` to `count`; covers 0- and 1-based ids. */
 export function idsToScan(last: bigint | undefined, count: bigint, scanBack: number): bigint[] {
   const from = last ?? (count > BigInt(scanBack) ? count - BigInt(scanBack) : 0n);
@@ -146,7 +151,8 @@ export class Keeper {
       onSubmitted?.();
       return { result };
     }
-    const hash = await walletClient.writeContract(request as Parameters<typeof walletClient.writeContract>[0]);
+    const gas = keeperGasLimit(await publicClient.estimateContractGas(request as Parameters<typeof publicClient.estimateContractGas>[0]));
+    const hash = await walletClient.writeContract({ ...request, gas } as Parameters<typeof walletClient.writeContract>[0]);
     onSubmitted?.();
     const receipt = await waitForSuccess(publicClient, hash, this.opts.txTimeoutMs);
     return { result, hash, receipt };

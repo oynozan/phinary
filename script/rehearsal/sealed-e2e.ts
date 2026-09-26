@@ -12,8 +12,8 @@
  *
  * The sealed bot of bot/src/sealed.ts runs in-process, poking each new block and proving every block no seal covers. A
  * trader swaps random sizes through PoolSwapTest every one to three blocks, so many seals break and leave gaps to
- * prove. The keeper of bot/src/keeper.ts opens two markets through `scheduler.open()`, and in each Alice buys UP and
- * Bob buys DOWN through PoolSwapTest.
+ * prove. The keeper of bot/src/keeper.ts opens two markets through `scheduler.open()` while the swaps run, and in each
+ * Alice buys UP and Bob buys DOWN through PoolSwapTest.
  *
  * In market 1 the bot stops just before the settlement window while the swaps go on. Past expiry `settle` must revert
  * with ObservationUnavailable(expiry), keep reverting after each small proof batch until the frontier covers
@@ -734,9 +734,8 @@ async function main(): Promise<void> {
   /* Market 1 */
 
   section('Market 1: settle is refused until the proofs reach expiry')
-  await quiet()
   const m1 = await openAndTrade()
-  resume(DRIFT)
+  drift = DRIFT
   await untilTime(m1.expiry - BigInt(m1.window) - 3n, 'shortly before the settlement window', sampleLag)
   await runner.stop()
   const stop1 = await head()
@@ -768,8 +767,8 @@ async function main(): Promise<void> {
 
   section('Market 2: outage past BLOCKHASH and EIP-2935, recovered with checkpointHeaders')
   await waitUntil('the scheduler can open the next slot', () => read<boolean>(scheduler, arts.scheduler.abi, 'canOpen'), 30_000)
-  await quiet()
   const m2 = await openAndTrade()
+  await quiet()
   // anvil_setCode rewrites the latest block's state in place, so only a seal of the idle pool can cover that block
   const etchFrom = await head()
   await test.setCode({ address: HISTORY_ADDRESS, bytecode: RETURNS_ZERO })
