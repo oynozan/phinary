@@ -62,27 +62,39 @@ In the screenshot, 5 USDC buys 6.08285 ETHUP, an average of 0.822 per token. Tha
 
 A two-minute market moves fast: its price can shift by 10 to 16 cents during a wallet confirmation. **Auto** sizes the tolerance for each quote. A fixed 1 to 5% makes most swaps in short markets revert with `V4TooLittleReceived` after you have signed.
 
-### Confirm the swap
+### Review
 
-The first buy takes three wallet steps:
+Press **Review** to see the final amounts before anything is sent.
+
+![The review: 1.00 USDC in, 1.78985 ETHUP out, network cost under 0.001 ETH](/screenshots/uniswap/review.png)
+
+### Confirm in your wallet
+
+The first buy shows **Approve and swap** and takes three wallet steps:
+
+![Approval pending, step 1 of 3, then Sign message and Confirm swap](/screenshots/uniswap/steps.png)
 
 1. **Approve USDC** for Permit2, once per token.
 2. **Sign** a Permit2 message for UniversalRouter, valid for 30 days.
-3. **Swap.**
+3. **Confirm the swap.**
 
-Later buys need one confirmation. Selling YES or NO needs only **Sign** and **Swap**, because outcome tokens already allow Permit2.
+Later buys show **Swap** and need one confirmation. Selling YES or NO shows **Sign and swap**, with no approval, because outcome tokens already allow Permit2.
+
+The price keeps moving while you confirm. In the run below the first quote was 1.81904 ETHUP, the review a moment later showed 1.78985, and the swap filled 1.78016, inside the Auto slippage limit.
 
 ### Sell early, or hold
 
-Until trading closes you can sell back at the bid, by putting the token in **Sell** and USDC in **Buy**. After the cutoff the market leaves the picker until it has a result, about 14 seconds later.
+Until trading closes you can sell back at the bid, by putting the token in **Sell** and USDC in **Buy**. After the cutoff the card says **Closed, awaiting settlement** and no swap is possible until the result is in, about 14 seconds later.
+
+![The market closed for trading, 8 seconds before expiry, with the ETHUP balance shown](/screenshots/uniswap/closed.png)
 
 ### Collect your winnings
 
-After settlement the market moves to **Settled prediction markets**, and its card shows the result.
+After settlement the market moves to **Settled prediction markets**. Put the winning token in **Sell** and USDC in **Buy**: it sells for exactly **1.00 USDC per token**, with no spread and no price impact.
 
-![A settled market card: YES won and pays 1.00 USDC](/screenshots/uniswap/settled-card.png)
+![0.398302 ETHUP sells for 0.3983 USDC after YES won](/screenshots/uniswap/redeem.png)
 
-Sell the winning token for USDC in the same swap box, at exactly **1.00 USDC per token**. The losing token is worth nothing and cannot be sold.
+The losing token is worth nothing and cannot be sold.
 
 </Steps>
 
@@ -90,13 +102,18 @@ Sell the winning token for USDC in the same swap box, at exactly **1.00 USDC per
 Trade early in a market's life. Trading stops 12 seconds before expiry, and near the end a small ETH move swings the price a lot.
 </Callout>
 
-## Example
+## A real run
 
-At 15:26:54 Alice spends 5 USDC on the market in the screenshot and gets 6.08285 ETHUP.
+The review, wallet, closed-market and redemption screenshots come from this run on Unichain Sepolia on 26 Sep 2026, made in the Uniswap app with a test wallet.
 
-| Result at 15:28:00 | What Alice does | Alice ends with |
+| Time (UTC) | Action | Result |
 |---|---|---|
-| ETH's average over the last 10 s is above 2,689.62 | Sells 6.08285 ETHUP at 1.00 | 6.08 USDC, a profit of 1.08 |
-| ETH's average is at or below 2,689.62 | Nothing to sell | 0 USDC, a loss of 5 |
+| 16:35:16 | Buy YES with 1.00 USDC in the 16:36 market, strike 2,693.37 USD ([tx](https://sepolia.uniscan.xyz/tx/0xc7e93ab1a44e33c6c7b151adb40b9128c82a39f870cfe91df0b610c3b55d26ad)) | 1.78016 ETHUP |
+| 16:36:00 | The market expires below the strike | NO wins, the ETHUP is worth 0 |
+| 16:37:54 and 16:38:03 | Buy YES and NO with 0.22 USDC each in the 16:39 market, strike 2,692.56 USD | 0.398302 ETHUP and 0.400481 ETHDOWN |
+| 16:39:04 | The keeper settles the market | YES wins |
+| 16:39:59 | Sell 0.398302 ETHUP ([tx](https://sepolia.uniscan.xyz/tx/0x73610737bde9fa1b528b7d9dcd9ef24160cada7bb6bf924ea6476b86c4077328)) | 0.398302 USDC, exactly 1.00 each |
+
+Buying both sides guaranteed a winner, but 0.44 USDC in came back as 0.398: each purchase paid the ask, which is above the fair price. That gap is the spread the vault earns.
 
 Something went wrong? See [Troubleshooting](/guides/troubleshooting).
