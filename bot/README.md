@@ -7,7 +7,7 @@ Two small Node 24 processes that keep the live demo moving:
   Binance.US), computes the exact `sqrtPriceX96` for the pool's token order and decimals, and calls
   `PriceSteerer.steer(key, target)` when the pool is more than `MIRROR_THRESHOLD_BPS` away.
 - **`keeper`** creates a 1-minute market on the `PredictionHook` every period, struck at the oracle's start-of-block
-  price rounded to the cent (for example `YES ETH>2701.35 14:31:00`), then settles every market once it expires and
+  price rounded to the cent (tickers `ETHUP` / `ETHDOWN`, name for example `ETH > $2701.35 26 Sep 14:32`), then settles every market once it expires and
   sweeps its surplus back to the LP vault.
 
 TypeScript runs directly on Node 24 (type stripping), so there is no build step. The only runtime dependency is viem.
@@ -59,7 +59,7 @@ Log format (values illustrative):
 
 ```
 2026-09-26T14:30:01.204Z INFO  [mirror] steered source=coinbase feed=2701.35 pool=2700.64 devBps=2.63 target=15… tx=0x… block=… gas=…
-2026-09-26T14:31:00.611Z INFO  [keeper] market created market=17 name="YES ETH>2701.35 14:32:00" strike=2701.35 openTime=… expiry=… budget=10.00 sigma=58.3% tx=0x…
+2026-09-26T14:31:00.611Z INFO  [keeper] market created market=17 name="ETH > $2701.35 26 Sep 14:32" strike=2701.35 openTime=… expiry=… budget=10.00 sigma=58.3% tx=0x…
 2026-09-26T14:32:02.090Z INFO  [keeper] settled market=17 yesWon=true status=2 tx=0x…
 2026-09-26T14:32:03.311Z INFO  [keeper] swept market=17 usdc=8.41 tx=0x…
 ```

@@ -224,7 +224,7 @@ MARKET_BUDGET_USDC=10 make bots    # any bot setting passes through, see bot/.en
 **Healthy logs look like this:**
 - the mirror logs `steered … devBps=…` whenever ETH has moved 2 bp or more;
 - the keeper logs, every minute:
-  - `market created market=N name="YES ETH>2680.57 21:59:19" …`;
+  - `market created market=N name="ETH > $2680.57 26 Sep 21:59" …`;
   - `settled market=N-1 yesWon=…`;
   - `swept market=N-1 usdc=…`.
 

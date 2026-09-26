@@ -48,6 +48,8 @@ export interface MarketTemplate {
   fixedVarE36: bigint;
   kernel: number;
   timeZone: string;
+  /** Underlying ticker for the {ticker} placeholder (the demo pool's token is dWETH, so it is set explicitly). */
+  ticker: string;
   nameTemplate: string;
   symbolTemplate: string;
 }
@@ -105,16 +107,41 @@ export function formatClock(unixSec: bigint, timeZone: string): string {
   return `${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
-/** Fills {side} {strike} {time} {hhmmss} {hhmm} placeholders. */
-export function renderTemplate(template: string, side: "YES" | "NO", strike: string, clock: string): string {
-  const hhmmss = clock.replaceAll(":", "");
-  return template
-    .replaceAll("{side}", side)
-    .replaceAll("{strike}", strike)
-    .replaceAll("{time}", clock)
-    .replaceAll("{hhmmss}", hhmmss)
-    .replaceAll("{hhmm}", hhmmss.slice(0, 4));
+/** "26 Sep" of a unix timestamp in an IANA time zone. */
+export function formatDate(unixSec: bigint, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, day: "numeric", month: "short" }).formatToParts(
+    new Date(Number(unixSec) * 1000),
+  );
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("day")} ${get("month")}`;
 }
+
+export type Side = "UP" | "DOWN";
+
+export interface TemplateValues {
+  side: Side;
+  ticker: string;
+  strike: string;
+  /** HH:MM:SS */
+  clock: string;
+  /** "26 Sep" */
+  date: string;
+}
+
+/** Fills {side} {ticker} {strike} {date} {time} (HH:MM:SS) {hhmm} (HH:MM) {hhmmss} (HHMMSS) placeholders. */
+export function renderTemplate(template: string, v: TemplateValues): string {
+  return template
+    .replaceAll("{side}", v.side)
+    .replaceAll("{ticker}", v.ticker)
+    .replaceAll("{strike}", v.strike)
+    .replaceAll("{date}", v.date)
+    .replaceAll("{time}", v.clock)
+    .replaceAll("{hhmmss}", v.clock.replaceAll(":", ""))
+    .replaceAll("{hhmm}", v.clock.slice(0, 5));
+}
+
+/** MetaMask's wallet_watchAsset rejects symbols longer than this. */
+export const MAX_SYMBOL_LENGTH = 11;
 
 export function expiryFor(openTime: bigint, t: Pick<MarketTemplate, "tenorSec" | "expiryAlignSec">): bigint {
   const raw = openTime + BigInt(t.tenorSec);
@@ -145,6 +172,17 @@ export function validateTemplate(t: MarketTemplate): void {
   if (t.sigmaMode === 1 && t.fixedVarE36 <= 0n) fail("sigmaMode 1 needs a positive fixed variance");
   if (t.kernel !== 0) fail("kernel must be 0 (Gaussian); PredictionHook reverts UnsupportedKernel otherwise");
   new Intl.DateTimeFormat("en-GB", { timeZone: t.timeZone });
+  if (!/^[A-Za-z0-9]{1,6}$/.test(t.ticker)) fail("ticker must be 1-6 letters or digits");
+  const longest = renderTemplate(t.symbolTemplate, {
+    side: "DOWN",
+    ticker: t.ticker,
+    strike: "99999.99",
+    clock: "23:59:59",
+    date: "30 Sep",
+  });
+  if (longest.length > MAX_SYMBOL_LENGTH) {
+    fail(`symbol template renders up to ${longest.length} characters ("${longest}"); wallets reject more than ${MAX_SYMBOL_LENGTH}`);
+  }
 }
 
 export interface BuiltMarket {
@@ -160,6 +198,7 @@ export function buildMarketParams(oracle: Address, lnSpotWad: bigint, blockTimes
   const openTime = blockTimestamp + BigInt(t.openDelaySec);
   const expiry = expiryFor(openTime, t);
   const clock = formatClock(expiry, t.timeZone);
+  const names = { ticker: t.ticker, strike, clock, date: formatDate(expiry, t.timeZone) };
   return {
     strikeCents,
     strike,
@@ -176,10 +215,10 @@ export function buildMarketParams(oracle: Address, lnSpotWad: bigint, blockTimes
       sigmaMode: t.sigmaMode,
       fixedVarE36: t.sigmaMode === 1 ? t.fixedVarE36 : 0n,
       kernel: t.kernel,
-      yesName: renderTemplate(t.nameTemplate, "YES", strike, clock),
-      yesSymbol: renderTemplate(t.symbolTemplate, "YES", strike, clock),
-      noName: renderTemplate(t.nameTemplate, "NO", strike, clock),
-      noSymbol: renderTemplate(t.symbolTemplate, "NO", strike, clock),
+      yesName: renderTemplate(t.nameTemplate, { ...names, side: "UP" }),
+      yesSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "UP" }),
+      noName: renderTemplate(t.nameTemplate, { ...names, side: "DOWN" }),
+      noSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "DOWN" }),
     },
   };
 }

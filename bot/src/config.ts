@@ -314,8 +314,9 @@ export function loadMarketTemplate(env: Env): MarketTemplate {
         : varE36FromAnnualVol(envString(env, "FIXED_SIGMA_ANNUAL", "0.6")),
     kernel: envInt(env, "KERNEL", 0, 0, 255),
     timeZone: envString(env, "MARKET_TIMEZONE", "UTC"),
-    nameTemplate: envString(env, "MARKET_NAME_TEMPLATE", "{side} ETH>{strike} {time}"),
-    symbolTemplate: envString(env, "MARKET_SYMBOL_TEMPLATE", "{side}-{strike}-{hhmmss}"),
+    ticker: envString(env, "MARKET_TICKER", "ETH"),
+    nameTemplate: envString(env, "MARKET_NAME_TEMPLATE", "{ticker} > ${strike} {date} {hhmm}"),
+    symbolTemplate: envString(env, "MARKET_SYMBOL_TEMPLATE", "{ticker}{side}"),
   };
   validateTemplate(template);
   return template;

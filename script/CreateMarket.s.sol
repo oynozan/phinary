@@ -8,7 +8,8 @@ import {IUnderlyingOracle} from "../src/interfaces/IUnderlyingOracle.sol";
 import {ScriptBase} from "./base/ScriptBase.sol";
 
 /// @title CreateMarket
-/// @notice One-off "ETH above K at T" market, with the keeper bot's env names and defaults (bot/.env.example).
+/// @notice One-off "ETH above K at T" market, with the keeper bot's env names and defaults (bot/.env.example): tickers
+///         ETHUP / ETHDOWN and the name "ETH > $2684.00 26 Sep 14:31" (UTC).
 /// @dev STRIKE_USD defaults to the oracle's start-of-block price rounded half up to the cent. The signer must be the
 ///      hook owner or keeper, and the vault must hold MARKET_BUDGET_USDC idle.
 contract CreateMarket is ScriptBase {
@@ -73,23 +74,40 @@ contract CreateMarket is ScriptBase {
         p.fixedVarE36 = _varE36(_envUnits("FIXED_SIGMA_ANNUAL", "0.6", 18));
         p.kernel = 0;
 
-        string memory strike = _formatUnits(cents, 2, 2);
-        string memory clock = _clock(expiry);
-        p.yesName = string.concat("YES ETH>", strike, " ", clock);
-        p.noName = string.concat("NO ETH>", strike, " ", clock);
-        string memory hhmmss = vm.replace(clock, ":", "");
-        p.yesSymbol = string.concat("YES-", strike, "-", hhmmss);
-        p.noSymbol = string.concat("NO-", strike, "-", hhmmss);
+        string memory ticker = vm.envOr("MARKET_TICKER", string("ETH"));
+        string memory name = string.concat(ticker, " > $", _formatUnits(cents, 2, 2), " ", _date(expiry), " ", _hhmm(expiry));
+        p.yesName = name;
+        p.noName = name;
+        p.yesSymbol = string.concat(ticker, "UP");
+        p.noSymbol = string.concat(ticker, "DOWN");
     }
 
     function _strikeCents(int256 lnStrikeWad) internal pure returns (uint256) {
         return (uint256(F.expWad(lnStrikeWad)) + 0.5e16) / 1e16;
     }
 
-    /// @dev HH:MM:SS (UTC) of a unix timestamp
-    function _clock(uint256 t) internal pure returns (string memory) {
+    /// @dev HH:MM (UTC) of a unix timestamp
+    function _hhmm(uint256 t) internal pure returns (string memory) {
         uint256 s = t % 86_400;
-        return string.concat(_two(s / 3600), ":", _two((s / 60) % 60), ":", _two(s % 60));
+        return string.concat(_two(s / 3600), ":", _two((s / 60) % 60));
+    }
+
+    /// @dev "26 Sep" (UTC) of a unix timestamp, via Hinnant's days-to-civil conversion
+    function _date(uint256 t) internal pure returns (string memory) {
+        uint256 z = t / 86_400 + 719_468;
+        uint256 era = z / 146_097;
+        uint256 doe = z - era * 146_097;
+        uint256 yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+        uint256 doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        uint256 mp = (5 * doy + 2) / 153;
+        uint256 day = doy - (153 * mp + 2) / 5 + 1;
+        uint256 month = mp < 10 ? mp + 3 : mp - 9;
+        bytes memory names = "JanFebMarAprMayJunJulAugSepOctNovDec";
+        bytes memory mon = new bytes(3);
+        for (uint256 i; i < 3; ++i) {
+            mon[i] = names[(month - 1) * 3 + i];
+        }
+        return string.concat(vm.toString(day), " ", string(mon));
     }
 
     function _two(uint256 v) internal pure returns (string memory) {

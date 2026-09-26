@@ -6,6 +6,7 @@ import {
   buildMarketParams,
   expiryFor,
   formatClock,
+  formatDate,
   isSettleDue,
   lnStrikeWadFromCents,
   renderTemplate,
@@ -39,8 +40,9 @@ const TEMPLATE: MarketTemplate = {
   fixedVarE36: varE36FromAnnualVol("0.6"),
   kernel: 0,
   timeZone: "UTC",
-  nameTemplate: "{side} ETH>{strike} {time}",
-  symbolTemplate: "{side}-{strike}-{hhmmss}",
+  ticker: "ETH",
+  nameTemplate: "{ticker} > ${strike} {date} {hhmm}",
+  symbolTemplate: "{ticker}{side}",
 };
 
 test("strike is the oracle price rounded half up to the cent", () => {
@@ -67,8 +69,15 @@ test("clock and templates", () => {
   const t = 1790346660n;
   assert.equal(formatClock(t, "UTC"), "14:31:00");
   assert.equal(formatClock(t, "Asia/Tokyo"), "23:31:00");
-  assert.equal(renderTemplate("{side} ETH>{strike} {time}", "YES", "2701.35", "14:31:00"), "YES ETH>2701.35 14:31:00");
-  assert.equal(renderTemplate("{side}-{strike}-{hhmmss}/{hhmm}", "NO", "2701.35", "14:31:00"), "NO-2701.35-143100/1431");
+  assert.equal(formatDate(t, "UTC"), "25 Sep");
+  assert.equal(formatDate(1790380800n, "UTC"), "26 Sep");
+  assert.equal(formatDate(1790346660n + 10n * 3600n, "Asia/Tokyo"), "26 Sep");
+  assert.equal(formatDate(1791244800n, "UTC"), "6 Oct");
+  const v = { side: "UP" as const, ticker: "ETH", strike: "2701.35", clock: "14:31:00", date: "25 Sep" };
+  assert.equal(renderTemplate("{ticker}{side}", v), "ETHUP");
+  assert.equal(renderTemplate("{ticker}{side}", { ...v, side: "DOWN" }), "ETHDOWN");
+  assert.equal(renderTemplate("{ticker} > ${strike} {date} {hhmm}", v), "ETH > $2701.35 25 Sep 14:31");
+  assert.equal(renderTemplate("{side}-{strike}-{hhmmss} {time}", { ...v, side: "DOWN" }), "DOWN-2701.35-143100 14:31:00");
 });
 
 test("expiry is open + tenor, optionally aligned up", () => {
@@ -102,10 +111,10 @@ test("buildMarketParams produces the 1-minute demo market", () => {
     sigmaMode: 0,
     fixedVarE36: 0n,
     kernel: 0,
-    yesName: "YES ETH>2701.35 14:31:00",
-    yesSymbol: "YES-2701.35-143100",
-    noName: "NO ETH>2701.35 14:31:00",
-    noSymbol: "NO-2701.35-143100",
+    yesName: "ETH > $2701.35 25 Sep 14:31",
+    yesSymbol: "ETHUP",
+    noName: "ETH > $2701.35 25 Sep 14:31",
+    noSymbol: "ETHDOWN",
   });
 });
 
@@ -130,6 +139,10 @@ test("template validation rejects unusable markets", () => {
     { kernel: 1 },
     { kernel: 3 },
     { timeZone: "Not/AZone" },
+    { ticker: "" },
+    { ticker: "ETH USD" },
+    { symbolTemplate: "{side}-{strike}-{hhmmss}" },
+    { symbolTemplate: "{ticker}{side}{hhmmss}" },
   ];
   for (const b of bad) assert.throws(() => validateTemplate({ ...TEMPLATE, ...b }), Error, JSON.stringify(b, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
   validateTemplate(TEMPLATE);
