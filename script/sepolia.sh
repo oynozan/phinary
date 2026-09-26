@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Guarded broadcasts to the real Unichain Sepolia (chain 1301): deploy, fund the vault, or create a one-off market.
+# Guarded broadcasts to the real Unichain Sepolia (chain 1301): deploy, fund the vault, create a one-off market, deploy
+# the scheduler-owned hook, or renounce the oracle.
 #
-#   script/sepolia.sh deploy    Deploy.s.sol -> deployments/unichain-sepolia.json
-#   script/sepolia.sh fund      Fund.s.sol, FUND_USDC (default 20) of the deployer's Circle USDC into the vault
-#   script/sepolia.sh market    CreateMarket.s.sol with the keeper defaults (MARKET_* and QUOTE_* env)
+#   script/sepolia.sh deploy           Deploy.s.sol -> deployments/unichain-sepolia.json
+#   script/sepolia.sh fund             Fund.s.sol, FUND_USDC (default 20) of the deployer's Circle USDC into the vault
+#   script/sepolia.sh market           CreateMarket.s.sol with the keeper defaults (MARKET_* and QUOTE_* env)
+#   script/sepolia.sh scheduler        DeployScheduler.s.sol, a MarketScheduler and the new PredictionHook it owns, then
+#                                      record() checks both on-chain and only then updates the deployments file
+#   script/sepolia.sh renounce-oracle  RenounceOracle.s.sol, the UnderlyingOracleHook loses its owner (IRREVERSIBLE)
 #
 # Each command checks the RPC (chain 1301, not anvil), shows the signer's balances, simulates the script, and only then
 # asks for a typed confirmation before broadcasting (or takes CONFIRM=<command> for a non-interactive, explicit opt-in).
@@ -32,7 +36,9 @@ case "$CMD" in
   deploy) SCRIPT=script/Deploy.s.sol:Deploy ;;
   fund) SCRIPT=script/Fund.s.sol:Fund ;;
   market) SCRIPT=script/CreateMarket.s.sol:CreateMarket ;;
-  *) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  scheduler) SCRIPT=script/DeployScheduler.s.sol:DeployScheduler ;;
+  renounce-oracle) SCRIPT=script/RenounceOracle.s.sol:RenounceOracle ;;
+  *) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
 
 [[ -z "${CI:-}" ]] || die "refusing to broadcast to Unichain Sepolia from CI"
@@ -91,6 +97,15 @@ case "$CMD" in
   market)
     [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
     ;;
+  scheduler)
+    [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
+    echo "  replaces predictionHook $(sed -nE 's/.*"predictionHook": "([^"]+)".*/\1/p' "$DEPLOYMENTS") (moves to legacyPredictionHooks)"
+    echo "  note     stop the keeper first, no other signer transaction may land between the scheduler and the hook"
+    ;;
+  renounce-oracle)
+    [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
+    echo "  oracle   $(sed -nE 's/.*"underlyingOracle": "([^"]+)".*/\1/p' "$DEPLOYMENTS") loses its owner for good (IRREVERSIBLE)"
+    ;;
 esac
 
 echo
@@ -119,4 +134,20 @@ forge script "$SCRIPT" --rpc-url "$RPC" --broadcast --slow
 if [[ "$CMD" == deploy ]]; then
   echo
   echo "Next: make fund-sepolia FUND_USDC=<amount>, then make bots and node packages/swap-sdk/scripts/vendor-interface.mjs"
+fi
+if [[ "$CMD" == scheduler ]]; then
+  # The deployments file changes only once record() has read the pair back from the chain
+  echo
+  echo "Recording: checking the pair on-chain before $DEPLOYMENTS changes ..."
+  REC="$RUN/scheduler.record.log"
+  for attempt in 1 2 3 4 5 6; do
+    if forge script "$SCRIPT" --sig 'record()' --rpc-url "$RPC" >"$REC" 2>&1; then break; fi
+    if [[ "$attempt" == 6 ]]; then
+      tail -n 30 "$REC" >&2
+      die "record failed and $DEPLOYMENTS is unchanged (full log $REC). Once the pair checks out, rerun from $ROOT with the same env: NETWORK=$NETWORK DEPLOYMENTS_FILE= forge script $SCRIPT --sig 'record()' --rpc-url $RPC"
+    fi
+    sleep 5
+  done
+  sed -n '/== Logs ==/,/^$/p' "$REC"
+  echo "Next: settle and sweep the old hook's markets, move the vault USDC into the new hook, then script/sepolia.sh renounce-oracle"
 fi
