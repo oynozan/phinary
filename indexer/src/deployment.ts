@@ -23,7 +23,10 @@ type DeploymentFile = {
   deployBlock: number
 }
 
-const repoRoot = path.resolve(import.meta.dirname, '..', '..')
+// `import.meta.dirname` is undefined under Ponder's own esbuild-based config bundler (it evaluates
+// ponder.config.ts outside a plain Node ESM loader), so it can't be used here. Ponder always runs
+// with `indexer/` as the working directory, so the repo root is one level up from `process.cwd()`.
+const repoRoot = path.resolve(process.cwd(), '..')
 
 function resolveNetwork(env: Record<string, string | undefined>): IndexerNetwork {
   return env.PONDER_NETWORK === 'local' ? 'local' : 'unichain-sepolia'
