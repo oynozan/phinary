@@ -3,6 +3,7 @@ import {
   ContractFunctionRevertedError,
   numberToHex,
   parseEventLogs,
+  toHex,
   zeroHash,
   type Account,
   type Address,
@@ -16,6 +17,7 @@ import { loadEnvFiles, loadSealedConfig } from "./config.ts";
 import { verifiedHeader } from "./header.ts";
 import { isRevert } from "./keeper.ts";
 import { createLogger, errMsg, type Logger } from "./log.ts";
+import { poolStateSlot } from "./pricing.ts";
 import {
   buildBlockProof,
   HISTORY_ADDRESS,
@@ -36,6 +38,9 @@ const FIRST_CHUNK = 16;
 const CHUNK = 128;
 /** Parallel RPC reads while building a batch */
 const CONCURRENCY = 4;
+
+/** Depth of the startup eth_getProof probe, well past the ~30 blocks pruned public nodes serve */
+const PROOF_PROBE_DEPTH = 300n;
 
 /** Includes BlockHashes so reverts such as UnknownBlockHash decode by name */
 const oracleAbi = [...sealedPoolOracleAbi, ...sealedPoolOracleImplAbi] as const;
@@ -96,6 +101,26 @@ function revertName(e: unknown): string | undefined {
   if (!(e instanceof BaseError)) return undefined;
   const revert = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
   return revert?.data?.errorName;
+}
+
+/** False, after one warning, when no reader serves eth_getProof PROOF_PROBE_DEPTH blocks behind `head` */
+export async function checkProofWindow(readers: readonly Reader[], target: OracleTarget, head: bigint, log: Logger): Promise<boolean> {
+  const block = head > PROOF_PROBE_DEPTH ? head - PROOF_PROBE_DEPTH : 0n;
+  const slot = poolStateSlot(target.poolId);
+  const errors = await Promise.all(
+    readers.map((r) =>
+      r.request({ method: "eth_getProof", params: [target.poolManager, [slot], toHex(block)] }).then(
+        (p) => (Array.isArray(p?.accountProof) ? undefined : "no accountProof"),
+        (e: unknown) => (e instanceof BaseError && e.details) || errMsg(e),
+      ),
+    ),
+  );
+  if (errors.includes(undefined)) return true;
+  log.warn(
+    "no RPC serves eth_getProof 300 blocks back, so blocks missed during an outage cannot be proven: add an archive RPC to RPC_URL or SEALED_RPC_FALLBACKS",
+    { block, errors: errors.join(" | ") },
+  );
+  return false;
 }
 
 /**
@@ -364,6 +389,7 @@ async function main(): Promise<void> {
     fallbacks,
   });
   const target = await bot.oracleTarget();
+  await checkProofWindow([clients.publicClient, ...fallbacks], target, await clients.publicClient.getBlockNumber(), log);
   log.info("sealed bot ready", {
     account: clients.account?.address ?? "none (dry run)",
     keyFrom: cfg.privateKey?.source,

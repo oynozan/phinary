@@ -339,6 +339,10 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 
 The sealed bot (`bot/src/sealed.ts`, `npm run sealed` in `bot/`) pokes every block and proves every block no seal covers. It needs no role, since the contract checks every seal and proof.
 
+**RPC for proofs.** Keeping up needs `eth_getProof` only for the last few blocks, which any node serves. Recovering from an outage means proving every block the outage left unsealed, so `RPC_URL` or one of `SEALED_RPC_FALLBACKS` must serve `eth_getProof` for blocks as old as the outage: an archive node, or one with a wide proof window.
+- On 2026-09-26 most `https://mainnet.unichain.org` backends refused a few dozen blocks back (`distance to target block exceeds maximum proof window`), and publicnode serves old proofs only on an archive plan.
+- At start-up the bot asks every configured RPC for a proof 300 blocks back. If none answers, it logs one warning and keeps running, since it can still keep up with the head.
+
 ### End to end on anvil
 
 ```sh

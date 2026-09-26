@@ -10,7 +10,7 @@ import { createLogger } from "../src/log.ts";
 import { varE36FromAnnualVol } from "../src/market.ts";
 import { orientationFor, poolId, poolStateSlot, decodeSlot0, sortTokens, sqrtPriceX96FromPrice, type PoolKey } from "../src/pricing.ts";
 import { buildBlockProof, HISTORY_ADDRESS } from "../src/proof.ts";
-import { SealedBot, type SealedTick } from "../src/sealed.ts";
+import { checkProofWindow, SealedBot, type SealedTick } from "../src/sealed.ts";
 import { ANVIL_KEY, deploy, findAnvil, read, send, startAnvil } from "./helpers/anvil.ts";
 import { loadArtifact, type Artifact } from "./helpers/artifacts.ts";
 
@@ -132,6 +132,28 @@ function proofOf() {
     storageProof: [{ key: FIXTURE.slot, value: FIXTURE.slotValue, proof: FIXTURE.slotProof }],
   };
 }
+
+test("checkProofWindow warns once when no RPC serves eth_getProof 300 blocks back", async () => {
+  const lines: string[] = [];
+  const log = createLogger("sealed-test", "debug", (l) => lines.push(l));
+  const asked: unknown[] = [];
+  const pruned = fixtureClient((r) => {
+    if (r.method !== "eth_getProof") return undefined;
+    asked.push(r.params[2]);
+    throw new Error("distance to target block exceeds maximum proof window");
+  });
+  assert.equal(await checkProofWindow([pruned, pruned], target, 1000n, log), false);
+  assert.deepEqual(asked, ["0x2bc", "0x2bc"], "both RPCs are asked for head - 300");
+  const warns = lines.filter((l) => l.includes(" WARN "));
+  assert.equal(warns.length, 1);
+  assert.match(warns[0]!, /archive/);
+  assert.match(warns[0]!, /maximum proof window/);
+
+  lines.length = 0;
+  assert.equal(await checkProofWindow([pruned, fixtureClient()], target, 1000n, log), true, "one archive fallback is enough");
+  assert.equal(await checkProofWindow([fixtureClient()], target, 100n, log), true, "a chain younger than 300 blocks asks for block 0");
+  assert.deepEqual(lines, []);
+});
 
 /* Anvil with a PoolManager, a hookless pool and SealedPoolOracle */
 

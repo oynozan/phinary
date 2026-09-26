@@ -113,6 +113,10 @@ role: the contract verifies every seal and proof, so a faulty bot can stall the 
 - Headers are rebuilt from `eth_getBlockByNumber` (`src/header.ts`, the 21 Isthmus fields) and must hash to the block
   hash before anything is sent. `eth_getProof` of the PoolManager's `slot0` slot (`src/proof.ts`) must start at the
   header's state root. Refusals are retried with backoff, then on `SEALED_RPC_FALLBACKS`.
+- Recovering from an outage proves blocks as old as the outage, so `RPC_URL` or a `SEALED_RPC_FALLBACKS` entry must
+  serve historical `eth_getProof` (an archive node or a wide proof window). Most `mainnet.unichain.org` backends refuse
+  a few dozen blocks back, and publicnode needs an archive plan. On start-up the bot asks every RPC for a proof 300
+  blocks back and warns once, without exiting, when none answers.
 - A block hash comes from `BLOCKHASH` for 256 blocks, then from EIP-2935 for 8,191. Past those, and 32 blocks early to
   leave time to land, it first stores the missing hashes with `checkpointHeaders`, walking back from the oldest block a
   window still serves.
