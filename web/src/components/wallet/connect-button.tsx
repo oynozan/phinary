@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WalletCards, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -32,7 +33,8 @@ export function ConnectButton({ className }: { className?: string }) {
         return (
             <>
                 <Button className={cn(pill, className)} disabled={wallet.status === "connecting"} onClick={() => setOpen(true)}>
-                    {wallet.status === "connecting" ? "Connecting" : "Connect"}
+                    <WalletCards className="size-4" aria-hidden="true" />
+                    {wallet.status === "connecting" ? "Connecting" : "Connect wallet"}
                 </Button>
                 <WalletDialog open={open} onOpenChange={setOpen} />
             </>
@@ -43,8 +45,9 @@ export function ConnectButton({ className }: { className?: string }) {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" className={cn(pill, "gap-2", className)}>
-                    <span className={cn("size-2 rounded-full", wallet.wrongNetwork ? "bg-down" : "bg-primary")} />
-                    {shortAddress(wallet.address)}
+                    <WalletCards className={cn("size-4", wallet.wrongNetwork ? "text-down" : "text-violet-300")} aria-hidden="true" />
+                    <span className="wallet-address">{shortAddress(wallet.address)}</span>
+                    <ChevronDown className="wallet-chevron ml-3 size-3.5 text-muted-foreground" aria-hidden="true" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">

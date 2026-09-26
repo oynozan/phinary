@@ -14,7 +14,7 @@ Hackathon demo visitors and users exploring the testnet markets. Broader product
 Unichain Sepolia. Current connection supports real market reads, wallet connection and UP purchases. DOWN navigation opens an existing preview with the current unsupported-purchase notice. History, volume and settlement history are unavailable; never fabricate them. Protocol, pricing, API, SDK and contracts stay unchanged. Scope: Markets body and shared header only.
 
 ## Brand Commitments
-Phinary text wordmark. English UI, UP / DOWN terminology. The user-approved reference is a near-black financial interface with violet atmospheric artwork and compact market tables.
+Phinary cyan/violet Phi mark and text wordmark (updated user reference). English UI, UP / DOWN terminology. The user-approved reference is a near-black financial interface with violet atmospheric artwork and compact market tables.
 
 ## Evidence on Hand
 README.md, DESIGN.md, current data hooks and the approved Markets screenshot and prompt in the conversation. Data and transaction behavior are authoritative over illustrative values in the reference.

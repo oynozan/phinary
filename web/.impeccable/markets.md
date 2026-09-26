@@ -1,5 +1,5 @@
 # Markets direction
 Mode: Operate. Approved implementation plan from user, 2026-09-26.
 Desktop reference: 1536 x 1024. Full-width thin header, 60/40 split compact hero and featured preview, dense table below. Manrope, near-black #080b12, violet hero/nav accents and lighter UP text, coral DOWN, green only for live/success. Actual implemented tokens are normative in DESIGN.md. Cards 12px radius, primary controls 8px; filter buttons 7px and groups/row actions 9px. Static orbital artwork with empty left area; no permanent animation.
-Preserve Phinary text-only wordmark. Hero copy follows supplied prompt rather than illustrative screenshot copy. Only ETH is supported; do not reproduce fake assets, volume, changes or histories. N/A and History unavailable are deliberate reference deviations.
-Other pages keep their body design. Shared header (64px) and shell top offset (88px, 76px below 640px) are the only cross-page changes. Mobile stacks hero and uses compact semantic market rows, retaining dock and menu.
+Use the cyan/violet Phi mark and Phinary wordmark from the updated user reference. Hero copy follows supplied prompt rather than illustrative screenshot copy. Only ETH is supported; do not reproduce fake assets, volume, changes or histories. N/A and History unavailable are deliberate reference deviations.
+Other pages keep their body design. Shared header (52px) and shell top offset (76px, 68px below 640px) are the only cross-page changes. Mobile stacks hero and uses compact semantic market rows, retaining dock and menu.

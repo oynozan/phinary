@@ -253,17 +253,28 @@
     }
 }
 
-/* Shared header refresh. Other page body tokens remain unchanged. */
-:root { --header-h: 64px; --shell-top: 88px; }
-.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: 64px; background: rgb(9 12 20 / 94%); border-bottom: 1px solid #252a38; backdrop-filter: blur(12px); color: #f5f5fa; font-family: var(--font-manrope), sans-serif; }
-.app-header-inner { width: 100%; height: 100%; max-width: 1536px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 48px; justify-content: space-between; }
-.app-header-nav { align-self: stretch; flex: 1; gap: 36px; align-items: stretch; }
-.app-header-link { position: relative; display: flex; align-items: center; font-size: 14px; color: #bfc8df; }
-.app-header-link.is-active { color: #fff; }
-.app-header-link.is-active::after { content: ''; position: absolute; height: 2px; left: 0; right: 0; bottom: 0; background: #bc55ff; }
+/* Compact shared header, matching the approved reference. */
+:root { --header-h: 52px; --shell-top: 76px; }
+.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: #080b13; border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
+.app-header::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: url("/markets/orbit.webp") 56% 23% / 1050px auto no-repeat; opacity: .45; mask-image: linear-gradient(to right, transparent 30%, black 47%, black 66%, transparent 80%); }
+.app-header-inner { width: 100%; height: 100%; max-width: 1536px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 56px; justify-content: space-between; }
+.header-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+.header-brand-mark { flex-shrink: 0; }
+.header-brand > span { font-family: var(--font-manrope), sans-serif; font-size: 23px; font-weight: 750; letter-spacing: -.035em; }
+.app-header-nav { align-self: stretch; flex: 1; gap: 34px; align-items: stretch; }
+.app-header-link { position: relative; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #aab6d1; }
+.app-header-link.is-active { color: #fff; font-weight: 700; }
+.app-header-link.is-active::after { content: ""; position: absolute; height: 2px; left: 0; right: 0; bottom: 0; background: #c13aff; box-shadow: 0 -2px 9px #ad2df077; }
 .app-header-link:hover { color: #ddaeff; }
-.app-header .header-wallet, .app-header .header-balance { height: 38px; border-radius: 9px; border: 1px solid #303646; background: #10141e; color: #e7eafb; font-size: 12px; padding: 0 13px; }
+.app-header .header-wallet, .app-header .header-balance { height: 34px; border-radius: 8px; border: 1px solid #2a3143; background: #090d16; color: #e7eafb; font-size: 12px; padding: 0 11px; gap: 8px; }
+.app-header .header-wallet { min-width: 142px; justify-content: center; }
+.app-header .header-balance { gap: 6px; font-family: inherit; }
+.app-header .header-balance .num { font-weight: 500; }
+.app-header .header-usdc-icon { color: #fff; background: #2777f5; border-radius: 50%; padding: 1px; }
 .app-header .header-wallet:hover { background: #20192d; border-color: #8e55b3; }
-.app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 4px; }
-@media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 32px; } .app-header-nav { gap: 26px; } }
-@media (max-width: 639px) { :root { --shell-top: 76px; } .app-header-inner { padding: 0 20px; gap: 12px; } .app-header .header-wallet { padding: 0 12px; max-width: 155px; } }
+.app-header .header-menu { border-radius: 8px; background: #121722; color: #c5cce0; }
+.app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 3px; }
+@media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 38px; } .app-header-nav { gap: 26px; } }
+@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 24px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } .app-header::before { opacity: .25; } }
+
+@media (max-width: 380px) { .app-header .header-wallet { font-size: 10px; padding: 0 8px; gap: 6px; } .app-header .wallet-chevron { display: none; } .app-header .wallet-address { max-width: 70px; overflow: hidden; text-overflow: ellipsis; } }

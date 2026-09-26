@@ -54,7 +54,7 @@ components:
   header:
     backgroundColor: "{colors.header}"
     textColor: "{colors.foreground}"
-    height: "64px"
+    height: "52px"
   search:
     textColor: "{colors.foreground}"
     rounded: "{rounded.control}"
@@ -74,17 +74,17 @@ Violet has distinct implemented roles: primary token, hero accent, navigation un
 
 ## Typography
 
-Markets and header use Manrope, with inherited tabular numerals. The text-only Phinary wordmark retains its existing Akt treatment. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
+Markets and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
 
 ## Layout
 
-Shared header height is 64px on every route. The shell supplies 88px top padding, reduced to 76px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.
+Shared header height is 52px on every route. The shell supplies 76px top padding, reduced to 68px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.
 
 Markets and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.
 
 ## Elevation & Depth
 
-Thin borders and tonal surfaces establish depth. The header uses 12px backdrop blur; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets honors reduced motion.
+Thin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets honors reduced motion.
 
 ## Shapes
 
@@ -92,7 +92,7 @@ Cards and table containers use the card radius. Search, select and featured acti
 
 ## Components
 
-The header keeps a text-only wordmark, active underline and existing wallet behavior. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.
+The header keeps a Phi mark and wordmark, luminous active underline and existing wallet behavior. Connected wallet controls show a blue USDC icon and wallet/address/chevron in compact 34px bordered controls; disconnected wallets show Connect wallet. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.
 
 ## Do's and Don'ts
 
