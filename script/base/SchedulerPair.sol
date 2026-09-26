@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {console2} from "forge-std/Script.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
@@ -31,22 +32,40 @@ abstract contract SchedulerPair is ScriptBase {
         address hook;
     }
 
-    function schedulerConfig() public view returns (IMarketScheduler.Config memory c) {
-        c.period = _envU32("SCHEDULER_PERIOD_SEC", 60);
-        c.tenor = _envU32("MARKET_TENOR_SEC", 120);
-        c.window = _envU32("MARKET_WINDOW_SEC", 10);
-        c.cutoffBuffer = _envU32("MARKET_CUTOFF_BUFFER_SEC", 2);
-        c.nSamples = _envU32("MARKET_N_SAMPLES", 10);
+    /// @notice The spec's Unichain Sepolia demo values, the default for every config field
+    function demoDefaults() public pure returns (IMarketScheduler.Config memory c) {
+        c.period = 60;
+        c.tenor = 120;
+        c.window = 10;
+        c.cutoffBuffer = 2;
+        c.nSamples = 10;
         c.quote = IPredictionHook.QuoteParams({
-            h0Wad: SafeCastLib.toUint64(_envUnits("QUOTE_H0", "0.02", 18)),
-            gammaSWad: SafeCastLib.toUint64(_envUnits("QUOTE_GAMMA_S", "0.00002", 18)),
-            lambdaWad: SafeCastLib.toUint128(_envUnits("QUOTE_LAMBDA", "0.001", 18)),
-            qEpochMax: SafeCastLib.toUint128(_envUnits("QUOTE_Q_EPOCH_MAX", "100", 6)),
-            pMinWad: SafeCastLib.toUint64(_envUnits("QUOTE_P_MIN", "0.02", 18))
+            h0Wad: 0.02e18,
+            gammaSWad: 0.00002e18,
+            lambdaWad: 0.001e18,
+            qEpochMax: 100e6,
+            pMinWad: 0.02e18
         });
-        c.maxBudget = _envUnits("MARKET_BUDGET_USDC", "10", 6);
-        c.minBudget = _envUnits("SCHEDULER_MIN_BUDGET_USDC", "1", 6);
-        c.ticker = vm.envOr("MARKET_TICKER", string("ETH"));
+        c.maxBudget = 10e6;
+        c.minBudget = 1e6;
+        c.ticker = "ETH";
+    }
+
+    function schedulerConfig() public view returns (IMarketScheduler.Config memory c) {
+        c = demoDefaults();
+        c.period = _envU32("SCHEDULER_PERIOD_SEC", c.period);
+        c.tenor = _envU32("MARKET_TENOR_SEC", c.tenor);
+        c.window = _envU32("MARKET_WINDOW_SEC", c.window);
+        c.cutoffBuffer = _envU32("MARKET_CUTOFF_BUFFER_SEC", c.cutoffBuffer);
+        c.nSamples = _envU32("MARKET_N_SAMPLES", c.nSamples);
+        c.quote.h0Wad = SafeCastLib.toUint64(_envUnitsOr("QUOTE_H0", c.quote.h0Wad, 18));
+        c.quote.gammaSWad = SafeCastLib.toUint64(_envUnitsOr("QUOTE_GAMMA_S", c.quote.gammaSWad, 18));
+        c.quote.lambdaWad = SafeCastLib.toUint128(_envUnitsOr("QUOTE_LAMBDA", c.quote.lambdaWad, 18));
+        c.quote.qEpochMax = SafeCastLib.toUint128(_envUnitsOr("QUOTE_Q_EPOCH_MAX", c.quote.qEpochMax, 6));
+        c.quote.pMinWad = SafeCastLib.toUint64(_envUnitsOr("QUOTE_P_MIN", c.quote.pMinWad, 18));
+        c.maxBudget = _envUnitsOr("MARKET_BUDGET_USDC", c.maxBudget, 6);
+        c.minBudget = _envUnitsOr("SCHEDULER_MIN_BUDGET_USDC", c.minBudget, 6);
+        c.ticker = vm.envOr("MARKET_TICKER", c.ticker);
     }
 
     /// @dev The scheduler constructor's InvalidConfig checks, each naming the env variable at fault
@@ -63,20 +82,21 @@ abstract contract SchedulerPair is ScriptBase {
         require(c.quote.pMinWad != 0 && c.quote.pMinWad < 0.5e18, "QUOTE_P_MIN must be in (0, 0.5)");
     }
 
-    /// @dev Call inside a broadcast from `deployer`, it sends exactly two transactions from it
+    /// @dev Call inside a broadcast from `deployer` (exactly two transactions), `salt` redeploys a hook that failed
     function _deployPair(
         address deployer,
         address poolManager,
         address usdc,
         address oracle,
         IMarketScheduler.Config memory c
-    ) internal returns (Pair memory p) {
+    ) internal returns (Pair memory p, bytes32 salt) {
         uint64 nonce = vm.getNonce(deployer);
         address scheduler = vm.computeCreateAddress(deployer, nonce);
         bytes memory init = abi.encodePacked(
             vm.getCode("src/PredictionHook.sol:PredictionHook"), abi.encode(poolManager, usdc, scheduler)
         );
-        (bytes32 salt, address hook) = _mineHookSalt(PREDICTION_FLAGS, init);
+        address hook;
+        (salt, hook) = _mineHookSalt(PREDICTION_FLAGS, init);
 
         p.scheduler = deployCode("src/MarketScheduler.sol:MarketScheduler", abi.encode(hook, oracle, c));
         require(p.scheduler == scheduler, "scheduler address differs from the nonce prediction");
@@ -108,24 +128,45 @@ abstract contract SchedulerPair is ScriptBase {
     }
 
     function _logConfig(IMarketScheduler.Config memory c) internal pure {
-        _log("period / tenor s", string.concat(vm.toString(c.period), " / ", vm.toString(c.tenor)));
-        _log(
-            "window / cutoff s, samples",
-            string.concat(vm.toString(c.window), " / ", vm.toString(c.cutoffBuffer), ", ", vm.toString(c.nSamples))
-        );
-        _log("h0", _formatUnits(c.quote.h0Wad, 18, 8));
-        _log("gammaS", _formatUnits(c.quote.gammaSWad, 18, 8));
-        _log("lambda", _formatUnits(c.quote.lambdaWad, 18, 8));
-        _log("qEpochMax tokens", _formatUnits(c.quote.qEpochMax, 6, 6));
-        _log("pMin", _formatUnits(c.quote.pMinWad, 18, 8));
-        _log("budget max / min USDC", string.concat(_formatUnits(c.maxBudget, 6, 6), " / ", _formatUnits(c.minBudget, 6, 6)));
-        _log("ticker", c.ticker);
+        string[] memory lines = _configLines(c);
+        for (uint256 i; i < lines.length; ++i) {
+            console2.log(string.concat("  ", lines[i]));
+        }
+    }
+
+    /// @dev One line per field, marked "(env override)" where it differs from `demoDefaults()`
+    function _configLines(IMarketScheduler.Config memory c) internal pure returns (string[] memory lines) {
+        IMarketScheduler.Config memory d = demoDefaults();
+        lines = new string[](13);
+        lines[0] = _line("period s", vm.toString(c.period), c.period != d.period);
+        lines[1] = _line("tenor s", vm.toString(c.tenor), c.tenor != d.tenor);
+        lines[2] = _line("window s", vm.toString(c.window), c.window != d.window);
+        lines[3] = _line("cutoff buffer s", vm.toString(c.cutoffBuffer), c.cutoffBuffer != d.cutoffBuffer);
+        lines[4] = _line("samples", vm.toString(c.nSamples), c.nSamples != d.nSamples);
+        lines[5] = _line("h0", _formatUnits(c.quote.h0Wad, 18, 8), c.quote.h0Wad != d.quote.h0Wad);
+        lines[6] = _line("gammaS", _formatUnits(c.quote.gammaSWad, 18, 8), c.quote.gammaSWad != d.quote.gammaSWad);
+        lines[7] = _line("lambda", _formatUnits(c.quote.lambdaWad, 18, 8), c.quote.lambdaWad != d.quote.lambdaWad);
+        lines[8] =
+            _line("qEpochMax tokens", _formatUnits(c.quote.qEpochMax, 6, 6), c.quote.qEpochMax != d.quote.qEpochMax);
+        lines[9] = _line("pMin", _formatUnits(c.quote.pMinWad, 18, 8), c.quote.pMinWad != d.quote.pMinWad);
+        lines[10] = _line("max budget USDC", _formatUnits(c.maxBudget, 6, 6), c.maxBudget != d.maxBudget);
+        lines[11] = _line("min budget USDC", _formatUnits(c.minBudget, 6, 6), c.minBudget != d.minBudget);
+        lines[12] = _line("ticker", c.ticker, keccak256(bytes(c.ticker)) != keccak256(bytes(d.ticker)));
+    }
+
+    function _line(string memory k, string memory v, bool overridden) internal pure returns (string memory) {
+        return string.concat(k, ": ", v, overridden ? " (env override)" : "");
     }
 
     function _envU32(string memory name, uint256 def) internal view returns (uint32) {
         uint256 v = vm.envOr(name, def);
         if (v > type(uint32).max) revert(string.concat(name, " does not fit in uint32"));
         return uint32(v);
+    }
+
+    /// @dev `_envUnits` with a numeric default, so the defaults live only in `demoDefaults()`
+    function _envUnitsOr(string memory name, uint256 def, uint8 decimals) internal view returns (uint256) {
+        return vm.envExists(name) ? _parseUnits(vm.envString(name), decimals, name) : def;
     }
 
     /// @dev `path` with its trailing ".json" replaced by `suffix`

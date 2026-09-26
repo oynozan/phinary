@@ -25,15 +25,18 @@ contract DeployScheduler is SchedulerPair {
         address oracle;
     }
 
-    function run() external returns (Pair memory) {
-        return _stage(_deploymentsPath(), schedulerConfig());
+    function run() external returns (Pair memory p) {
+        (p,) = _stage(_deploymentsPath(), schedulerConfig());
     }
 
     function record() external {
         _record(_deploymentsPath(), schedulerConfig());
     }
 
-    function _stage(string memory path, IMarketScheduler.Config memory c) internal returns (Pair memory p) {
+    function _stage(string memory path, IMarketScheduler.Config memory c)
+        internal
+        returns (Pair memory p, bytes32 salt)
+    {
         string memory json = _readDeploymentsAt(path);
         string memory pending = _withSuffix(path, ".pending.json");
         if (vm.exists(pending)) revert(string.concat("staged pair awaits record(): ", pending));
@@ -45,7 +48,7 @@ contract DeployScheduler is SchedulerPair {
         uint256 deployBlock = block.number;
 
         address deployer = _startBroadcast();
-        p = _deployPair(deployer, t.poolManager, t.usdc, t.oracle, c);
+        (p, salt) = _deployPair(deployer, t.poolManager, t.usdc, t.oracle, c);
         vm.stopBroadcast();
 
         _verifyPair(p, t.poolManager, t.usdc, t.oracle, c);
@@ -62,6 +65,7 @@ contract DeployScheduler is SchedulerPair {
         _log("deployer", deployer);
         _log("marketScheduler", p.scheduler);
         _log("predictionHook", p.hook);
+        _log("hook salt", vm.toString(salt));
         address[] memory legacy = _legacyHooks(json);
         if (legacy.length != 0) _log("replaces", legacy[legacy.length - 1]);
         _log("underlyingOracle", t.oracle);

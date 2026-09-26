@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Deployers} from "v4-core/test/utils/Deployers.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
+import {LibString} from "solady/utils/LibString.sol";
 import {DeployScheduler} from "../../script/DeployScheduler.s.sol";
 import {RenounceOracle} from "../../script/RenounceOracle.s.sol";
 import {SchedulerPair} from "../../script/base/SchedulerPair.sol";
@@ -48,8 +49,12 @@ contract DeploySchedulerHarness is DeployScheduler {
         return signer;
     }
 
-    function stage(string memory path, IMarketScheduler.Config memory c) external returns (Pair memory) {
+    function stage(string memory path, IMarketScheduler.Config memory c) external returns (Pair memory, bytes32) {
         return _stage(path, c);
+    }
+
+    function configLines(IMarketScheduler.Config memory c) external pure returns (string[] memory) {
+        return _configLines(c);
     }
 
     function recordAt(string memory path, IMarketScheduler.Config memory c) external {
@@ -145,7 +150,7 @@ contract DeploySchedulerTest is Test, Deployers {
         string memory path = _seed("addresses", "");
         address predicted = vm.computeCreateAddress(deployer, NONCE);
 
-        SchedulerPair.Pair memory p = script.stage(path, demoConfig());
+        (SchedulerPair.Pair memory p,) = script.stage(path, demoConfig());
 
         assertEq(p.scheduler, predicted, "scheduler is the CREATE at the deployer's nonce");
         assertEq(vm.getNonce(deployer), NONCE + 2, "exactly two deployer transactions");
@@ -164,7 +169,7 @@ contract DeploySchedulerTest is Test, Deployers {
 
     function test_deployedPairOpensMarketsOnceFunded() public {
         string memory path = _seed("opens", "");
-        SchedulerPair.Pair memory p = script.stage(path, demoConfig());
+        (SchedulerPair.Pair memory p,) = script.stage(path, demoConfig());
         address lp = makeAddr("lp");
         usdc.mint(lp, 100e6);
         vm.startPrank(lp);
@@ -214,6 +219,54 @@ contract DeploySchedulerTest is Test, Deployers {
         assertEq(keccak256(abi.encode(script.schedulerConfig())), keccak256(abi.encode(demoConfig())));
     }
 
+    function test_demoDefaultsAreTheSpecValues() public view {
+        assertEq(keccak256(abi.encode(script.demoDefaults())), keccak256(abi.encode(demoConfig())));
+    }
+
+    function test_returnedSaltIsTheHookCreate2Salt() public {
+        string memory path = _seed("salt", "");
+        (SchedulerPair.Pair memory p, bytes32 salt) = script.stage(path, demoConfig());
+        bytes memory init = abi.encodePacked(
+            vm.getCode("src/PredictionHook.sol:PredictionHook"), abi.encode(address(manager), address(usdc), p.scheduler)
+        );
+        assertEq(vm.computeCreate2Address(salt, keccak256(init), CREATE2_FACTORY), p.hook);
+        _cleanup(path);
+    }
+
+    function test_configLinesFlagExactlyTheFieldsThatDifferFromTheDemoDefaults() public view {
+        string[] memory plain = script.configLines(demoConfig());
+        assertEq(plain.length, 13, "one line per field");
+        for (uint256 j; j < plain.length; ++j) {
+            assertFalse(LibString.contains(plain[j], "(env override)"), plain[j]);
+        }
+        for (uint256 i; i < 13; ++i) {
+            string[] memory lines = script.configLines(_changed(i));
+            for (uint256 j; j < lines.length; ++j) {
+                assertEq(LibString.contains(lines[j], "(env override)"), i == j, lines[j]);
+            }
+        }
+        assertEq(script.configLines(_changed(6))[6], "gammaS: 0.00005000 (env override)");
+        assertEq(plain[6], "gammaS: 0.00002000");
+    }
+
+    /// @dev The demo config with field `i` changed, in the order the config lines are logged
+    function _changed(uint256 i) internal pure returns (IMarketScheduler.Config memory c) {
+        c = demoConfig();
+        if (i == 0) c.period = 30;
+        else if (i == 1) c.tenor = 180;
+        else if (i == 2) c.window = 5;
+        else if (i == 3) c.cutoffBuffer = 3;
+        else if (i == 4) c.nSamples = 20;
+        else if (i == 5) c.quote.h0Wad = 0.01e18;
+        else if (i == 6) c.quote.gammaSWad = 0.00005e18;
+        else if (i == 7) c.quote.lambdaWad = 0.002e18;
+        else if (i == 8) c.quote.qEpochMax = 50e6;
+        else if (i == 9) c.quote.pMinWad = 0.03e18;
+        else if (i == 10) c.maxBudget = 20e6;
+        else if (i == 11) c.minBudget = 2e6;
+        else c.ticker = "BTC";
+    }
+
     /* Deployments file */
 
     function test_stageLeavesTheDeploymentsFileUntilRecord() public {
@@ -229,7 +282,7 @@ contract DeploySchedulerTest is Test, Deployers {
 
     function test_recordWritesTheVerifiedPair() public {
         string memory path = _seed("record", "");
-        SchedulerPair.Pair memory p = script.stage(path, demoConfig());
+        (SchedulerPair.Pair memory p,) = script.stage(path, demoConfig());
         vm.warp(T0 + 30);
         vm.roll(BLOCK + 30);
 
@@ -298,7 +351,7 @@ contract DeploySchedulerTest is Test, Deployers {
 
     function test_recordRefusesAPairThatFailsTheOnChainChecks() public {
         string memory path = _seed("unverified", "");
-        SchedulerPair.Pair memory p = script.stage(path, demoConfig());
+        (SchedulerPair.Pair memory p,) = script.stage(path, demoConfig());
         string memory pending = _pending(path);
         vm.writeFile(pending, vm.replace(vm.readFile(pending), vm.toString(p.scheduler), vm.toString(address(oracle))));
 

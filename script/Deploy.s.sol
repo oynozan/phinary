@@ -159,7 +159,7 @@ contract Deploy is SchedulerPair {
     }
 
     function _deployPredictionHook(Deployment memory d, IMarketScheduler.Config memory sc) internal {
-        Pair memory p = _deployPair(d.deployer, d.poolManager, d.usdc, d.underlyingOracle, sc);
+        (Pair memory p,) = _deployPair(d.deployer, d.poolManager, d.usdc, d.underlyingOracle, sc);
         d.marketScheduler = p.scheduler;
         d.predictionHook = p.hook;
     }
