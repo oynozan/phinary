@@ -1,13 +1,23 @@
 {
   "name": "phinary-web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE next dev -p 3100",
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "eslint",
-    "test": "vitest run"
+    "dev:onchain": "env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE next dev -p 3101 --hostname 127.0.0.1",
+    "check:connection": "node scripts/check-connection.mts",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.mts",
+    "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts",
+    "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts",
+    "preview:activity": "node --import tsx scripts/preview-activity.mts",
+    "preview:vault": "node --import tsx scripts/preview-vault.mts",
+    "test:vault:fork": "node --import tsx scripts/test-vault-fork.mts",
+    "test:lifecycle:fork": "node --import tsx scripts/test-lifecycle-fork.mts",
+    "test:browser:fork": "node --import tsx scripts/test-browser-fork.mjs"
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.81",
@@ -38,6 +48,8 @@
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "playwright": "^1.58.2",
+    "tsx": "^4.23.15"
   }
 }

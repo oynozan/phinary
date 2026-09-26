@@ -17,8 +17,8 @@ export function ActivityStats({ markets, now, className }: { markets: Market[] |
         const since = now - HOUR;
         for (const m of markets) {
             if (m.openTime > since && m.openTime <= now) {
-                volume += m.volume;
-                trades += m.tradeCount;
+                volume += m.volume ?? 0;
+                trades += m.tradeCount ?? 0;
             }
             if (m.settledAt !== null && m.settledAt > since) {
                 if (m.phase === "resolved-up") up += 1;

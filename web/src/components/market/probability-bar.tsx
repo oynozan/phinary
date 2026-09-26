@@ -2,7 +2,8 @@ import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** UP share vs DOWN share, split by a 2px gap. Optional labels above. */
-export function ProbabilityBar({ up, labels = false, className }: { up: number; labels?: boolean; className?: string }) {
+export function ProbabilityBar({ up, labels = false, className }: { up: number | null; labels?: boolean; className?: string }) {
+    if (up === null) return <div className={cn("h-2 w-full rounded-full bg-surface-3", className)} aria-label="Probability unavailable" />;
     const p = Math.min(1, Math.max(0, up));
     return (
         <div className={cn("w-full", className)}>

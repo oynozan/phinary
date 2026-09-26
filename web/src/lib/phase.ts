@@ -1,4 +1,4 @@
-import type { MarketInfo, MarketStatus, Phase } from "@/lib/types";
+import type { MarketInfo, MarketStatus, Phase } from "./types.ts";
 
 type Timing = Pick<MarketInfo, "openTime" | "expiry" | "window" | "cutoffBuffer" | "status" | "upWon">;
 

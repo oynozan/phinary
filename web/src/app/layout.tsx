@@ -16,7 +16,7 @@ const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const ubuntuMono = Ubuntu_Mono({ variable: "--font-ubuntu-mono", weight: ["400", "700"], subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: { default: `${BRAND_NAME}: ETH in two minutes`, template: `%s · ${BRAND_NAME}` },
+    title: { default: `${BRAND_NAME}: ETH prediction markets`, template: `%s · ${BRAND_NAME}` },
     description: "Binary ETH prediction markets priced by Black-Scholes on Uniswap v4.",
 };
 

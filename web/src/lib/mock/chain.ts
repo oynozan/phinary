@@ -409,7 +409,7 @@ export class MockChain {
         const f = this.flowOf(s, t);
         const pts = f.history.filter((p) => p.t <= t);
         const m = this.marketAt(id, t);
-        if (m && isResolved(m.phase) && m.settledAt) {
+        if (m && isResolved(m.phase) && m.settledAt && m.upChance !== null) {
             const v = m.upChance;
             pts.push({ t: m.expiry, mid: v, ask: v, bid: v, eth: m.settlementPrice ?? s.strike });
         }
@@ -433,7 +433,7 @@ export class MockChain {
         for (let id = this.lastIdAt(t); id >= lowest; id--) {
             const m = this.marketAt(id, t);
             if (!m) continue;
-            items.push({ kind: "created", id: `c-${id}`, time: m.createdAt, marketId: id });
+            if (m.createdAt !== null) items.push({ kind: "created", id: `c-${id}`, time: m.createdAt, marketId: id });
             if (m.settledAt) {
                 items.push({ kind: "settled", id: `s-${id}`, time: m.settledAt, marketId: id, upWon: m.upWon, invalid: m.phase === "invalid" });
             }

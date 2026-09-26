@@ -1,373 +1,104 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { ArrowRight, Droplet } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-import { Panel } from "@/components/layout/panel";
-import { AmountInput, AssetChip, Balance, Profit, SegmentedPills, SwapOutput, SwapStack } from "@/components/market";
+import { formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
-import { LiquidMetalButton } from "@/components/ui/liquid-metal-button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { WalletDialog } from "@/components/wallet/wallet-dialog";
-import { COLLATERAL_SYMBOL } from "@/config/brand";
-import { useLiveMarketId, useNow, usePortfolio, useWallet } from "@/lib/data";
-import { formatCents, formatCountdown, formatNumber, formatTokens, formatUsd, sideLabel, tokenTicker } from "@/lib/format";
-import { isResolved } from "@/lib/phase";
-import { previewBuy, previewSell } from "@/lib/trade";
-import type { Market, Quote, Side } from "@/lib/types";
-import { cn } from "@/lib/utils";
-
-import { OutcomeSelector } from "./outcome-selector";
-import { TradeSteps } from "./trade-steps";
-import { amountString, parseAmount, type TradeForm, type TradeMode } from "./types";
-import { useClaims } from "./use-claims";
-import { useTradeFlow } from "./use-trade-flow";
+import { retryMarkets, useNow } from "@/lib/data";
+import { getConnectionConfig } from "@/lib/onchain/config";
+import { parseUsdc } from "@/lib/onchain/buy";
+import { useBuyQuote } from "@/lib/onchain/use-buy-quote";
+import { useTokenBalance } from "@/lib/onchain/balances";
+import { useWalletSession, refreshWalletBalances, switchWalletNetwork } from "@/lib/onchain/wallet";
+import { buyUp, claimMarket, checkPendingTransaction, useTransaction } from "@/lib/onchain/transactions";
+import { formatCents, formatTokens, formatUsd } from "@/lib/format";
+import { isResolved, payoutPerToken } from "@/lib/phase";
+import { detailCanBuy, purchaseSummary, DETAIL_PHASE } from "@/lib/markets/detail";
+import type { Market } from "@/lib/types";
+import type { TradeForm } from "./types";
 
 export const TRADE_INPUT_ID = "trade-amount";
+const explorer = "https://sepolia.uniscan.xyz/tx/";
 
-const QUICK_BUY = [1, 5, 10];
-const SELL_FRACTIONS = [0.25, 0.5];
-const EPS = 1e-9;
-
-const MODES = [
-    { value: "buy" as const, label: "Buy" },
-    { value: "sell" as const, label: "Sell" },
-];
-
-const pill =
-    "num rounded-full border bg-background px-3 py-1 font-secondary text-xs font-semibold text-muted-foreground transition-colors outline-none hover:bg-surface-3 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring disabled:bg-surface disabled:text-subtle";
-
-function priceOf(q: Quote, side: Side, mode: TradeMode) {
-    if (mode === "buy") return side === "up" ? q.askUp : q.askDown;
-    return side === "up" ? q.bidUp : q.bidDown;
-}
-
-function LiveLink({ id, side }: { id: number; side: Side }) {
-    return (
-        <Button variant="outline" size="lg" asChild>
-            <Link href={`/market/${id}?side=${side}`}>
-                Live market
-                <ArrowRight aria-hidden />
-            </Link>
-        </Button>
-    );
-}
-
-/** Resolved markets swap the form for the payout and a Claim for winners */
-function OutcomeCard({ market, side }: { market: Market; side: Side }) {
-    const wallet = useWallet();
-    const portfolio = usePortfolio();
-    const live = useLiveMarketId(market.id);
-    const claims = useClaims();
-    const invalid = market.phase === "invalid";
-    const winner: Side = market.phase === "resolved-down" ? "down" : "up";
-    const claimable = (portfolio.data?.positions ?? []).filter((p) => p.marketId === market.id).reduce((n, p) => n + p.claimable, 0);
-    const claiming = claims.claiming === market.id;
-
-    return (
-        <Panel highlight className="flex flex-col items-center gap-6 px-6 py-10 text-center">
-            <p className="font-heading text-3xl leading-tight font-medium">
-                {invalid ? (
-                    <>
-                        <span className="num">$0.50</span> <span className="text-muted-foreground">each side</span>
-                    </>
-                ) : (
-                    <>
-                        <span className={winner === "up" ? "text-up" : "text-down"}>
-                            <span aria-hidden className="mr-1.5 text-xl align-middle">
-                                {winner === "up" ? "▲" : "▼"}
-                            </span>
-                            {tokenTicker(winner)}
-                        </span>{" "}
-                        <span className="text-muted-foreground">pays</span> <span className="num">$1.00</span>
-                    </>
-                )}
-            </p>
-            {!wallet.isLoading && wallet.isConnected && claimable > 0 && (
-                <Button size="xl" className="w-full" disabled={claims.busy} onClick={() => void claims.claimOne(market.id)}>
-                    {claiming ? "Claiming" : `Claim ${formatUsd(claimable)}`}
-                </Button>
-            )}
-            {live.data != null && <LiveLink id={live.data} side={side} />}
-        </Panel>
-    );
-}
-
-/** The market's trade box, laid out like atomic.cash's swap panel */
-export function TradeCard({
-    market,
-    form,
-    onFormChange,
-    className,
-}: {
-    market: Market;
-    form: TradeForm;
-    onFormChange: React.Dispatch<React.SetStateAction<TradeForm>>;
-    className?: string;
+export function TradeCard({ market, form, onFormChange, className, holdings }: {
+    market: Market; form: TradeForm; onFormChange: React.Dispatch<React.SetStateAction<TradeForm>>; className?: string; holdings: ReturnType<typeof useTokenBalance>;
 }) {
-    if (isResolved(market.phase)) {
-        return (
-            <section aria-label="Outcome" className={cn("min-w-0", className)}>
-                <OutcomeCard market={market} side={form.side} />
-            </section>
-        );
-    }
-    return <OrderForm market={market} form={form} onFormChange={onFormChange} className={className} />;
-}
-
-function OrderForm({
-    market,
-    form,
-    onFormChange,
-    className,
-}: {
-    market: Market;
-    form: TradeForm;
-    onFormChange: React.Dispatch<React.SetStateAction<TradeForm>>;
-    className?: string;
-}) {
-    const wallet = useWallet();
-    const portfolio = usePortfolio();
-    const live = useLiveMarketId(market.id);
+    const wallet = useWalletSession();
+    const transaction = useTransaction();
     const now = useNow();
-    const flow = useTradeFlow();
-    const [walletOpen, setWalletOpen] = useState(false);
-
-    const { mode, side } = form;
-    const q = market.quote;
-    const tradable = market.phase === "live" && !!q?.tradable;
-    const ticker = tokenTicker(side);
-    const busy = flow.running;
-
-    const position = (portfolio.data?.positions ?? []).find((p) => p.marketId === market.id && p.side === side) ?? null;
-    const held = position?.qty ?? 0;
-
-    const amount = parseAmount(form.amount);
-    const sellQty = form.max ? held : amount;
-    const preview = q ? (mode === "buy" ? previewBuy(q, side, amount) : previewSell(q, side, sellQty)) : null;
-    const receive = mode === "buy" ? (preview?.qty ?? 0) : (preview?.usdc ?? 0);
-
-    const prices: Record<Side, number | null> = {
-        up: q ? priceOf(q, "up", mode) : null,
-        down: q ? priceOf(q, "down", mode) : null,
+    const refreshHoldings = holdings.refresh;
+    const [open, setOpen] = useState(false);
+    const [slippage, setSlippage] = useState(100);
+    const [reviewed, setReviewed] = useState<ReturnType<typeof useBuyQuote>["quote"]>();
+    const wrongNetwork = wallet.chainId !== null && wallet.chainId !== getConnectionConfig().chainId;
+    const supported = true;
+    const downHoldings = useTokenBalance(market.down);
+    const refreshDownHoldings = downHoldings.refresh;
+    const selectedHoldings = form.side === "up" ? holdings : downHoldings;
+    const inputBalance = form.mode === "buy" ? wallet.usdc : selectedHoldings.data ?? null;
+    const inputLabel = form.mode === "buy" ? "USDC" : form.side.toUpperCase();
+    const outputLabel = form.mode === "buy" ? form.side.toUpperCase() : "USDC";
+    const live = detailCanBuy(market, now);
+    const locked = transaction.busy || Boolean(transaction.pending);
+    const quoteQuery = useBuyQuote(market.id, form.amount, slippage, wallet.address, supported && live && !locked && !wrongNetwork, form.side, form.mode);
+    const quote = locked ? reviewed : quoteQuery.quote;
+    const ownResult = transaction.result?.marketId === market.id && transaction.result.account === wallet.address ? transaction.result : undefined;
+    useEffect(() => {
+        if (transaction.result?.marketId === market.id) {
+            void refreshHoldings(); void refreshDownHoldings(); retryMarkets(market.id); retryMarkets();
+        }
+    }, [transaction.result, market.id, refreshHoldings, refreshDownHoldings]);
+    let amount = 0n;
+    try { amount = parseUsdc(form.amount); } catch { /* invalid input disables submit */ }
+    const reason = !supported ? "Only UP purchases are available in this phase" : !live ? "Trading closed or unavailable" :
+        amount <= 0n ? "Enter an amount" : quoteQuery.error ? quoteQuery.error : !quote ? "Getting quote" :
+        (now ?? quote.blockTime) - quote.blockTime > 15 ? "Refreshing quote" : inputBalance === null ? "Input balance unavailable" :
+        amount > inputBalance ? "Not enough input tokens" : wallet.eth === null ? "ETH balance unavailable" : wallet.eth === 0n ? "Test ETH required for gas" : null;
+    const hash = transaction.pending?.hash ?? ownResult?.hash ?? transaction.progress?.hash;
+    const submit = async () => {
+        if (reason || !quote || locked) return;
+        setReviewed(quote);
+        try { await buyUp(quote); onFormChange((old) => ({ ...old, amount: "", max: false })); }
+        catch { /* shared transaction status shows the error, including unresolved receipts */ }
     };
-
-    const nextLive = market.phase === "live" ? null : (live.data ?? null);
-
-    function blockedReason(): string | null {
-        if (market.phase === "upcoming") return now === null ? "Upcoming" : `Opens in ${formatCountdown(market.openTime - now)}`;
-        if (market.phase !== "live") return "Trading closed";
-        if (!tradable) return "Trading paused";
-        if (!((mode === "buy" ? amount : sellQty) > 0)) return "Enter an amount";
-        if (mode === "buy" && amount > wallet.usdc + EPS) return `Not enough ${COLLATERAL_SYMBOL}`;
-        if (mode === "sell" && sellQty > held + EPS) return `Not enough ${ticker}`;
-        return null;
-    }
-    const reason = blockedReason();
-
-    const activeStep = flow.steps
-        ? flow.steps.approve === "active"
-            ? "Approving"
-            : flow.steps.sign === "active"
-              ? "Signing"
-              : flow.steps.swap === "active"
-                ? "Swapping"
-                : null
-        : null;
-    const label = activeStep ?? reason ?? `${mode === "buy" ? "Buy" : "Sell"} ${sideLabel(side)}`;
-
-    function setMode(next: TradeMode) {
-        onFormChange((f) => (f.mode === next ? f : { ...f, mode: next, amount: "", max: false }));
-    }
-
-    function setSide(next: Side) {
-        onFormChange((f) => ({ ...f, side: next, amount: f.mode === "sell" ? "" : f.amount, max: false }));
-    }
-
-    function setAmount(value: string, max = false) {
-        onFormChange((f) => ({ ...f, amount: value, max }));
-    }
-
-    async function submit() {
-        if (reason || busy) return;
-        const token = mode === "buy" ? COLLATERAL_SYMBOL : `${market.id}:${side}`;
-        try {
-            const trade = await flow.run(token, () =>
-                mode === "buy" ? wallet.buy(market.id, side, amount) : wallet.sell(market.id, side, sellQty),
-            );
-            toast.success(`${trade.isBuy ? "Bought" : "Sold"} ${formatTokens(trade.qty)} ${ticker}`, {
-                description: `${formatUsd(trade.usdc)} at ${formatCents(trade.price, 1)}`,
-            });
-            onFormChange((f) => ({ ...f, amount: "", max: false }));
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Trade failed");
-        }
-    }
-
-    async function drip() {
-        try {
-            const r = await wallet.requestTestFunds();
-            toast.success(`${formatUsd(r.usdc)} ${COLLATERAL_SYMBOL} received`);
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Drip failed");
-        }
-    }
-
-    const showDrip = wallet.isConnected && !wallet.wrongNetwork && mode === "buy" && wallet.usdc < Math.max(amount, 0.01);
-    const sellProfit = mode === "sell" && position && preview ? preview.usdc - preview.qty * position.avgPrice : null;
-    const outcome = { kind: "outcome" as const, side };
-    const usdc = { kind: "usdc" as const };
-
-    let cta: React.ReactNode;
-    if (wallet.isLoading) {
-        cta = <Skeleton className="h-14 w-full rounded-full" />;
-    } else if (!wallet.isConnected) {
-        cta = (
-            <Button type="button" size="xl" className="w-full" disabled={wallet.status === "connecting"} onClick={() => setWalletOpen(true)}>
-                {wallet.status === "connecting" ? "Connecting" : "Connect"}
-            </Button>
-        );
-    } else if (wallet.wrongNetwork) {
-        cta = (
-            <Button type="button" size="xl" className="w-full" onClick={() => void wallet.switchNetwork()}>
-                Switch network
-            </Button>
-        );
-    } else {
-        cta = <LiquidMetalButton type="submit" fullWidth label={label} disabled={!!reason || busy} />;
-    }
-
-    return (
-        <section aria-label="Trade" className={cn("min-w-0", className)}>
-            <form
-                noValidate
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void submit();
-                }}
-            >
-                <SegmentedPills
-                    aria-label="Order"
-                    size="md"
-                    fullWidth
-                    options={MODES.map((o) => ({ ...o, disabled: busy }))}
-                    value={mode}
-                    onChange={setMode}
-                />
-
-                <OutcomeSelector className="mt-3" value={side} onChange={setSide} prices={prices} disabled={busy} />
-
-                <SwapStack
-                    className="mt-3"
-                    onFlip={() => setMode(mode === "buy" ? "sell" : "buy")}
-                    flipLabel={mode === "buy" ? "Switch to sell" : "Switch to buy"}
-                    flipDisabled={busy}
-                    top={
-                        mode === "buy" ? (
-                            <AmountInput
-                                id={TRADE_INPUT_ID}
-                                label="You pay"
-                                value={form.amount}
-                                onChange={(v) => setAmount(v)}
-                                quick={QUICK_BUY}
-                                max={wallet.isConnected ? wallet.usdc : undefined}
-                                disabled={busy}
-                                adornment={
-                                    <span className="flex items-center gap-3">
-                                        {wallet.isConnected && <Balance value={formatNumber(wallet.usdc)} />}
-                                        <AssetChip asset={usdc} />
-                                    </span>
-                                }
-                            />
-                        ) : (
-                            <>
-                                <AmountInput
-                                    id={TRADE_INPUT_ID}
-                                    label="You sell"
-                                    value={form.amount}
-                                    onChange={(v) => setAmount(v)}
-                                    quick={[]}
-                                    disabled={busy}
-                                    adornment={
-                                        <span className="flex items-center gap-3">
-                                            {wallet.isConnected && <Balance value={formatTokens(held)} />}
-                                            <AssetChip asset={outcome} title={market.tokenName} />
-                                        </span>
-                                    }
-                                />
-                                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                    {SELL_FRACTIONS.map((f) => (
-                                        <button
-                                            key={f}
-                                            type="button"
-                                            className={pill}
-                                            disabled={busy || held <= 0}
-                                            onClick={() => setAmount(amountString(held * f, "down"))}
-                                        >
-                                            {f * 100}%
-                                        </button>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        className={cn(pill, form.max && held > 0 && "border-primary bg-primary text-primary-foreground hover:bg-accent-2 hover:text-primary-foreground")}
-                                        aria-pressed={form.max}
-                                        disabled={busy || held <= 0}
-                                        onClick={() => setAmount(amountString(held), true)}
-                                    >
-                                        Max
-                                    </button>
-                                </div>
-                            </>
-                        )
-                    }
-                    bottom={
-                        <SwapOutput
-                            htmlFor={TRADE_INPUT_ID}
-                            chip={mode === "buy" ? <AssetChip asset={outcome} title={market.tokenName} /> : <AssetChip asset={usdc} />}
-                            value={receive > 0 ? (mode === "buy" ? formatTokens(receive) : formatNumber(receive)) : null}
-                        />
-                    }
-                />
-
-                <dl className="mt-3 flex items-center justify-between gap-3 px-1 font-secondary text-xs text-muted-foreground">
-                    <div className="flex items-baseline gap-1.5">
-                        <dt>Avg</dt>
-                        <dd className="num font-semibold text-foreground">{preview ? formatCents(preview.avgPrice, 1) : "-"}</dd>
-                    </div>
-                    {mode === "buy" ? (
-                        <div className="flex items-baseline gap-1.5">
-                            <dt>If {sideLabel(side)} wins</dt>
-                            <dd className="num font-semibold text-foreground">{formatUsd(preview?.toWin ?? 0)}</dd>
-                        </div>
-                    ) : (
-                        <div className="flex items-baseline gap-1.5">
-                            <dt>Profit</dt>
-                            <dd className="font-semibold">
-                                {sellProfit === null ? "-" : <Profit value={sellProfit} />}
-                            </dd>
-                        </div>
-                    )}
-                </dl>
-
-                <div className="mt-3">{cta}</div>
-
-                <TradeSteps steps={flow.steps} />
-
-                {(showDrip || nextLive !== null) && (
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                        {showDrip && (
-                            <Button type="button" variant="outline" size="lg" disabled={wallet.dripping} onClick={() => void drip()}>
-                                <Droplet aria-hidden />
-                                {wallet.dripping ? "Sending" : "Get test funds"}
-                            </Button>
-                        )}
-                        {nextLive !== null && <LiveLink id={nextLive} side={side} />}
-                    </div>
-                )}
-            </form>
-            <WalletDialog open={walletOpen} onOpenChange={setWalletOpen} />
-        </section>
-    );
+    const summary = supported && quote ? purchaseSummary(quote.amountIn, quote.amountOut) : null;
+    const resolved = isResolved(market.phase);
+    const setAmount = (amount: string, max = false) => onFormChange((old) => ({ ...old, amount, max }));
+    const inputDisabled = locked || !supported || !live || wrongNetwork;
+    return <section aria-label="Trade" className={`detail-panel detail-trade ${className ?? ""}`}>
+        <div className="detail-trade-heading"><div><h2>{resolved ? "Settlement" : "Trade"}</h2><p>{resolved ? DETAIL_PHASE[market.phase] : "Buy tokens in this market"}</p></div>
+            {!resolved && <div className="detail-segments" role="group" aria-label="Trade mode"><button type="button" aria-pressed={form.mode === "buy"} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, mode: "buy", amount: "", max: false }))}>Buy</button><button type="button" aria-pressed={form.mode === "sell"} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, mode: "sell", amount: "", max: false }))}>Sell</button></div>}
+        </div>
+        {resolved ? <><dl className="detail-quote-summary"><div><dt>UP payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "up") ?? 0)}</dd></div><div><dt>DOWN payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "down") ?? 0)}</dd></div></dl><p className="detail-note">Redeem your winning tokens, or both sides of an invalid market.</p><button type="button" className="detail-primary" disabled={locked || wallet.status !== "connected" || wrongNetwork || ((market.phase === "invalid" ? (holdings.data ?? 0n) + (downHoldings.data ?? 0n) : market.upWon ? holdings.data ?? 0n : downHoldings.data ?? 0n) < (market.phase === "invalid" ? 2n : 1n))} onClick={() => { void claimMarket(market.id).catch(() => {}); }}>Claim</button></> : <>
+            <fieldset className="detail-side-field"><legend>Select side</legend><div className="detail-sides">{(["up", "down"] as const).map((side) => <button type="button" key={side} className={`detail-${side}`} aria-pressed={form.side === side} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, side, mode: "buy", amount: "", max: false }))}><strong>{side === "up" ? "▲ UP" : "▼ DOWN"}</strong><span>{market.quote ? formatCents(side === "up" ? market.quote.askUp : market.quote.askDown) : "N/A"}</span></button>)}</div></fieldset>
+            <p className="detail-note">{form.mode === "buy" ? "Buy outcome tokens with USDC." : "Sell outcome tokens for USDC."}</p>
+            <div className="detail-amount-label"><label htmlFor={TRADE_INPUT_ID}>Amount</label><span>Balance: {wallet.status !== "connected" || wrongNetwork || inputBalance === null ? "N/A" : `${formatTokens(Number(formatUnits(inputBalance!, 6)))} ${inputLabel}`}</span></div>
+            <div className="detail-amount"><input id={TRADE_INPUT_ID} inputMode="decimal" autoComplete="off" placeholder="0.00" value={form.amount} disabled={inputDisabled} onChange={(event) => setAmount(event.target.value)} aria-describedby="trade-availability" /><span>{inputLabel}</span></div>
+            <div className="detail-quick">{[10, 50, 100].map((value) => <button type="button" key={value} aria-pressed={!form.max && Number(form.amount) === value} disabled={inputDisabled} onClick={() => setAmount(String(value))}>{value}</button>)}<button type="button" aria-pressed={form.max} disabled={inputDisabled || wallet.status !== "connected" || inputBalance === null} onClick={() => { if (inputBalance !== null) setAmount(formatUnits(inputBalance!, 6), true); }}>Max</button></div>
+            <dl className="detail-quote-summary" aria-live="polite"><div><dt>You receive</dt><dd className="detail-up">{summary ? `${formatUnits(quote!.amountOut, 6)} ${outputLabel}` : "N/A"}</dd></div><div><dt>Avg price</dt><dd>{summary ? formatCents(form.mode === "buy" ? summary.average : Number(quote!.amountOut) / Number(quote!.amountIn), 1) : "N/A"}</dd></div><div><dt>Potential payout</dt><dd>{summary && form.mode === "buy" ? formatUsd(summary.payout) : "N/A"}</dd></div><div><dt>Potential profit</dt><dd className={summary && summary.profit < 0 ? "detail-down" : "detail-positive"}>{summary && form.mode === "buy" ? formatUsd(summary.profit, { signed: true }) : "N/A"}</dd></div></dl>
+            <p className="detail-note">{form.mode === "buy" ? `Payout and profit assume ${form.side.toUpperCase()} wins. Gas costs excluded.` : "Minimum receive is protected by your slippage setting. Gas costs excluded."}</p>
+            <div className="detail-submit">
+                {!supported || !live ? <button type="button" className="detail-primary" disabled>{!supported ? "DOWN purchase unavailable" : DETAIL_PHASE[market.phase] === "Live" ? "Quote unavailable" : DETAIL_PHASE[market.phase]}</button> : wallet.status !== "connected" ? <button type="button" className="detail-primary" disabled={wallet.status === "connecting" || locked} onClick={() => setOpen(true)}>Connect wallet</button> :
+                    wrongNetwork ? <button type="button" className="detail-primary" disabled={locked} onClick={() => { void switchWalletNetwork().catch((error: Error) => toast.error(error.message)); }}>Switch to Unichain Sepolia</button> :
+                    <button type="button" className="detail-primary" disabled={Boolean(reason) || locked} onClick={() => void submit()}>{transaction.busy ? transaction.progress?.message ?? "Checking order" : transaction.pending ? "Confirmation pending" : `${form.mode === "buy" ? "Buy" : "Sell"} ${form.side.toUpperCase()}`}</button>}
+            </div>
+            <p id="trade-availability" className="detail-note" role="status">{reason && !quoteQuery.error ? reason : null}</p>
+            <details className="detail-advanced"><summary>Advanced details</summary><div>
+                <label>Slippage tolerance<select aria-label="Slippage tolerance" value={slippage} disabled={locked} onChange={(event) => setSlippage(Number(event.target.value))}><option value={100}>1%</option><option value={500}>5%</option><option value={1000}>10%</option></select></label>
+                <p><span>Minimum receive</span><span>{supported && quote ? `${formatUnits(quote.minimumOut, 6)} ${outputLabel}` : "N/A"}</span></p>
+                <p><span>Your {form.side.toUpperCase()}</span><span>{selectedHoldings.data == null ? "N/A" : formatUnits(selectedHoldings.data, 6)}</span></p>
+            </div></details>
+        </>}
+        {wallet.balanceError && <Button variant="outline" className="mt-3 w-full" onClick={() => void refreshWalletBalances()}>Retry balances</Button>}
+        <div aria-live="polite" className="detail-transaction-status">
+            {transaction.progress && <p>{transaction.progress.step === "approve" ? "1. Approve" : transaction.progress.step === "sign" ? "2. Sign" : "3. Purchase"}: {transaction.progress.message}</p>}
+            {quoteQuery.error && !locked && <p role="alert" className="detail-down">{quoteQuery.error}</p>}
+            {transaction.error && <p role="alert" className="detail-down">{transaction.error}</p>}
+            {ownResult && <p>Transaction confirmed. Check your updated balance.</p>}
+            {hash && <a href={`${explorer}${hash}`} target="_blank" rel="noreferrer">View transaction</a>}
+            {transaction.pending && <Button variant="outline" disabled={transaction.busy} onClick={() => void checkPendingTransaction()}>Check confirmation</Button>}
+        </div>
+        <WalletDialog open={open} onOpenChange={setOpen} />
+    </section>;
 }

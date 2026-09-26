@@ -77,7 +77,7 @@ export interface Market extends MarketInfo {
     cutoff: number;
     /** expiry - window */
     windowStart: number;
-    createdAt: number;
+    createdAt: number | null;
     /** ERC20 name shared by both tokens, e.g. "ETH > $2684.53 26 Sep 00:48" */
     tokenName: string;
     upTicker: string;
@@ -85,9 +85,9 @@ export interface Market extends MarketInfo {
     /** live quote while pricing is defined, otherwise the last one before the window (tradable = false) */
     quote: Quote | null;
     /** probability of UP to display: live mid, last mid, or the outcome once resolved */
-    upChance: number;
-    volume: number;
-    tradeCount: number;
+    upChance: number | null;
+    volume: number | null;
+    tradeCount: number | null;
     /** geometric average ETH price over the window, once expiry has passed */
     settlementPrice: number | null;
     settledAt: number | null;

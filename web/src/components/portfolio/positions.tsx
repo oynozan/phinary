@@ -1,201 +1,48 @@
-"use client";
-
-import Link from "next/link";
-import { Clock, LoaderCircle } from "lucide-react";
-
-import { Panel } from "@/components/layout/panel";
-import { Countdown, isFlat, MarketQuestion, PriceTag, Profit, SideMark } from "@/components/market";
-import type { Claims } from "@/components/trade/use-claims";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCents, formatPercent, formatTokens, formatUsd, marketQuestion, sideLabel } from "@/lib/format";
-import { isTradable, nextDeadline } from "@/lib/phase";
-import type { Position } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCountdown, formatUsd } from "@/lib/format";
+import { payoutPerToken } from "@/lib/phase";
+import { claimPlan, portfolioUnitPrice, amountText, canSell, historyStatus, resultLabel, type PortfolioAvailability, type PortfolioRow, type PortfolioSection } from "@/lib/portfolio/view-model";
 
-export const positionKey = (p: Pick<Position, "marketId" | "side">) => `${p.marketId}:${p.side}`;
-
-const num = "num font-secondary text-sm";
-
-/** Resolved markets pay a whole-dollar amount, live ones trade in cents. */
-function formatMark(p: Position) {
-    return p.state === "claimable" || p.state === "lost" ? formatUsd(p.mark) : formatCents(p.mark);
+export function displayMoney(value: number | null, signed = false) { return value === null ? "N/A" : formatUsd(value, { signed }); }
+function date(value: number | null) {
+    return value === null ? "N/A" : new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false }).format(value * 1000) + " UTC";
 }
-
-function Action({ position: p, claims, onSell }: { position: Position; claims: Claims; onSell: (p: Position) => void }) {
-    const what = `${sideLabel(p.side)} in ${marketQuestion(p.market.strike, p.market.expiry)}`;
-
-    if (p.state === "claimable") {
-        const mine = claims.claiming === p.marketId;
-        return (
-            <Button
-                size="sm"
-                className="min-w-20 font-semibold"
-                disabled={claims.busy}
-                aria-label={`Claim ${what}`}
-                onClick={() => claims.claimOne(p.marketId)}
-            >
-                {mine && <LoaderCircle aria-hidden className="animate-spin" />}
-                Claim
-            </Button>
-        );
+function Profit({ row }: { row: PortfolioRow }) {
+    return <span className={row.profit === null ? "" : row.profit > 0 ? "portfolio-positive" : row.profit < 0 ? "portfolio-negative" : ""}>{displayMoney(row.profit, true)}{row.profit !== null && row.profitPercent !== null && <small>({row.profitPercent > 0 ? "+" : ""}{row.profitPercent.toFixed(1)}%)</small>}</span>;
+}
+export const SECTION_COPY = {
+    open: { title: "Open Positions", subtitle: "Your active positions across all markets.", empty: "No open positions", columns: ["Market", "Side", "Amount", "Avg cost", "Current price", "Value", "P&L", "Time left", "Action"] },
+    claimable: { title: "Claimable Positions", subtitle: "Your settled positions ready to claim.", empty: "Nothing to claim right now.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Action"] },
+    history: { title: "History", subtitle: "Your resolved position history.", empty: "No position history yet.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Status"] },
+};
+function StateContent({ availability, section, marketBase }: { availability: PortfolioAvailability; section: PortfolioSection; marketBase: string }) {
+    if (availability === "loading") return <div aria-label={`Loading ${SECTION_COPY[section].title}`} aria-busy className="portfolio-loading"><Skeleton /><Skeleton /><Skeleton /></div>;
+    if (availability !== "ready") return <div className="portfolio-empty">{availability === "disconnected" ? "Connect your wallet to view this section." : availability === "wrong-network" ? "Switch to Unichain Sepolia to view this section." : availability === "error" ? "Portfolio data could not be loaded." : "Portfolio data is not connected yet."}</div>;
+    return <div className="portfolio-empty"><p>{SECTION_COPY[section].empty}</p>{section === "open" && <><span>Explore markets to open a position.</span><a href={`${marketBase}/`}>Browse Markets</a></>}</div>;
+}
+export function PositionsTable({ rows, section, availability, now, actionsEnabled, onSell, onClaim, marketBase = "" }: {
+    rows: PortfolioRow[]; section: PortfolioSection; availability: PortfolioAvailability; now: number; actionsEnabled: boolean; onSell: (row: PortfolioRow) => void; onClaim: (row: PortfolioRow) => void; marketBase?: string;
+}) {
+    const copy = SECTION_COPY[section];
+    function cells(row: PortfolioRow) {
+        const open = section === "open";
+        const tradable = canSell(row, now);
+        const deadline = row.phase === "upcoming" ? `Opens in ${formatCountdown(row.openTime - now)}` : tradable ? formatCountdown(row.cutoff - now) : "Awaiting settlement";
+        const payout = payoutPerToken(row.phase, row.side);
+        return [
+            <a className="portfolio-market-link" href={`${marketBase}/market/${row.marketId}?side=${row.side}`} key="market"><strong>{row.question}</strong><small>{date(row.expiry)}</small></a>,
+            open ? <span className={`portfolio-side portfolio-${row.side}`} key="side">{row.side === "up" ? "▲ UP" : "▼ DOWN"}</span> : <span className={`portfolio-result ${payout === 0 ? "portfolio-negative" : ""}`} key="result">{resultLabel(row)}</span>,
+            amountText(row.quantity), portfolioUnitPrice(row.avgCost), portfolioUnitPrice(open ? row.currentPrice : payout), displayMoney(row.value), <Profit row={row} key="profit" />,
+            open ? deadline : date(row.settledAt),
+            section === "history" ? <span className="portfolio-history-status" key="status">{historyStatus(row)}</span> : <button type="button" key="action" className={open ? "portfolio-secondary" : "portfolio-claim"} disabled={!actionsEnabled || (open && !tradable) || (!open && !claimPlan(rows.filter(r => r.marketId === row.marketId)).marketIds.length)} onClick={() => open ? onSell(row) : onClaim(row)} aria-label={`${open ? "Sell" : "Claim"} ${row.side.toUpperCase()}, market ${row.marketId}`} title={!actionsEnabled ? "Not connected yet" : open && !tradable ? "Trading is closed" : undefined}>{open ? "Sell" : "Claim"}</button>,
+        ];
     }
-    if (p.state === "open" && isTradable(p.market.phase)) {
-        return (
-            <Button variant="outline" size="sm" className="min-w-20" aria-label={`Sell ${what}`} onClick={() => onSell(p)}>
-                Sell
-            </Button>
-        );
-    }
-    const deadline = nextDeadline(p.market, p.market.phase);
-    if ((p.state === "pending" || p.state === "open") && deadline !== null) {
-        return (
-            <span className="inline-flex h-8 items-center gap-1.5 px-1 text-sm text-muted-foreground">
-                <Clock aria-hidden className="size-3.5" />
-                <span className="sr-only">Next phase in</span>
-                <Countdown to={deadline} />
-            </span>
-        );
-    }
-    return null;
-}
-
-function MarketCell({ position: p, withSide = false }: { position: Position; withSide?: boolean }) {
-    const m = p.market;
-    const deadline = nextDeadline(m, m.phase);
-    const live = m.phase === "live" && deadline !== null;
-    return (
-        <div className="min-w-0">
-            <Link
-                href={`/market/${m.id}`}
-                className="rounded-sm outline-none transition-colors hover:text-primary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <MarketQuestion strike={m.strike} expiry={m.expiry} as="span" className="text-base" />
-            </Link>
-            {(withSide || live) && (
-                <div className="mt-1 flex flex-wrap items-center gap-3 font-secondary text-xs">
-                    {withSide && <SideMark side={p.side} />}
-                    {live && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            <Clock aria-hidden className="size-3" />
-                            <span className="sr-only">Trading closes in</span>
-                            <Countdown to={deadline} />
-                        </span>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function ProfitCell({ position: p, align = "end" }: { position: Position; align?: "start" | "end" }) {
-    const pct = !isFlat(p.cost) ? p.pnl / p.cost : 0;
-    return (
-        <div className={cn("flex flex-col gap-0.5", align === "end" ? "items-end" : "items-start")}>
-            <Profit value={p.pnl} className="font-secondary text-sm font-semibold" />
-            <span className="num font-secondary text-[11px] text-muted-foreground">
-                {pct > 0 ? "+" : ""}
-                {formatPercent(pct)}
-            </span>
-        </div>
-    );
-}
-
-/** Table from lg, stacked cards below. */
-export function PositionsTable({ positions, claims, onSell }: { positions: Position[]; claims: Claims; onSell: (p: Position) => void }) {
-    return (
-        <>
-            <Panel flush className="hidden overflow-hidden lg:block">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="bg-surface-2 hover:bg-surface-2">
-                            {["Market", "Side", "Tokens", "Avg cost", "Bid", "Value", "Profit"].map((h, i) => (
-                                <TableHead
-                                    key={h}
-                                    scope="col"
-                                    className={cn(
-                                        "h-11 font-secondary text-xs font-medium text-muted-foreground",
-                                        i === 0 ? "pl-6" : "px-4",
-                                        i > 1 && "text-right",
-                                    )}
-                                >
-                                    {h}
-                                </TableHead>
-                            ))}
-                            <TableHead scope="col" className="h-11 pr-6 text-right">
-                                <span className="sr-only">Action</span>
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {positions.map((p) => (
-                            <TableRow key={positionKey(p)} className={cn("hover:bg-surface-2", p.state === "lost" && "opacity-55")}>
-                                <TableCell className="py-4 pl-6">
-                                    <MarketCell position={p} />
-                                </TableCell>
-                                <TableCell className="px-4">
-                                    <PriceTag side={p.side} />
-                                </TableCell>
-                                <TableCell className={cn(num, "px-4 text-right")}>{formatTokens(p.qty)}</TableCell>
-                                <TableCell className={cn(num, "px-4 text-right text-muted-foreground")}>{formatCents(p.avgPrice)}</TableCell>
-                                <TableCell className={cn(num, "px-4 text-right")}>{formatMark(p)}</TableCell>
-                                <TableCell className={cn(num, "px-4 text-right font-semibold")}>{formatUsd(p.value)}</TableCell>
-                                <TableCell className="px-4 text-right">
-                                    <ProfitCell position={p} />
-                                </TableCell>
-                                <TableCell className="w-32 pr-6 text-right">
-                                    <Action position={p} claims={claims} onSell={onSell} />
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </Panel>
-
-            <ul className="grid gap-3 md:grid-cols-2 lg:hidden">
-                {positions.map((p) => (
-                    <li key={positionKey(p)} className={cn("rounded-3xl border bg-surface p-4 sm:p-5", p.state === "lost" && "opacity-60")}>
-                        <MarketCell position={p} withSide />
-                        <dl className="mt-4 grid grid-cols-4 gap-2 rounded-2xl border bg-surface-2 px-3 py-2.5">
-                            {[
-                                ["Tokens", formatTokens(p.qty)],
-                                ["Avg", formatCents(p.avgPrice)],
-                                ["Bid", formatMark(p)],
-                                ["Value", formatUsd(p.value)],
-                            ].map(([k, v]) => (
-                                <div key={k} className="min-w-0">
-                                    <dt className="font-secondary text-[11px] text-muted-foreground">{k}</dt>
-                                    <dd className="num mt-0.5 truncate font-secondary text-sm font-semibold">{v}</dd>
-                                </div>
-                            ))}
-                        </dl>
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                            <ProfitCell position={p} align="start" />
-                            <Action position={p} claims={claims} onSell={onSell} />
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </>
-    );
-}
-
-export function PositionsSkeleton() {
-    return (
-        <Panel flush aria-hidden className="overflow-hidden">
-            <div className="h-11 border-b bg-surface-2" />
-            {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4 border-b px-6 py-5 last:border-0">
-                    <Skeleton className="size-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-56 max-w-full" />
-                        <Skeleton className="h-3 w-24" />
-                    </div>
-                    <Skeleton className="hidden h-4 w-64 sm:block" />
-                    <Skeleton className="h-8 w-20 rounded-full" />
-                </div>
-            ))}
-        </Panel>
-    );
+    return <section className="portfolio-section" aria-labelledby={`portfolio-${section}-heading`}>
+        <div className="portfolio-section-heading"><div><h2 id={`portfolio-${section}-heading`}>{copy.title}</h2><p>{copy.subtitle}</p></div>{availability === "ready" && <span>{rows.length} {rows.length === 1 ? "position" : "positions"}</span>}</div>
+        {availability !== "ready" || rows.length === 0 ? <div className="portfolio-table-shell"><StateContent availability={availability} section={section} marketBase={marketBase} /></div> : <>
+            <div className="portfolio-table-shell portfolio-desktop"><Table><TableHeader><TableRow>{copy.columns.map((col) => <TableHead key={col}>{col}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}>{cells(row).map((value, i) => <TableCell key={copy.columns[i]}>{value}</TableCell>)}</TableRow>)}</TableBody></Table></div>
+            <div className="portfolio-mobile">{rows.map((row) => { const values = cells(row); return <article className="portfolio-position-card" key={row.id}><div className="portfolio-card-title">{values[0]}{values[1]}</div><dl>{[5, 6, 2, 3, 4, 7].map((i) => <div key={copy.columns[i]}><dt>{copy.columns[i]}</dt><dd>{values[i]}</dd></div>)}</dl><div className="portfolio-card-action">{section === "history" && <span>Status</span>}{values[8]}</div></article>; })}</div>
+        </>}
+    </section>;
 }

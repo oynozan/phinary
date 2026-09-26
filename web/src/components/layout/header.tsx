@@ -10,26 +10,34 @@ import { BalancePill } from "@/components/wallet/balance-pill";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { cn } from "@/lib/utils";
 
-import { Logo } from "./logo";
+import { BRAND_NAME } from "@/config/brand";
 import { isActivePath, NAV_ITEMS } from "./nav-items";
 
-/** Floating pill header (atomic.cash): logo left, text nav centered, wallet right. */
+/** Shared navigation; wallet behavior stays in its existing components. */
 export function Header() {
     const pathname = usePathname();
 
     return (
-        <header className="fixed z-50 flex w-full items-center justify-center px-2 pt-4 sm:px-4">
-            <div className="flex h-(--header-h) w-full max-w-[1200px] min-w-0 items-center justify-between gap-2 rounded-full border bg-surface px-4 sm:gap-4 sm:px-6 lg:px-10">
-                <Logo />
+        <header className="app-header">
+            <div className="app-header-inner">
+                <Link href="/" aria-label={`${BRAND_NAME} home`} className="header-brand">
+                    <svg className="header-brand-mark" width="30" height="32" viewBox="0 0 30 32" fill="none" aria-hidden="true">
+                        <defs><linearGradient id="phinary-header-mark" x1="4" y1="3" x2="25" y2="29" gradientUnits="userSpaceOnUse"><stop stopColor="#72ddfa"/><stop offset=".48" stopColor="#9c83fa"/><stop offset="1" stopColor="#bd35f0"/></linearGradient></defs>
+                        <path d="M15 7C8.1 7 3 10.5 3 16s5.1 9 12 9 12-3.5 12-9-5.1-9-12-9Z" stroke="url(#phinary-header-mark)" strokeWidth="5"/>
+                        <path d="M15 1v30" stroke="url(#phinary-header-mark)" strokeWidth="5"/>
+                    </svg>
+                    <span>{BRAND_NAME}</span>
+                </Link>
 
-                <nav className="hidden min-w-0 flex-1 justify-center gap-6 lg:flex">
+                <nav className="app-header-nav hidden lg:flex">
                     {NAV_ITEMS.map((item) => (
                         <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
                             className={cn(
-                                "text-lg transition-colors",
-                                isActivePath(pathname, item.href) ? "text-white" : "text-muted-foreground hover:text-primary",
+                                "app-header-link",
+                                isActivePath(pathname, item.href) ? "is-active" : "",
                             )}
                         >
                             {item.label}
@@ -38,14 +46,14 @@ export function Header() {
                 </nav>
 
                 <div className="flex min-w-0 items-center justify-end gap-2">
-                    <BalancePill className="hidden md:flex" />
-                    <ConnectButton />
+                    <BalancePill className="header-balance hidden md:flex" />
+                    <ConnectButton className="header-wallet" />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="secondary"
                                 size="icon"
-                                className="size-9 sm:size-11 lg:hidden"
+                                className="header-menu size-8 lg:hidden"
                                 aria-label="Open menu"
                             >
                                 <Menu className="size-6" />

@@ -1,138 +1,52 @@
 "use client";
+import { formatUnits } from "viem";
+import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { formatUsd } from "@/lib/format";
+import { portfolioUnitPrice, amountText, canSell, tokenAmount, type PortfolioActions, type PortfolioRow, type SellPreview } from "@/lib/portfolio/view-model";
 
-import { useState } from "react";
-import { Clock, LoaderCircle } from "lucide-react";
-import { toast } from "sonner";
-
-import { AmountInput, AssetChip, Balance, Countdown, MarketQuestion, Profit, SwapOutput, SwapStack } from "@/components/market";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { useQuote, useWallet } from "@/lib/data";
-import { formatCents, formatNumber, formatTokens, formatUsd, tokenTicker } from "@/lib/format";
-import { isTradable, nextDeadline } from "@/lib/phase";
-import { previewSell } from "@/lib/trade";
-import type { Position } from "@/lib/types";
-
-// Inputs within a cent of the balance sell the whole position, so no dust is left behind
-const FULL_TOLERANCE = 0.01;
-
-function SellForm({ position: p, onDone }: { position: Position; onDone: () => void }) {
-    const wallet = useWallet();
-    const quote = useQuote(p.marketId).data ?? null;
-    const balance = Math.floor(p.qty * 100) / 100;
-    const [amount, setAmount] = useState(() => String(balance));
+function SellForm({ row, now, actions, onDone, onBusy }: { row: PortfolioRow; now: number; actions: PortfolioActions; onDone: (message: string) => void; onBusy: (busy: boolean) => void }) {
+    const [amount, setAmount] = useState(amountText(row.quantity));
+    const [quoteState, setQuote] = useState<{ key: string; value?: SellPreview; error?: string }>({ key: "" });
     const [submitting, setSubmitting] = useState(false);
-
-    const ticker = tokenTicker(p.side);
-    const parsed = Number(amount) || 0;
-    const full = parsed > 0 && Math.abs(parsed - p.qty) < FULL_TOLERANCE;
-    const qty = full ? p.qty : parsed;
-    const over = !full && parsed > p.qty;
-    const tradable = isTradable(p.market.phase) && !!quote?.tradable;
-    const preview = quote && qty > 0 && !over ? previewSell(quote, p.side, qty) : null;
-    const profit = preview ? preview.usdc - qty * p.avgPrice : 0;
-    const deadline = nextDeadline(p.market, p.market.phase);
-
-    const label = !tradable ? "Trading closed" : over ? `Not enough ${ticker}` : qty <= 0 ? "Enter an amount" : submitting ? "Selling" : "Sell";
-
-    async function submit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!preview || !tradable || submitting) return;
-        setSubmitting(true);
-        try {
-            if (wallet.wrongNetwork) await wallet.switchNetwork();
-            const t = await wallet.sell(p.marketId, p.side, qty);
-            toast.success(`Sold ${formatTokens(t.qty)} ${ticker} for ${formatUsd(t.usdc)}`);
-            onDone();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Sell failed");
-            setSubmitting(false);
-        }
+    const [error, setError] = useState("");
+    const units = tokenAmount(amount);
+    const tradable = canSell(row, now);
+    const valid = units !== null && units > 0n && units <= row.quantity;
+    const quoteKey = `${row.id}:${amount}:${row.quantity}:${tradable}`;
+    const quote = quoteState.key === quoteKey ? quoteState.value : undefined;
+    const quoteError = quoteState.key === quoteKey ? quoteState.error : undefined;
+    useEffect(() => {
+        if (!valid || !tradable || units === null || submitting) return;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            void actions.quoteSell(row, units).then((value) => { if (!cancelled) setQuote({ key: quoteKey, value }); }).catch((e: unknown) => { if (!cancelled) setQuote({ key: quoteKey, error: e instanceof Error ? e.message : "Quote unavailable" }); });
+        }, 250);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [actions, row, units, valid, tradable, quoteKey, submitting]);
+    const reason = !tradable ? "Trading is closed" : units === null || units <= 0n ? "Enter a valid amount (up to 6 decimals)" : units > row.quantity ? "Amount exceeds your position balance" : quoteError ?? (!quote ? "Getting quote…" : null);
+    async function submit(event: React.FormEvent) {
+        event.preventDefault();
+        if (reason || !quote || units === null || submitting) return;
+        setSubmitting(true); onBusy(true); setError("");
+        try { const paid = await actions.sell(row, units, quote); onDone(`Sold ${amountText(units)} ${row.side.toUpperCase()}${typeof paid === "number" ? ` for ${formatUsd(paid)}` : ""}`); }
+        catch (e) { setError(e instanceof Error ? e.message : "Sale failed. Try again."); }
+        finally { setSubmitting(false); onBusy(false); }
     }
-
-    return (
-        <form onSubmit={submit} className="grid gap-5">
-            <div className="px-10 text-center">
-                <DialogTitle className="text-lg leading-tight">
-                    <MarketQuestion strike={p.market.strike} expiry={p.market.expiry} as="span" />
-                </DialogTitle>
-                {deadline !== null && (
-                    <p className="mt-1.5 inline-flex items-center gap-1 font-secondary text-xs text-muted-foreground">
-                        <Clock aria-hidden className="size-3" />
-                        <Countdown to={deadline} />
-                    </p>
-                )}
-            </div>
-
-            <SwapStack
-                top={
-                    <AmountInput
-                        id="sell-amount"
-                        label="You sell"
-                        value={amount}
-                        onChange={setAmount}
-                        quick={[]}
-                        max={p.qty}
-                        disabled={submitting}
-                        autoFocus
-                        adornment={
-                            <span className="flex items-center gap-3">
-                                <Balance value={formatNumber(balance)} />
-                                <AssetChip asset={{ kind: "outcome", side: p.side }} title={p.market.tokenName} />
-                            </span>
-                        }
-                    />
-                }
-                bottom={
-                    <SwapOutput
-                        htmlFor="sell-amount"
-                        chip={<AssetChip asset={{ kind: "usdc" }} />}
-                        value={preview ? formatNumber(preview.usdc) : null}
-                    />
-                }
-            />
-
-            <dl className="-mt-2 flex items-center justify-between px-1 font-secondary text-xs text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                    <dt>Price</dt>
-                    <dd className="num font-semibold text-foreground">
-                        {preview ? formatCents(preview.avgPrice, 1) : quote ? formatCents(p.side === "up" ? quote.bidUp : quote.bidDown, 1) : "-"}
-                    </dd>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <dt>Profit</dt>
-                    <dd className="font-semibold">
-                        <Profit value={profit} />
-                    </dd>
-                </div>
-            </dl>
-
-            <Button type="submit" size="xl" className="w-full" disabled={!preview || !tradable || submitting}>
-                {submitting && <LoaderCircle aria-hidden className="animate-spin" />}
-                {label}
-            </Button>
-        </form>
-    );
+    return <form onSubmit={submit} className="portfolio-sell-form">
+        <DialogTitle>Sell {row.side.toUpperCase()}</DialogTitle><DialogDescription>{row.question}</DialogDescription>
+        <p className={`portfolio-${row.side}`}>{row.side === "up" ? "▲ UP" : "▼ DOWN"}<span>Balance: {amountText(row.quantity)} tokens</span></p>
+        <label htmlFor="portfolio-sell-amount">Amount in tokens</label><input id="portfolio-sell-amount" value={amount} inputMode="decimal" autoComplete="off" disabled={submitting || !tradable} onChange={(e) => { setAmount(e.target.value); setError(""); }} aria-describedby="portfolio-sell-status" />
+        <div className="portfolio-percentages">{[25, 50, 75, 100].map((percent) => <button type="button" key={percent} disabled={submitting || !tradable} onClick={() => setAmount(amountText(row.quantity * BigInt(percent) / 100n))}>{percent === 100 ? "Max" : `${percent}%`}</button>)}</div>
+        <dl className="portfolio-dialog-quote"><div><dt>Expected USDC received</dt><dd>{quote && !reason ? formatUsd(quote.usdc) : "N/A"}</dd></div><div><dt>Average sell price</dt><dd>{quote && !reason ? portfolioUnitPrice(quote.averagePrice) : "N/A"}</dd></div></dl>
+        {quote?.review && <p className="portfolio-dialog-note">Minimum receive: {formatUnits(quote.review.minimumOut, 6)} USDC · Slippage: {quote.review.slippageBps / 100}%</p>}
+        <p id="portfolio-sell-status" role="status" className="portfolio-dialog-note">{reason}</p>{error && <p role="alert" className="portfolio-negative">{error}</p>}
+        <button type="submit" className="portfolio-primary" disabled={submitting || Boolean(reason)}>{submitting ? "Selling…" : `Sell ${row.side.toUpperCase()}`}</button>
+    </form>;
 }
-
-/** Quick sell from the positions table, styled as the stacked trade card. */
-export function SellDialog({
-    position,
-    open,
-    onOpenChange,
-    nonce,
-}: {
-    position: Position | null;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    /** changes on every open so the form starts fresh */
-    nonce: number;
-}) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 p-5 sm:max-w-md sm:p-6" aria-describedby={undefined}>
-                {position && <SellForm key={`${position.marketId}:${position.side}:${nonce}`} position={position} onDone={() => onOpenChange(false)} />}
-            </DialogContent>
-        </Dialog>
-    );
+export function SellDialog({ row, now, actions, onClose, onDone, restoreFocus }: { restoreFocus: () => void; row: PortfolioRow | null; now: number; actions?: PortfolioActions; onClose: () => void; onDone: (message: string) => void }) {
+    const [busy, setBusy] = useState(false);
+    return <Dialog open={row !== null && Boolean(actions)} onOpenChange={(open) => { if (!open && !busy) onClose(); }}><DialogContent className="portfolio-dialog" onCloseAutoFocus={(e) => { e.preventDefault(); restoreFocus(); }} showCloseButton={!busy} onEscapeKeyDown={(e) => { if (busy) e.preventDefault(); }} onPointerDownOutside={(e) => { if (busy) e.preventDefault(); }}>
+        {row && actions && <SellForm key={row.id} row={row} now={now} actions={actions} onBusy={setBusy} onDone={onDone} />}
+    </DialogContent></Dialog>;
 }

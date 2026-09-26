@@ -1,5 +1,7 @@
 "use client";
 
+import { toast } from "sonner";
+
 import { TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,7 @@ export function WrongNetworkBanner() {
             <div className="flex items-center gap-3 rounded-full border border-down bg-surface py-1.5 pr-1.5 pl-4 text-sm">
                 <TriangleAlert className="size-4 text-down" />
                 <span>Wrong network</span>
-                <Button size="sm" onClick={() => wallet.switchNetwork()}>
+                <Button size="sm" onClick={() => { void wallet.switchNetwork().catch((error) => toast.error(error instanceof Error ? error.message : "Could not switch network")); }}>
                     Switch to {CHAIN.name}
                 </Button>
             </div>

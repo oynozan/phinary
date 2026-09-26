@@ -1,43 +1,16 @@
 "use client";
 
-import { Droplet } from "lucide-react";
-import { toast } from "sonner";
-
-import { Button } from "@/components/ui/button";
-import { useWallet } from "@/lib/data";
-import { formatUsd } from "@/lib/format";
+import { formatUnits } from "viem";
+import { CircleDollarSign } from "lucide-react";
+import { useWalletSession } from "@/lib/onchain/wallet";
 import { cn } from "@/lib/utils";
 
-/** USDC balance, or "Get test funds" when the wallet is empty. Hidden when disconnected. */
 export function BalancePill({ className }: { className?: string }) {
-    const wallet = useWallet();
-    if (wallet.isLoading || !wallet.isConnected) return null;
-
-    if (wallet.usdc < 0.01) {
-        return (
-            <Button
-                variant="outline"
-                className={cn("h-11 gap-2 border-primary bg-primary-soft px-5 text-base text-primary hover:bg-primary-soft-hover hover:text-primary", className)}
-                disabled={wallet.dripping || wallet.wrongNetwork}
-                onClick={async () => {
-                    try {
-                        const r = await wallet.requestTestFunds();
-                        toast.success(`${formatUsd(r.usdc)} USDC received`);
-                    } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Drip failed");
-                    }
-                }}
-            >
-                <Droplet className="size-4" />
-                {wallet.dripping ? "Sending" : "Get test funds"}
-            </Button>
-        );
-    }
-
-    return (
-        <div className={cn("flex h-11 items-center gap-2 rounded-full border bg-surface-2 px-5 font-secondary text-base", className)}>
-            <span className="num font-semibold">{formatUsd(wallet.usdc)}</span>
-            <span className="text-muted-foreground">USDC</span>
-        </div>
-    );
+    const wallet = useWalletSession();
+    if (wallet.status !== "connected") return null;
+    return <div className={cn("flex h-11 items-center gap-2 rounded-full border bg-surface-2 px-5 font-secondary text-base", className)}>
+        <CircleDollarSign className="header-usdc-icon size-5 shrink-0" aria-hidden="true" />
+        <span className="num font-semibold">{wallet.usdc === null ? "Unavailable" : formatUnits(wallet.usdc, 6)}</span>
+        <span className="text-muted-foreground">USDC</span>
+    </div>;
 }
