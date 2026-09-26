@@ -10,7 +10,7 @@ index 0000000..6c1b52a
 +form quote and trade the YES/NO outcome tokens of our PredictionHook markets on Unichain Sepolia (chain 1301). Every other
 +token and chain still goes through Uniswap's hosted Trading API unchanged.
 +
-+The approach is "Strategy B" from `../docs/md/research/interface-fork/RECOMMENDATION.md`: the `TradingApiClient` singleton is
++The approach is "Strategy B" from `../docs/research/interface-fork/RECOMMENDATION.md`: the `TradingApiClient` singleton is
 +wrapped, and requests for a USDC <-> YES/NO pair on 1301 are answered in the page. Quotes come from the official V4Quoter
 +(`eth_call`); the transaction is `UniversalRouter 2.0.execute([PERMIT2_PERMIT,] V4_SWAP[swap, SETTLE_ALL, TAKE_ALL])`,
 +built locally.
@@ -9065,8 +9065,88 @@ index 138037a..d6236a1 100644
    logBoundedOnce(`${what}:${key}`, message)
  }
  
+diff --git a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
+index 3f9bd69..ad0dc2d 100644
+--- a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
++++ b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
+@@ -17,12 +17,14 @@ const {
+   mockUseRwaTokenOptions,
+   mockUseCommonTokensOptionsWithFallback,
+   mockUseBridgingTokensOptions,
++  mockUsePredictionTokenOptions,
+ } = vi.hoisted(() => ({
+   mockUseFeatureFlag: vi.fn(),
+   mockUseIsFeatureGated: vi.fn(),
+   mockUseRwaTokenOptions: vi.fn(),
+   mockUseCommonTokensOptionsWithFallback: vi.fn(),
+   mockUseBridgingTokensOptions: vi.fn(),
++  mockUsePredictionTokenOptions: vi.fn(),
+ }))
+ 
+ vi.mock('@universe/gating', async (importOriginal) => ({
+@@ -42,6 +44,15 @@ vi.mock('uniswap/src/components/TokenSelector/hooks/useCommonTokensOptionsWithFa
+ vi.mock('uniswap/src/features/bridging/hooks/tokens', () => ({
+   useBridgingTokensOptions: mockUseBridgingTokensOptions,
+ }))
++// Falls through to the real hook unless a test sets a return value.
++vi.mock('uniswap/src/features/predictionMarkets/usePredictionTokenOptions', async (importOriginal) => {
++  const actual = await importOriginal<typeof import('uniswap/src/features/predictionMarkets/usePredictionTokenOptions')>()
++  return {
++    ...actual,
++    usePredictionTokenOptions: (...args: Parameters<typeof actual.usePredictionTokenOptions>) =>
++      mockUsePredictionTokenOptions(...args) ?? actual.usePredictionTokenOptions(...args),
++  }
++})
+ 
+ const stock: RwaTokenOption = {
+   type: OnchainItemListOptionType.Rwa,
+@@ -192,3 +203,44 @@ describe('useTokenSectionsForSwap Stocks section', () => {
+     )
+   })
+ })
++
++describe('useTokenSectionsForSwap error', () => {
++  const backendError = new Error('blocked by CORS')
++
++  beforeEach(() => {
++    mockUseRwaTokenOptions.mockReturnValue([])
++    mockUseFeatureFlag.mockReturnValue(false)
++    mockUseIsFeatureGated.mockReturnValue(false)
++    mockUseCommonTokensOptionsWithFallback.mockReturnValue({
++      data: undefined,
++      error: backendError,
++      refetch: vi.fn(),
++      loading: false,
++    })
++    mockUseBridgingTokensOptions.mockReturnValue({
++      data: undefined,
++      error: backendError,
++      refetch: vi.fn(),
++      loading: false,
++      shouldNest: false,
++    })
++  })
++
++  afterEach(() => {
++    mockUsePredictionTokenOptions.mockReset()
++  })
++
++  it('does not report a failed backend list when the prediction markets loaded', () => {
++    mockUsePredictionTokenOptions.mockReturnValue({ open: [tokenOption], settled: undefined })
++    const { data, error } = renderSwapSections(TokenSelectorVariation.SwapOutput)
++    expect(data?.length).toBeGreaterThan(0)
++    expect(error).toBeUndefined()
++  })
++
++  it('reports the error when nothing loaded', () => {
++    mockUsePredictionTokenOptions.mockReturnValue({ open: undefined, settled: undefined })
++    const { data, error } = renderSwapSections(TokenSelectorVariation.SwapOutput)
++    expect(data).toBeUndefined()
++    expect(error).toBe(backendError)
++  })
++})
 diff --git a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
-index 9fdfacb..701e3f1 100644
+index 9fdfacb..1c79998 100644
 --- a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
 +++ b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
 @@ -25,6 +25,8 @@ import {
@@ -9121,6 +9201,16 @@ index 9fdfacb..701e3f1 100644
      trendingSection,
      suggestedSection,
      stocksSection,
+@@ -210,7 +232,8 @@ export function useTokenSectionsForSwap({
+     () => ({
+       data: sections,
+       loading,
+-      error: error || undefined,
++      // A failed backend list must not hide sections that did load, such as the on-chain prediction markets.
++      error: sections ? undefined : error || undefined,
+       refetch,
+     }),
+     [error, loading, refetch, sections],
 diff --git a/packages/uniswap/src/constants/routing.ts b/packages/uniswap/src/constants/routing.ts
 index c299259..87f162c 100644
 --- a/packages/uniswap/src/constants/routing.ts
@@ -10437,23 +10527,25 @@ index 0000000..17d48e7
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts b/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts
 new file mode 100644
-index 0000000..776b397
+index 0000000..acf118f
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,46 @@
 +// Generated by packages/swap-sdk/scripts/vendor-interface.mjs from deployments/unichain-sepolia.json.
 +export const PREDICTION_DEPLOYMENT_JSON: Record<string, unknown> = {
 +  chainId: 1301,
 +  demoLiquidity: '1000000000000000000',
 +  demoUsdc: '0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D',
 +  demoWeth: '0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5',
-+  deployBlock: 63521900,
-+  deployedAt: 1790374328,
++  deployBlock: 63569309,
++  deployedAt: 1790421737,
 +  deployer: '0x2d1697607Cd75fb012114391c1320a0c3ed6b25C',
 +  explorer: 'https://sepolia.uniscan.xyz',
 +  initialEthPriceUsd: '2684.93',
 +  initialSqrtPriceX96: '4105314865866007812399485',
 +  keeper: '0x2d1697607Cd75fb012114391c1320a0c3ed6b25C',
++  legacyPredictionHooks: ['0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8'],
++  marketScheduler: '0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd',
 +  multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
 +  network: 'unichain-sepolia',
 +  oracleParams: {
@@ -10468,7 +10560,7 @@ index 0000000..776b397
 +  },
 +  permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
 +  poolManager: '0x00B036B58a818B1BC34d502D3fE730Db729e62AC',
-+  predictionHook: '0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8',
++  predictionHook: '0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8',
 +  priceSteerer: '0x21C55279188072E6BfeF14c4920eA1cEFEd358a3',
 +  rpcUrl: 'https://sepolia.unichain.org',
 +  stateView: '0xc199F1072a74D4e905ABa1A84d9a45E2546B6222',
@@ -12335,32 +12427,64 @@ index 0000000..41596c3
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated.ts
 new file mode 100644
-index 0000000..5e63dd8
+index 0000000..5609b95
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated.ts
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,40 @@
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
-+// Generated by scripts/gen-abi.mjs from IUnderlyingOracle, QuoteMath, BinaryPricer. Do not edit.
++// Generated by scripts/gen-abi.mjs from PredictionHook, UnderlyingOracleHook, IUnderlyingOracle, QuoteMath, BinaryPricer. Do not edit.
 +export const hookErrorsAbi = [
-+  { type: 'error', name: 'ObservationUnavailable', inputs: [{ name: 't', type: 'uint32' }] },
 +  { type: 'error', name: 'Band', inputs: [] },
-+  { type: 'error', name: 'Unreachable', inputs: [] },
++  { type: 'error', name: 'DonateDisabled', inputs: [] },
++  { type: 'error', name: 'EpochCapExceeded', inputs: [] },
++  { type: 'error', name: 'ForeignInitialize', inputs: [] },
++  { type: 'error', name: 'HookNotImplemented', inputs: [] },
++  { type: 'error', name: 'Insolvent', inputs: [] },
++  { type: 'error', name: 'InsufficientIdle', inputs: [] },
++  { type: 'error', name: 'InsufficientShares', inputs: [] },
++  { type: 'error', name: 'InvalidParams', inputs: [] },
++  { type: 'error', name: 'InvalidPool', inputs: [] },
++  { type: 'error', name: 'LiquidityDisabled', inputs: [] },
++  { type: 'error', name: 'MarketClosed', inputs: [] },
++  { type: 'error', name: 'NotPoolManager', inputs: [] },
++  { type: 'error', name: 'NotSettled', inputs: [] },
++  { type: 'error', name: 'NotTradable', inputs: [] },
++  { type: 'error', name: 'OracleAvailable', inputs: [] },
++  { type: 'error', name: 'OutOfBand', inputs: [] },
++  { type: 'error', name: 'TooEarly', inputs: [] },
 +  { type: 'error', name: 'TooLate', inputs: [] },
++  { type: 'error', name: 'Unauthorized', inputs: [] },
++  { type: 'error', name: 'UnknownMarket', inputs: [] },
++  { type: 'error', name: 'UnknownPool', inputs: [] },
++  { type: 'error', name: 'Unreachable', inputs: [] },
++  { type: 'error', name: 'UnsupportedKernel', inputs: [] },
++  { type: 'error', name: 'ZeroAmount', inputs: [] },
 +  { type: 'error', name: 'ZeroVariance', inputs: [] },
++  { type: 'error', name: 'AlreadyBound', inputs: [] },
++  { type: 'error', name: 'AlreadyInitialized', inputs: [] },
++  { type: 'error', name: 'CheckpointUnavailable', inputs: [{ name: 'grid', type: 'uint32' }] },
++  { type: 'error', name: 'FutureTime', inputs: [{ name: 't', type: 'uint32' }] },
++  { type: 'error', name: 'NewOwnerIsZeroAddress', inputs: [] },
++  { type: 'error', name: 'NoHandoverRequest', inputs: [] },
++  { type: 'error', name: 'NotBound', inputs: [] },
++  { type: 'error', name: 'ObservationUnavailable', inputs: [{ name: 't', type: 'uint32' }] },
++  { type: 'error', name: 'WrongPool', inputs: [] },
++  { type: 'error', name: 'UnknownKernel', inputs: [] },
 +] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts
 new file mode 100644
-index 0000000..f55ed46
+index 0000000..73bf70f
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,79 @@
 +import { hookErrorsAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated'
++import { marketSchedulerAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated'
 +import { outcomeTokenAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated'
 +import { predictionHookAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/predictionHook.generated'
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
 +import { erc20Abi, parseAbi } from 'viem'
 +
-+export { erc20Abi, hookErrorsAbi, outcomeTokenAbi, predictionHookAbi }
++export { erc20Abi, hookErrorsAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi }
 +
 +const POOL_KEY =
 +  'struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }'
@@ -12432,6 +12556,89 @@ index 0000000..f55ed46
 +  'error PriceLimitOutOfBounds(uint160 sqrtPriceLimitX96)',
 +  'error SafeCastOverflow()',
 +])
+diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts
+new file mode 100644
+index 0000000..d90c14c
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts
+@@ -0,0 +1,77 @@
++// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
++// Generated by scripts/gen-abi.mjs from src/interfaces/IMarketScheduler.sol. Do not edit.
++export const marketSchedulerAbi = [
++  { type: 'function', name: 'canOpen', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'bool' }] },
++  {
++    type: 'function',
++    name: 'config',
++    stateMutability: 'view',
++    inputs: [],
++    outputs: [
++      {
++        name: '',
++        type: 'tuple',
++        components: [
++          { name: 'period', type: 'uint32' },
++          { name: 'tenor', type: 'uint32' },
++          { name: 'window', type: 'uint32' },
++          { name: 'cutoffBuffer', type: 'uint32' },
++          { name: 'nSamples', type: 'uint32' },
++          {
++            name: 'quote',
++            type: 'tuple',
++            components: [
++              { name: 'h0Wad', type: 'uint64' },
++              { name: 'gammaSWad', type: 'uint64' },
++              { name: 'lambdaWad', type: 'uint128' },
++              { name: 'qEpochMax', type: 'uint128' },
++              { name: 'pMinWad', type: 'uint64' },
++            ],
++          },
++          { name: 'maxBudget', type: 'uint256' },
++          { name: 'minBudget', type: 'uint256' },
++          { name: 'ticker', type: 'string' },
++        ],
++      },
++    ],
++  },
++  { type: 'function', name: 'hook', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] },
++  { type: 'function', name: 'lastSlot', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
++  {
++    type: 'function',
++    name: 'nextOpenTime',
++    stateMutability: 'view',
++    inputs: [],
++    outputs: [{ name: '', type: 'uint256' }],
++  },
++  {
++    type: 'function',
++    name: 'open',
++    stateMutability: 'nonpayable',
++    inputs: [],
++    outputs: [{ name: 'marketId', type: 'uint256' }],
++  },
++  { type: 'function', name: 'oracle', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] },
++  {
++    type: 'event',
++    name: 'MarketOpened',
++    anonymous: false,
++    inputs: [
++      { name: 'marketId', type: 'uint256', indexed: true },
++      { name: 'slot', type: 'uint256', indexed: true },
++      { name: 'caller', type: 'address', indexed: true },
++      { name: 'budget', type: 'uint256', indexed: false },
++      { name: 'strikeCents', type: 'uint256', indexed: false },
++    ],
++  },
++  { type: 'error', name: 'AlreadyOpened', inputs: [{ name: 'slot', type: 'uint256' }] },
++  {
++    type: 'error',
++    name: 'InsufficientIdle',
++    inputs: [
++      { name: 'budget', type: 'uint256' },
++      { name: 'minBudget', type: 'uint256' },
++    ],
++  },
++  { type: 'error', name: 'InvalidConfig', inputs: [] },
++] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated.ts
 new file mode 100644
 index 0000000..f898af1
@@ -12921,7 +13128,7 @@ index 0000000..b53773c
 +] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/constants.ts b/packages/uniswap/src/features/predictionMarkets/sdk/constants.ts
 new file mode 100644
-index 0000000..9ec6fee
+index 0000000..838c7b8
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/constants.ts
 @@ -0,0 +1,64 @@
@@ -12991,10 +13198,10 @@ index 0000000..9ec6fee
 +export const PERMIT_SIG_DEADLINE_SECONDS = 30 * 60
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts b/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts
 new file mode 100644
-index 0000000..762d48a
+index 0000000..e51706c
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,133 @@
 +import {
 +  type ChainContracts,
 +  FORBIDDEN_ROUTERS,
@@ -13007,6 +13214,10 @@ index 0000000..762d48a
 +export interface PredictionDeployment extends ChainContracts {
 +  predictionHook?: Address
 +  underlyingOracle?: Address
++  /** The ownerless MarketScheduler that owns `predictionHook` and is the only account able to open markets. */
++  marketScheduler?: Address
++  /** Prior `predictionHook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
++  legacyPredictionHooks: Address[]
 +  deployBlock?: bigint
 +  /** Keys that were present but held a placeholder value. */
 +  placeholders: string[]
@@ -13015,6 +13226,7 @@ index 0000000..762d48a
 +const ALIASES: Record<string, string[]> = {
 +  predictionHook: ['predictionHook', 'PredictionHook', 'prediction_hook', 'hook'],
 +  underlyingOracle: ['underlyingOracle', 'UnderlyingOracleHook', 'underlyingOracleHook', 'oracleHook', 'oracle'],
++  marketScheduler: ['marketScheduler', 'MarketScheduler'],
 +  usdc: ['usdc', 'USDC', 'collateral'],
 +  poolManager: ['poolManager', 'PoolManager'],
 +  v4Quoter: ['v4Quoter', 'V4Quoter', 'quoter'],
@@ -13057,6 +13269,15 @@ index 0000000..762d48a
 +  return { present: false, value: undefined }
 +}
 +
++/** `legacyPredictionHooks` checksummed, skipping placeholders and non-address entries. Missing or not an array yields []. */
++function legacyPredictionHooks(flat: Record<string, unknown>): Address[] {
++  const { value } = pick(flat, 'legacyPredictionHooks')
++  if (!Array.isArray(value)) {
++    return []
++  }
++  return value.filter((v): v is string => !isPlaceholderAddress(v)).map((v) => getAddress(v))
++}
++
 +/**
 + * Parses `deployments/unichain-sepolia.json`. Accepts flat or `{contracts: {...}}` layouts and common key spellings.
 + * Placeholders fall back to the chain defaults for Uniswap contracts and to `undefined` for ours.
@@ -13094,6 +13315,8 @@ index 0000000..762d48a
 +    chainId,
 +    predictionHook: address('predictionHook'),
 +    underlyingOracle: address('underlyingOracle'),
++    marketScheduler: address('marketScheduler'),
++    legacyPredictionHooks: legacyPredictionHooks(flat),
 +    usdc: address('usdc') ?? defaults.usdc,
 +    poolManager: address('poolManager') ?? defaults.poolManager,
 +    v4Quoter: address('v4Quoter') ?? defaults.v4Quoter,
