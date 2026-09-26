@@ -2,9 +2,9 @@
 
 This runbook covers the live demo on Unichain Sepolia (chain 1301): the contracts, the two bots, the two front ends, and what to do when something breaks.
 
-Demo markets are 60-second "ETH above K" markets:
+Demo markets are "ETH above K" markets. A new one opens every 60 seconds and each runs for about two minutes:
 - The underlying pool is our own demo WETH/USDC pool with the oracle hook. There is no external oracle: the strike and settlement price both come only from this Uniswap v4 pool. The price mirror keeps it at the real ETH price; it stands in for the arbitrage that would otherwise do this job, since a fresh testnet pool has no organic liquidity or traders to keep it in line on its own.
-- An ownerless `MarketScheduler` owns the hook. Anyone can call its `open()` once per wall-clock minute to open the next market, struck at the current price; the keeper bot is just the account that calls it first each minute. There is no admin, no setter and no keeper role on the hook itself.
+- An ownerless `MarketScheduler` owns the hook. Anyone can call its `open()` once per 60-second slot to open the next market, struck at the current price. Slots follow block timestamps (`block.timestamp / 60`), not the wall clock, and the keeper bot is just the account that calls `open()` first in each slot. There is no admin, no setter and no keeper role on the hook itself.
 - Trading stops 12 s before expiry (10 s settlement window plus 2 s buffer).
 - The keeper settles about 1-2 s after expiry. Winners sell the winning token for exactly 1.00 USDC.
 
@@ -46,12 +46,12 @@ make local-stop     # CLEAN=1 also deletes logs and deployments/local.json
 
 1. It starts `anvil --fork-url https://sepolia.unichain.org --block-time 1 --port 8545`. The chain id stays 1301, and the real PoolManager, V4Quoter, UniversalRouter 2.0, Permit2 and Circle USDC are all there.
 2. It gives ETH to three accounts: the deployer, a local keeper account and a local mirror account. It also gives the deployer 10,000 Circle USDC by writing the FiatToken balance slot (slot 9).
-3. It runs `script/Deploy.s.sol` at the live Coinbase ETH price, then `script/Fund.s.sol` with 500 USDC. Together they write `deployments/local.json`.
-4. It moves the PriceSteerer to the local mirror key, so deployer-signed scripts never race the mirror for nonces. Then it starts the mirror and the keeper with a 100 USDC market budget.
+3. It runs `script/Deploy.s.sol` at the live Coinbase ETH price, then `script/Fund.s.sol` with 500 USDC. Together they write `deployments/local.json`. As on Unichain Sepolia, the hook is owned by a `MarketScheduler` with the section 3 defaults: a 60 s period, a 120 s tenor and a budget of `min(10 USDC, vaultIdle / 2)`.
+4. It moves the PriceSteerer to the local mirror key, so deployer-signed scripts never race the mirror for nonces. Then it starts the mirror and the keeper, which calls the scheduler's `open()` once per slot and settles and sweeps each market.
 
 Logs, pids and forge broadcasts go to `deployments/.run/local/`. They are git-ignored, so local runs never touch `broadcast/`.
 
-Settings you can override: `LOCAL_PORT`, `FORK_URL`, `FORK_BLOCK`, `FUND_USDC`, `DEPLOYER_USDC`, `ETH_PRICE_USD`, `MARKET_BUDGET_USDC`, and `START_BOTS=0`.
+Settings you can override: `LOCAL_PORT`, `FORK_URL`, `FORK_BLOCK`, `FUND_USDC`, `DEPLOYER_USDC`, `ETH_PRICE_USD`, and `START_BOTS=0`. The scheduler settings of section 3 (`SCHEDULER_*`, `MARKET_*`, `QUOTE_*`) pass through to the deploy.
 
 ### What `make rehearse` checks
 
@@ -87,7 +87,7 @@ Rehearsal options:
 ### Other local helpers
 
 - `make local-status`: shows anvil, the bots, and their last log lines.
-- `make market-local`: creates a one-off market with `script/CreateMarket.s.sol`, calling `createMarket` directly as the deployer. It uses the keeper's env names and defaults (`MARKET_TENOR_SEC=60`, `MARKET_BUDGET_USDC=10`, `STRIKE_USD` = the oracle spot, `QUOTE_*` and so on). This is a manual tool for an EOA-owned hook; the local fork's hook is owned by the `MarketScheduler` (like Unichain Sepolia), so use `cast send $SCHEDULER "open()"` instead, or wait for the keeper bot.
+- `make market-local`: creates a one-off market with `script/CreateMarket.s.sol`, calling `createMarket` directly as the deployer. It reads the `MARKET_*` and `QUOTE_*` env names with its own defaults (`MARKET_TENOR_SEC=60`, `MARKET_BUDGET_USDC=10`, `STRIKE_USD` = the oracle spot, and so on). This is a manual tool for an EOA-owned hook; the local fork's hook is owned by the `MarketScheduler` (like Unichain Sepolia), so use `cast send $SCHEDULER "open()"` instead, or wait for the keeper bot.
 - `make local-wallet ADDR=0x… USDC=100`: sets a wallet's balances on the fork to 10 ETH and 100 Circle USDC, for trying the backup page with MetaMask.
 - To point MetaMask at the fork, add `http://127.0.0.1:8545` as an RPC URL of the Unichain Sepolia network (chain 1301) and select it. Switch back afterwards.
 
