@@ -60,3 +60,18 @@ browser also logs `[market-read]` with stage and exception classification.
   zero backup failures, visible stale-state samples, or browser errors. Recorded
   locally in `.review/rpc-recovery-verification.json`; not a guarantee of future uptime.
 - Typecheck, lint, all 92 unit tests, and the production build passed.
+
+## Separate history / Portfolio report
+
+`/api/markets/306/history` consistently failed with `Invalid price`, even though
+Ponder was synced and had the market. Its price rows include a valid ask of 1.02:
+`BinaryPricer.askBid` adds the base spread after calculating the probability band.
+Both the server and browser history validators incorrectly capped asks at 1.
+The fix preserves nonnegative finite asks above 1, while keeping probability and
+bid bounds. The actual API now returns 50 price points for market 306.
+
+Portfolio reads holdings separately from market history. The connected account
+`0x2356…6a85` had zero outcome-token holdings and zero configured USDC at block
+63589493, independently checked through PublicNode. The local indexer also had no
+positions or trades for it. Complete Portfolio accounting/history is not wired;
+the UI now distinguishes this limitation from zero results and read errors.

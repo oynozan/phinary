@@ -46,7 +46,7 @@ export function ConnectButton({ className }: { className?: string }) {
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" className={cn(pill, "gap-2", className)}>
                     <WalletCards className={cn("size-4", wallet.wrongNetwork ? "text-down" : "text-violet-300")} aria-hidden="true" />
-                    <span className="wallet-address">{shortAddress(wallet.address)}</span>
+                    <span className="wallet-address" title={wallet.address}>{shortAddress(wallet.address)}</span>
                     <ChevronDown className="wallet-chevron ml-3 size-3.5 text-muted-foreground" aria-hidden="true" />
                 </Button>
             </DropdownMenuTrigger>

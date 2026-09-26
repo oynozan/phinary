@@ -65,3 +65,10 @@ test('portfolio totals round invalid refunds per market after combining both sid
  assert.equal(totals([invalid, { ...invalid, marketId: 101 }]).claimable, .000002);
  assert.equal(totals([{ ...invalid, quantity: 1n, value: .0000005 }]).total, 0);
 });
+
+test('missing accounting remains unknown even when there are no open holdings', () => {
+    const totals = portfolioTotals({ availability: 'ready', rows: [], realized: null, accountingComplete: false });
+    assert.equal(totals.total, 0);
+    assert.equal(totals.unrealized, null);
+    assert.equal(totals.realized, null);
+});

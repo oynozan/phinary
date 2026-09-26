@@ -28,10 +28,11 @@ export function PortfolioScreen({ display, now, actions, notice, marketBase = ""
             {notice && <div className="portfolio-notice">{notice}</div>}
             <a href={marketBase || "/"}>Explore markets</a>
         </section> : <>
-        {notice && <div className="portfolio-notice">{notice}</div>}
+        {notice && <div className={`portfolio-notice ${display.availability === "ready" ? "portfolio-notice-ready" : ""}`}>{notice}</div>}
         <PortfolioSummary display={display} claimEnabled={actionEnabled && claimPlan(claimable).marketIds.length > 0 && claimPlan(claimable).amount !== null} onClaimAll={() => { captureFocus(); setMessage(""); setClaimRows(claimable); }} />
         {message && <div className="portfolio-toast" role="status">{message}<button type="button" aria-label="Dismiss notification" onClick={() => setMessage("")}>Dismiss</button></div>}
-        <PositionsTable {...shared} rows={open} section="open" /><PositionsTable {...shared} rows={claimable} section="claimable" /><HistoryTable {...shared} rows={history} />
+        <PositionsTable {...shared} rows={open} section="open" /><PositionsTable {...shared} rows={claimable} section="claimable" /><HistoryTable {...shared} rows={history} historyComplete={display.historyComplete} />
+        {display.accountingComplete === false && <p className="portfolio-availability-note">Cost basis and P&amp;L are not available yet.</p>}
         {!actions && <p className="portfolio-availability-note">Selling and claiming are not connected yet.</p>}
         </>}
         <SellDialog restoreFocus={restoreFocus} row={sellTarget} actions={actions} now={now} onClose={() => setSellId(null)} onDone={(result) => { setMessage(result); setSellId(null); }} />
