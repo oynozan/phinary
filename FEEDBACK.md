@@ -1,39 +1,43 @@
-# Uniswap feedback from the Phinary team
+# Phinary: binary options, traded as Uniswap swaps
 
-We built Phinary at ETHGlobal Tokyo 2026: binary prediction markets that trade through a Uniswap v4 hook on Unichain Sepolia. The hook calculates the price, traders swap through UniversalRouter, and a shared USDC vault backs the outcomes. We also built a TypeScript swap SDK, a dashboard, and an integration with a local fork of the Uniswap interface.
+Developer feedback from ETHGlobal Tokyo 2026.
 
-The part we liked most was being able to change the pricing model while still using v4 swaps. That is what made this project worth building on Uniswap. Our feedback is mostly about what happens after the hook works: helping someone find it, integrate it, and understand why a transaction failed.
+Phinary brings binary options into Uniswap v4. A trader buys an UP or DOWN token with USDC. At expiry, the winning side redeems for $1 per token. Buying and selling use the same Uniswap swap infrastructure that already handles token trades.
 
-## Finding a hook should not start with a JSON file
+The interesting part is inside the hook. Our [`beforeSwap` implementation](src/PredictionHook.sol#L221-L247) calculates an option price from the underlying pool price, volatility and time to expiry, then returns the swap delta. The pricing model is Black-Scholes adapted to the settlement window. A shared USDC vault supplies the backing, and settlement reads the underlying Uniswap pool's average price over that window.
 
-Our biggest request is an official, browsable place where a builder can explain a hook and someone else can find its deployment address.
+That is what we wanted to explore with v4: how much of an options venue can fit inside a hook while keeping the existing swap interface? Phinary puts the option pricing and accounting there, with V4Quoter, Permit2 and UniversalRouter handling the trader's route into it. We built a [TypeScript SDK](packages/swap-sdk/README.md), a dashboard, and an integration in a local fork of the Uniswap interface around that route.
 
-There is already a [Uniswap hooklist](https://github.com/Uniswap/hooklist), with a combined JSON file and individual deployment files. The developer site also has a [Hook Discovery page](https://developers.uniswap.org/docs/community/learning/hook-discovery) linking to community directories. So the missing piece for us was not a registry from scratch. It was an official discovery experience built around that information.
+The contracts are deployed on Unichain Sepolia. One distinction matters for the demo: a bot trades our testnet underlying pools toward external reference prices because those pools do not have organic arbitrage. The contracts read the pools; they do not consume the external feed directly. Our mainnet oracle design is separate and is not deployed. Current addresses are in the [deployment file](deployments/unichain-sepolia.json).
 
-Working through a large JSON list is awkward when the question is simply, “What does this hook do, and which address should I use?” For Phinary, we want to send someone to a page that explains the markets, identifies the network, and links to the right contract. They should not have to inspect a deployment file to get started.
+## Give each hook a page people can find
 
-A searchable page for each hook would help: a short description, deployments by chain, source code, hook permissions, and a working example. It should distinguish a listed hook from one reviewed for routing compatibility, and neither should look like a security endorsement. Builders could keep submitting metadata through GitHub; readers would get a page they can actually browse and share.
+Once the integration exists, sharing it should be straightforward. We want to send someone one link where they can see what Phinary does, which chain it runs on, and which hook address to use.
 
-If we could pick one improvement, it would be this.
+The [Uniswap hooklist](https://github.com/Uniswap/hooklist) already contains deployment metadata, and [Hook Discovery](https://developers.uniswap.org/docs/community/learning/hook-discovery) points to community catalogs. A useful next step would be an official browsing experience that brings the description, deployments, permissions, source and a working example together on a page for each hook.
 
-## Show the whole path from a custom hook to a wallet swap
+For Phinary, that page could explain that a swap buys a binary option, show its expiry and settlement rules, and give an integrator a quote example. An address and a set of permission flags do not tell that story on their own.
 
-For our integration, we put together pool discovery, V4Quoter calls, ERC-20 approval, Permit2, UniversalRouter calldata, simulation, and receipt handling. That work now lives in [our swap SDK](packages/swap-sdk/README.md).
+The page should also say whether a hook is simply listed or has been reviewed for routing compatibility. Neither label should imply a security audit. This is the improvement we would put first: make a working hook easier for the next developer to find and try.
 
-We would have liked a small, runnable reference that takes a custom pricing hook through that entire flow. Include the exact router deployment and ABI, then show one successful buy and sell on a testnet. A contract-only example leaves the wallet and frontend integration as another project.
+## Take the reference example all the way to the wallet
 
-It would also help to explain routing eligibility alongside that example. Being able to execute a swap through UniversalRouter does not mean the public Uniswap app will discover the pool. The [routing allowlist form](https://developers.uniswap.org/hook-allowlist) describes a separate review process. Link that step directly from the custom-hook integration guide, so builders know what their local demo proves and what still needs to happen.
+Our swap path includes pool discovery, a V4Quoter call, ERC-20 approval, Permit2, UniversalRouter calldata, simulation and receipt handling. The pieces come together in our SDK, but there is quite a bit of integration between a hook contract and a usable buy button.
 
-## Make nested hook errors easier to read
+A small reference app for a custom pricing hook would help. Pin the router address and ABI for a testnet, show a buy and a sell, and include the approval and failure paths. For a new builder, being able to compare one complete transaction against a known working example is more useful than another isolated code snippet.
 
-Our SDK decodes failures such as `UnexpectedRevertBytes -> WrappedError(hook) -> Band`. That underlying error matters: the frontend needs to distinguish a price outside the allowed band from a closed market, insufficient capacity, or a missing approval.
+Please put the routing review step beside that example. Phinary uses `beforeSwapReturnDelta`, and the [routing allowlist form](https://developers.uniswap.org/hook-allowlist) covers hooks using return deltas. Executing through UniversalRouter and appearing in the public Uniswap app are separate milestones. Our interface demo uses a local fork; it does not establish public routing support.
 
-A reusable decoder that accepts a hook's error ABI would save work here. A few examples showing the raw revert and the decoded cause would already help. We wrote [our own decoder](packages/swap-sdk/src/errors.ts); this seems useful beyond prediction markets.
+## Keep the hook's error visible
 
-## Include bad RPC responses in the frontend examples
+A failed quote can arrive as `UnexpectedRevertBytes -> WrappedError(hook) -> Band`. The last part is the one the trader needs. A price outside the allowed band needs a different response from a closed option, exhausted capacity or a missing approval.
 
-One bug looked like random market-loading failures. The public Sepolia RPC sometimes returned HTTP 200 with `result: null` for `eth_call`. Checking the HTTP status alone missed it. Replaying the same call at the same block returned valid data.
+We wrote a [decoder](packages/swap-sdk/src/errors.ts) that unwraps those errors and accepts additional hook error ABIs. A shared decoder, with raw revert examples and their decoded results, would be useful for other custom hooks too. The wrapper should preserve the reason the hook rejected the trade, all the way to the frontend.
 
-We added result validation and retried the same request through another RPC. In a two-minute observation, all three real empty responses recovered without a visible page error. The [investigation notes](web/docs/market-rpc-investigation.md) include the captured blocks and reproduction details.
+## Test the response body, even when the RPC says 200
 
-We did not establish what caused the provider to return null, and this was not a v4 contract failure. Still, a frontend example that handles malformed successful responses, preserves the last snapshot, and blocks trading on stale quotes would have been useful during the hackathon. These failures are much easier to diagnose when the example keeps the original error instead of turning everything into “could not load.”
+One of our loading bugs was easy to misread. The public Sepolia RPC sometimes returned HTTP 200 with `result: null` for `eth_call`. An HTTP-only check saw success. The contract decoder saw no data. Replaying the same call at the same block returned a valid result.
+
+We added response validation and retried the identical request through another RPC. During a two-minute observation, three real empty responses recovered without a visible page error. We kept the captured blocks and reproduction details in the [investigation notes](web/docs/market-rpc-investigation.md).
+
+We have not established why the provider returned null. This was not a v4 contract failure. It is still worth including in a frontend reference: preserve the last snapshot, stop trading on stale quotes, and retain enough error detail to diagnose the failure. In our case, treating every failure as “could not load” hid the clue we needed.
