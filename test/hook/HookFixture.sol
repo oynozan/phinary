@@ -190,6 +190,14 @@ abstract contract HookFixture is Test, Deployers {
     }
 
     function _routerPlan(PoolKey memory k, bool isBuy, bool exactIn, uint256 amt) internal view returns (bytes memory) {
+        return _routerPlan(k, isBuy, exactIn, amt, "");
+    }
+
+    function _routerPlan(PoolKey memory k, bool isBuy, bool exactIn, uint256 amt, bytes memory hookData)
+        internal
+        view
+        returns (bytes memory)
+    {
         bool zf1 = _swapParams(k, isBuy, exactIn, amt).zeroForOne;
         Currency inC = zf1 ? k.currency0 : k.currency1;
         Currency outC = zf1 ? k.currency1 : k.currency0;
@@ -197,12 +205,12 @@ abstract contract HookFixture is Test, Deployers {
         if (exactIn) {
             plan = plan.add(
                 Actions.SWAP_EXACT_IN_SINGLE,
-                abi.encode(IV4Router.ExactInputSingleParams(k, zf1, uint128(amt), 0, 0, ""))
+                abi.encode(IV4Router.ExactInputSingleParams(k, zf1, uint128(amt), 0, 0, hookData))
             );
         } else {
             plan = plan.add(
                 Actions.SWAP_EXACT_OUT_SINGLE,
-                abi.encode(IV4Router.ExactOutputSingleParams(k, zf1, uint128(amt), type(uint128).max, 0, ""))
+                abi.encode(IV4Router.ExactOutputSingleParams(k, zf1, uint128(amt), type(uint128).max, 0, hookData))
             );
         }
         plan = plan.add(Actions.SETTLE_ALL, abi.encode(inC, type(uint256).max));
