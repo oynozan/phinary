@@ -12,6 +12,7 @@ contract MockOracle is IUnderlyingOracle {
     int24 public flatTick;
     uint32 public oldest;
     bool public unavailable;
+    bool public spotUnavailable;
     mapping(uint32 => int56) internal _cum;
     mapping(uint32 => bool) internal _cumSet;
 
@@ -43,12 +44,18 @@ contract MockOracle is IUnderlyingOracle {
         unavailable = v;
     }
 
+    /// @dev Makes lnSpotSoBWad() revert, as a live oracle's start-of-block read can when it has no observation yet.
+    function setSpotUnavailable(bool v) external {
+        spotUnavailable = v;
+    }
+
     function setCum(uint32 t, int56 v) external {
         _cum[t] = v;
         _cumSet[t] = true;
     }
 
     function lnSpotSoBWad() external view returns (int256) {
+        if (spotUnavailable) revert ObservationUnavailable(uint32(block.timestamp));
         return lnSpot;
     }
 
