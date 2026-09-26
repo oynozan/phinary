@@ -13,6 +13,8 @@ import {MarketNames} from "./lib/MarketNames.sol";
 ///         no setter and no admin, every field is fixed at construction.
 /// @dev `keeper` on the hook is never set (stays address(0)); `open()` is the only path to `createMarket`.
 contract MarketScheduler is IMarketScheduler {
+    uint256 internal constant WAD = 1e18;
+
     IPredictionHook public immutable hook;
     address public immutable oracle;
 
@@ -37,6 +39,7 @@ contract MarketScheduler is IMarketScheduler {
         if (
             c.period == 0 || c.window == 0 || c.tenor < uint256(c.period) + c.window + c.cutoffBuffer
                 || c.maxBudget == 0 || c.minBudget == 0 || c.minBudget > c.maxBudget || tickerLen == 0 || tickerLen > 6
+                || oracle_ == address(0) || c.quote.qEpochMax == 0 || c.quote.pMinWad == 0 || c.quote.pMinWad >= WAD / 2
         ) revert InvalidConfig();
 
         hook = hook_;
@@ -99,8 +102,18 @@ contract MarketScheduler is IMarketScheduler {
     }
 
     /// @inheritdoc IMarketScheduler
+    /// @dev Mirrors every revert path in `open()`: the slot check, the budget check and a strike that `open()` could
+    ///      actually build (a reverting oracle read, or a spot low enough that `strikeCents` rounds to 0, which
+    ///      would make `MarketNames.lnStrikeWad` revert on `ln(0)`).
     function canOpen() external view returns (bool) {
-        return block.timestamp / _period > lastSlot;
+        if (block.timestamp / _period <= lastSlot) return false;
+        (, bool budgetOk) = _affordableBudget();
+        if (!budgetOk) return false;
+        try IUnderlyingOracle(oracle).lnSpotSoBWad() returns (int256 ln) {
+            return MarketNames.strikeCents(ln) != 0;
+        } catch {
+            return false;
+        }
     }
 
     /// @inheritdoc IMarketScheduler
@@ -129,9 +142,17 @@ contract MarketScheduler is IMarketScheduler {
 
     /// @return budget `min(maxBudget, hook.vaultIdle() / 2)`, reverting InsufficientIdle below `minBudget`.
     function _budget() internal view returns (uint256 budget) {
+        bool ok;
+        (budget, ok) = _affordableBudget();
+        if (!ok) revert InsufficientIdle(budget, _minBudget);
+    }
+
+    /// @return budget `min(maxBudget, hook.vaultIdle() / 2)`; ok whether it clears `minBudget`. Non-reverting form
+    ///         of `_budget`, shared with `canOpen()` so the two never disagree.
+    function _affordableBudget() internal view returns (uint256 budget, bool ok) {
         uint256 half = hook.vaultIdle() / 2;
         budget = half < _maxBudget ? half : _maxBudget;
-        if (budget < _minBudget) revert InsufficientIdle(budget, _minBudget);
+        ok = budget >= _minBudget;
     }
 
     function _ticker() internal view returns (string memory) {

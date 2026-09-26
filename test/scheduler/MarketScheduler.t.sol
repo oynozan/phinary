@@ -6,8 +6,10 @@ import {Deployers} from "v4-core/test/utils/Deployers.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
+import {LibString} from "solady/utils/LibString.sol";
 import {PredictionHook} from "../../src/PredictionHook.sol";
 import {IPredictionHook} from "../../src/interfaces/IPredictionHook.sol";
+import {IUnderlyingOracle} from "../../src/interfaces/IUnderlyingOracle.sol";
 import {MarketScheduler} from "../../src/MarketScheduler.sol";
 import {IMarketScheduler} from "../../src/interfaces/IMarketScheduler.sol";
 import {MarketNames} from "../../src/lib/MarketNames.sol";
@@ -132,16 +134,26 @@ contract MarketSchedulerTest is Test, Deployers {
         assertEq(hook.marketInfo(id).expiry, slotStart + TENOR);
     }
 
+    /// @dev setUp() fixes the oracle's spot at exactly 2690.13, so the strike is exactly $2690.13; this asserts
+    ///      literal strings, not just a round trip through the same MarketNames calls the scheduler itself uses.
     function test_namesAndSymbols() public {
         uint256 id = scheduler.open();
         IPredictionHook.MarketInfo memory info = hook.marketInfo(id);
+        string memory yesName = IERC20Metadata(info.yes).name();
+        string memory noName = IERC20Metadata(info.no).name();
+
+        assertEq(IERC20Metadata(info.yes).symbol(), "ETHUP");
+        assertEq(IERC20Metadata(info.no).symbol(), "ETHDOWN");
+        assertTrue(LibString.startsWith(yesName, "ETH > $"), "yes name prefix");
+        assertTrue(LibString.startsWith(noName, "ETH < $"), "no name prefix");
+        assertTrue(LibString.contains(yesName, "$2690.13"), "yes name strike");
+        assertTrue(LibString.contains(noName, "$2690.13"), "no name strike");
+
+        // Cross-check against MarketNames in addition to (not instead of) the literals above.
         uint256 cents = MarketNames.strikeCents(oracle.lnSpotSoBWad());
-        (string memory yesName, string memory noName, string memory yesSymbol, string memory noSymbol) =
-            MarketNames.names("ETH", cents, info.expiry);
-        assertEq(IERC20Metadata(info.yes).name(), yesName);
-        assertEq(IERC20Metadata(info.yes).symbol(), yesSymbol);
-        assertEq(IERC20Metadata(info.no).name(), noName);
-        assertEq(IERC20Metadata(info.no).symbol(), noSymbol);
+        (string memory expectedYes, string memory expectedNo,,) = MarketNames.names("ETH", cents, info.expiry);
+        assertEq(yesName, expectedYes);
+        assertEq(noName, expectedNo);
     }
 
     function test_strikeMatchesScriptRounding() public {
@@ -179,9 +191,23 @@ contract MarketSchedulerTest is Test, Deployers {
         hook.createMarket(p);
     }
 
+    /// @dev The deployer (address(this), which deployed usdc/oracle/hook/scheduler in _deploy) has no more
+    ///      standing with the hook than any other address: it is neither `owner` (the scheduler) nor `keeper`
+    ///      (never set), so both admin entry points reject it.
+    function test_deployerCannotAdministerHook() public {
+        IPredictionHook.MarketParams memory p;
+        vm.expectRevert(PredictionHook.Unauthorized.selector);
+        hook.createMarket(p);
+
+        vm.expectRevert(PredictionHook.Unauthorized.selector);
+        hook.setKeeper(address(0xBEEF));
+    }
+
     function test_oracleRevertKeepsSlot() public {
         oracle.setSpotUnavailable(true);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IUnderlyingOracle.ObservationUnavailable.selector, uint32(block.timestamp))
+        );
         scheduler.open();
         assertEq(scheduler.lastSlot(), 0);
 
@@ -197,6 +223,23 @@ contract MarketSchedulerTest is Test, Deployers {
         assertFalse(scheduler.canOpen());
         vm.warp(block.timestamp + PERIOD);
         assertTrue(scheduler.canOpen());
+
+        // Idle below 2*minBudget: budget = min(maxBudget, idle/2) would be below minBudget, so open() must revert
+        // and canOpen() must say so up front, not just once open() is actually called (the contract is immutable,
+        // so this can never be patched after deploy).
+        (,, MarketScheduler sLow) = _deploy(_config());
+        assertFalse(sLow.canOpen(), "fresh vault, idle 0 < 2*minBudget");
+        vm.expectRevert(abi.encodeWithSelector(IMarketScheduler.InsufficientIdle.selector, 0, MIN_BUDGET));
+        sLow.open();
+
+        // A reverting spot read must also show up in canOpen() before open() is ever called.
+        oracle.setSpotUnavailable(true);
+        assertFalse(scheduler.canOpen(), "oracle revert");
+        vm.expectRevert(
+            abi.encodeWithSelector(IUnderlyingOracle.ObservationUnavailable.selector, uint32(block.timestamp))
+        );
+        scheduler.open();
+        oracle.setSpotUnavailable(false);
     }
 
     function test_constructorRejectsShortTenor() public {
@@ -204,6 +247,51 @@ contract MarketSchedulerTest is Test, Deployers {
         c.tenor = PERIOD + WINDOW + CUTOFF - 1;
         vm.expectRevert(IMarketScheduler.InvalidConfig.selector);
         new MarketScheduler(IPredictionHook(address(hook)), address(oracle), c);
+    }
+
+    /// @dev Every branch of the constructor's InvalidConfig check, one config field at a time. The oracle/qEpochMax
+    ///      /pMinWad branches mirror the hook's own createMarket validation (PredictionHook.sol createMarket): a
+    ///      scheduler built without them deploys, but every open() reverts InvalidParams forever, since the
+    ///      scheduler's config is immutable.
+    function test_constructorRejectsInvalidConfigs() public {
+        IMarketScheduler.Config memory periodZero = _config();
+        periodZero.period = 0;
+        _expectInvalidConfig(periodZero, address(oracle));
+
+        IMarketScheduler.Config memory shortTenor = _config();
+        shortTenor.tenor = PERIOD + WINDOW + CUTOFF - 1;
+        _expectInvalidConfig(shortTenor, address(oracle));
+
+        IMarketScheduler.Config memory emptyTicker = _config();
+        emptyTicker.ticker = "";
+        _expectInvalidConfig(emptyTicker, address(oracle));
+
+        IMarketScheduler.Config memory longTicker = _config();
+        longTicker.ticker = "TOOLONG"; // 7 chars
+        _expectInvalidConfig(longTicker, address(oracle));
+
+        IMarketScheduler.Config memory minAboveMax = _config();
+        minAboveMax.minBudget = minAboveMax.maxBudget + 1;
+        _expectInvalidConfig(minAboveMax, address(oracle));
+
+        _expectInvalidConfig(_config(), address(0)); // oracle == address(0)
+
+        IMarketScheduler.Config memory zeroQEpochMax = _config();
+        zeroQEpochMax.quote.qEpochMax = 0;
+        _expectInvalidConfig(zeroQEpochMax, address(oracle));
+
+        IMarketScheduler.Config memory zeroPMin = _config();
+        zeroPMin.quote.pMinWad = 0;
+        _expectInvalidConfig(zeroPMin, address(oracle));
+
+        IMarketScheduler.Config memory pMinTooHigh = _config();
+        pMinTooHigh.quote.pMinWad = 0.5e18; // >= WAD/2
+        _expectInvalidConfig(pMinTooHigh, address(oracle));
+    }
+
+    function _expectInvalidConfig(IMarketScheduler.Config memory c, address oracleAddr) internal {
+        vm.expectRevert(IMarketScheduler.InvalidConfig.selector);
+        new MarketScheduler(IPredictionHook(address(hook)), oracleAddr, c);
     }
 
     function testFuzz_openAnySecondOfSlot(uint256 s) public {
