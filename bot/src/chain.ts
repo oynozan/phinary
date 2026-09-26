@@ -2,6 +2,7 @@ import {
   createPublicClient,
   createWalletClient,
   defineChain,
+  fallback,
   http,
   type Account,
   type Address,
@@ -14,7 +15,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { poolManagerAbi } from "./abi.ts";
-import type { CommonConfig } from "./config.ts";
+import { rpcUrlList, type CommonConfig } from "./config.ts";
 import { decodeSlot0, poolId, poolStateSlot, type PoolKey, type Slot0 } from "./pricing.ts";
 
 export interface Clients {
@@ -25,13 +26,17 @@ export interface Clients {
 }
 
 export function makeClients(cfg: Pick<CommonConfig, "rpcUrl" | "chainId" | "privateKey">): Clients {
+  const urls = rpcUrlList(cfg.rpcUrl);
+  if (urls.length === 0) throw new Error("RPC_URL is empty");
   const chain = defineChain({
     id: cfg.chainId,
     name: cfg.chainId === 1301 ? "Unichain Sepolia" : `chain-${cfg.chainId}`,
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [cfg.rpcUrl] } },
+    rpcUrls: { default: { http: urls } },
   });
-  const transport = http(cfg.rpcUrl, { retryCount: 2, timeout: 15_000 });
+  // Several URLs: each request goes to the first that answers, so a rate-limited primary falls through to the next.
+  const transports = urls.map((url) => http(url, { retryCount: 2, timeout: 15_000 }));
+  const transport: Transport = transports.length === 1 ? transports[0]! : fallback(transports);
   const publicClient = createPublicClient({ chain, transport, pollingInterval: 500 });
   if (!cfg.privateKey) return { chain, publicClient };
   const account = privateKeyToAccount(cfg.privateKey.key);

@@ -7,6 +7,8 @@ export type IndexerNetwork = 'unichain-sepolia' | 'local'
 export type IndexerDeployment = {
   chainId: number
   rpcUrl: string
+  /** `rpcUrl` split on commas; Ponder spreads requests across them and backs off any that rate-limit. */
+  rpcUrls: string[]
   hook: Address
   oracle: Address
   poolManager: Address
@@ -49,6 +51,10 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
   const file = JSON.parse(readFileSync(deploymentPath, 'utf8')) as DeploymentFile
 
   const rpcUrl = env.PONDER_RPC_URL_1301 ?? file.rpcUrl
+  const rpcUrls = rpcUrl.split(',').map((url) => url.trim()).filter(Boolean)
+  if (rpcUrls.length === 0 || rpcUrls.some((url) => !/^https?:\/\//.test(url))) {
+    throw new Error('PONDER_RPC_URL_1301 must be one or more comma-separated http(s) URLs')
+  }
   const deployBlock = file.deployBlock
   // This Hook was deployed after the deployment run's first block. Keep event
   // indexing at deployBlock, but start state reads after the contracts were initialized.
@@ -63,6 +69,7 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
   return {
     chainId: file.chainId,
     rpcUrl,
+    rpcUrls,
     hook: file.predictionHook,
     oracle: file.underlyingOracle,
     poolManager: file.poolManager,

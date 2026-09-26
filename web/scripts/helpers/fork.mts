@@ -38,7 +38,7 @@ export async function startFixture(options: { marketSource?: 'isolated' | 'sched
         assert.ok(ready, 'Anvil failed to start');
         assert.match(await rpc('web3_clientVersion'), /anvil/i);
         if (options.wallClock) await rpc('evm_setNextBlockTimestamp', [Math.floor(Date.now() / 1000)]);
-        const config = { ...original, rpcUrl };
+        const config = { ...original, rpcUrl, rpcUrls: [rpcUrl] };
         const client = createPublicClient({ chain: unichainSepolia, transport: http(rpcUrl), pollingInterval: 100, cacheTime: 0 });
         const account = privateKeyToAccount(generatePrivateKey());
         const wallet = createWalletClient({ account, chain: unichainSepolia, transport: http(rpcUrl) });

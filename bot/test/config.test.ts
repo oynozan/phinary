@@ -91,6 +91,9 @@ test("bot configs need a key unless dry-running", () => {
   assert.equal(m.privateKey?.source, "DEPLOYER_PRIVATE_KEY");
   assert.deepEqual(m.sources, ["kraken", "binanceus"]);
   assert.equal(m.rpcUrl, "http://x");
+  const listed = loadMirrorConfig({ ...env, DRY_RUN: "1", RPC_URL: " https://a.example , https://b.example/v2/k, " });
+  assert.equal(listed.rpcUrl, "https://a.example,https://b.example/v2/k", "primary first, fallbacks in order");
+  assert.throws(() => loadMirrorConfig({ ...env, DRY_RUN: "1", RPC_URL: "https://a.example,wss://b" }), /RPC_URL must be comma-separated/);
   assert.throws(() => loadMirrorConfig({ ...env, DRY_RUN: "1", MIRROR_SOURCES: "ftx" }), /unknown sources: ftx/);
   const k = loadKeeperConfig({ ...env, KEEPER_PRIVATE_KEY: KEY, DEPLOYER_PRIVATE_KEY: `0x${"cd".repeat(32)}` });
   assert.equal(k.privateKey?.source, "KEEPER_PRIVATE_KEY");

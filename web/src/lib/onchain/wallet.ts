@@ -110,7 +110,7 @@ export async function switchWalletNetwork() {
             if ((error as { code?: number }).code !== 4902) throw error;
             await selected.provider.request({ method: "wallet_addEthereumChain", params: [{
                 chainId: numberToHex(config.chainId), chainName: "Unichain Sepolia", nativeCurrency: unichainSepolia.nativeCurrency,
-                rpcUrls: [config.rpcUrl], blockExplorerUrls: ["https://sepolia.uniscan.xyz"],
+                rpcUrls: [config.publicRpcUrl], blockExplorerUrls: ["https://sepolia.uniscan.xyz"],
             }] });
             await selected.provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: numberToHex(config.chainId) }] });
         }

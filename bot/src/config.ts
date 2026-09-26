@@ -205,11 +205,21 @@ export function readPrivateKey(env: Env, names: string[]): { key: Hex; source: s
   return undefined;
 }
 
+/** Splits a comma-separated RPC list, in order, and rejects anything that is not an http(s) URL. */
+export function rpcUrlList(value: string, name = "RPC_URL"): string[] {
+  const urls = value.split(",").map((s) => s.trim()).filter((s) => s !== "");
+  for (const url of urls) {
+    if (!/^https?:\/\//.test(url)) throw new Error(`${name} must be comma-separated http(s) URLs`);
+  }
+  return urls;
+}
+
 /* Bot configs */
 
 export interface CommonConfig {
   deploymentsFile: string;
   deployments: Deployments;
+  /** One RPC URL, or several comma-separated: the first is primary, the rest are fallbacks in order */
   rpcUrl: string;
   chainId: number;
   dryRun: boolean;
@@ -231,7 +241,7 @@ function loadCommon(env: Env, keyVars: string[]): CommonConfig {
   return {
     deploymentsFile,
     deployments,
-    rpcUrl: envString(env, "RPC_URL", deployments.rpcUrl ?? DEFAULT_RPC_URL),
+    rpcUrl: rpcUrlList(envString(env, "RPC_URL", deployments.rpcUrl ?? DEFAULT_RPC_URL), "RPC_URL").join(","),
     chainId: envInt(env, "CHAIN_ID", deployments.chainId, 1),
     dryRun,
     once: envBool(env, "ONCE", false),
@@ -307,13 +317,7 @@ export interface SealedConfig extends CommonConfig {
 
 export function loadSealedConfig(env: Env = process.env): SealedConfig {
   const common = loadCommon(env, ["SEALED_KEY", "KEEPER_PRIVATE_KEY"]);
-  const fallbackRpcUrls = envString(env, "SEALED_RPC_FALLBACKS", "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s !== "");
-  for (const url of fallbackRpcUrls) {
-    if (!/^https?:\/\//.test(url)) throw new Error("SEALED_RPC_FALLBACKS must be comma-separated http(s) URLs");
-  }
+  const fallbackRpcUrls = rpcUrlList(envString(env, "SEALED_RPC_FALLBACKS", ""), "SEALED_RPC_FALLBACKS");
   return {
     ...common,
     oracle: requireAddress(common.deployments, "sealedOracle"),

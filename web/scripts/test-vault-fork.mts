@@ -25,7 +25,7 @@ const port = await new Promise<number>((resolve, reject) => {
 });
 const rpcUrl = `http://127.0.0.1:${port}`;
 const original = getConnectionConfig();
-const config = { ...original, rpcUrl };
+const config = { ...original, rpcUrl, rpcUrls: [rpcUrl] };
 const fork = spawn(binary, ["--fork-url", original.rpcUrl, "--port", String(port), "--host", "127.0.0.1", "--silent"], { stdio: ["ignore", "ignore", "pipe"] });
 let startError: Error | undefined;
 fork.on("error", (error) => { startError = error; });

@@ -32,6 +32,7 @@ describe('loadIndexerDeployment', () => {
     expect(deployment).toEqual({
       chainId: file.chainId,
       rpcUrl: file.rpcUrl,
+      rpcUrls: [file.rpcUrl],
       hook: file.predictionHook,
       oracle: file.underlyingOracle,
       poolManager: file.poolManager,
@@ -108,5 +109,13 @@ describe('loadIndexerDeployment', () => {
     const deployment = loadIndexerDeployment({ PONDER_RPC_URL_1301: 'http://example.invalid' })
 
     expect(deployment.rpcUrl).toBe('http://example.invalid')
+    expect(deployment.rpcUrls).toEqual(['http://example.invalid'])
+  })
+
+  it('reads several comma-separated RPC URLs from PONDER_RPC_URL_1301', () => {
+    const deployment = loadIndexerDeployment({ PONDER_RPC_URL_1301: ' https://a.invalid , https://b.invalid,' })
+
+    expect(deployment.rpcUrls).toEqual(['https://a.invalid', 'https://b.invalid'])
+    expect(() => loadIndexerDeployment({ PONDER_RPC_URL_1301: 'https://a.invalid,wss://b.invalid' })).toThrow(/http\(s\) URLs/)
   })
 })
