@@ -11,7 +11,8 @@
     "check:connection": "node scripts/check-connection.mts",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --import tsx --test test/*.test.mts",
-    "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts"
+    "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts",
+    "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts"
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.81",

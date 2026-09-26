@@ -1,5 +1,5 @@
 ---
-name: Phinary Markets, Market Detail and shared header
+name: Phinary Markets, Market Detail, Portfolio and shared header
 description: Compact near-black financial interface with violet atmosphere.
 colors:
   background: "#080b12"
@@ -199,7 +199,7 @@ components:
 
 ## Overview
 
-This refresh applies to Markets, Market Detail (`/market/[id]`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; product and data constraints remain in `PRODUCT.md`.
+This refresh applies to Markets, Market Detail (`/market/[id]`), Portfolio (`/portfolio`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; Portfolio scope is defined below and in `preview/portfolio/README.md`. Product and data constraints remain in `PRODUCT.md`.
 
 ## Colors
 
@@ -246,9 +246,23 @@ The user-approved settlement companion is a static orbital robot below the resol
 - Don't apply this refresh to other route bodies without a separate decision.
 - Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.
 
+## Portfolio scope
+
+Portfolio is a design-first extension, scoped to `.portfolio-page` and `.portfolio-dialog` in `src/components/portfolio/portfolio.css`. It does not restyle Markets, Market Detail, Activity, Vault or the shared header. The existing transparent header reveals the page-owned `/markets/orbit.webp` backdrop, extended above the shell offset. Its static 350px art uses 0.48 opacity and a fade mask. The summary and primary actions may use scoped violet gradients; no continuously animated effects, decorative icons, characters, promotional labels or slogans are added.
+
+Use Manrope and tabular numerals on the near-black `#080b12` ground, `#f5f5fa` text, `#b4bdd3` secondary text, fine borders and 8–12px corners. The heading is 30px (27px below 640px), section headings 23px (21px below 640px), and table text 13px. The container caps at 1536px with 48px gutters, 28px below 1280px and 20px below 640px. Below 1024px, tables become compact cards in a container capped at 780px. The five-metric summary wraps to three columns, then two below 640px with its total spanning both. Preserve the production mobile dock clearance.
+
+The compact title and “Your positions, claims and history.” lead into one summary band: Total portfolio value, Unrealised P&L, Realised P&L, Open positions, Claimable balance, then Claim all. Open Positions, Claimable Positions and History always follow vertically, without tabs or a separate claim banner. Open rows sort by expiry ascending; claimable rows by receivable value descending; history by settlement time descending with missing times last. Result means market outcome; Status means the user's processing state. Losing positions belong in History, and an unclaimed Invalid payout is not labelled Refunded.
+
+Production currently has no Portfolio accounting source or Sell/Claim integration. Disconnected wallets use the existing wallet dialog, wrong networks use the existing switch action, and correctly connected wallets see an unavailable-data notice. Summary values remain N/A and sections explain missing data instead of suggesting zero balances. No sample positions or preview execution callbacks enter the production route. Total portfolio value excludes wallet USDC and equals unsettled value plus claimable value only when all required values are available. Unit prices preserve 2–4 decimal places; amounts use two. No acquisition costs or realised P&L are inferred.
+
+Sell and Claim dialogs are exercisable only in the isolated sample preview. Sell has token quantities, 25/50/75/Max controls, quote states and explicit validation. Claim confirmation counts distinct markets, processes them sequentially and preserves successful sample claims after partial failure. Existing Radix dialogs provide focus trapping; close restores the opener or the Portfolio heading when the row disappears. Visible 2px violet focus outlines and reduced-motion overrides are mandatory. Disabled actions remain readable. Empty states use text and a necessary link only.
+
+Run `npm run preview:portfolio` from `web/` for the loopback-only preview at `http://localhost:3102`. It always labels itself “UI preview · Sample data”, uses isolated ETH fixtures and never connects wallets, calls RPC or submits transactions. See `preview/portfolio/README.md` for scenarios, operational limits and verification notes.
+
 ## Legacy body reference
 
-The following rules apply only to other route bodies and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.
+The following rules apply only to route bodies outside Markets, Market Detail and Portfolio, and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.
 
 ### Hard rules
 
