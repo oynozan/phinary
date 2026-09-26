@@ -13,6 +13,7 @@ const meta: MetaRecord = {
     settlement: "Settlement",
     vault: "The LP vault",
     glossary: "Glossary",
+    faq: "FAQ",
 };
 
 export default meta;

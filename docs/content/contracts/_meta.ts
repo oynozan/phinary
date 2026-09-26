@@ -12,6 +12,7 @@ const meta: MetaRecord = {
     pricing: "Pricing math",
     oracle: "Oracle",
     scheduler: "Scheduler",
+    security: "Security and verification",
 };
 
 export default meta;

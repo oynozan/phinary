@@ -12,6 +12,7 @@ const meta: MetaRecord = {
     troubleshooting: "Troubleshooting",
     liquidity: "Provide liquidity",
     "run-locally": "Run the demo locally",
+    deploy: "Deploy your own",
 };
 
 export default meta;

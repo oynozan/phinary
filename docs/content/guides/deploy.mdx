@@ -1,0 +1,93 @@
+---
+title: Deploy your own
+description: Deploy the oracle, the hook and the scheduler to Unichain Sepolia and fund the vault.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Deploy your own
+
+One script deploys the whole stack: demo tokens, the oracle hook and its ETH/USDC pool, the price steerer, and the `MarketScheduler` and `PredictionHook` pair. The full runbook is [`docs/md/RUNBOOK.md`](https://github.com/oynozan/phinary/blob/main/docs/md/RUNBOOK.md).
+
+## Before you start
+
+- **Foundry 1.8.3** and a repo-root `.env` with `DEPLOYER_PRIVATE_KEY` and `DEPLOYER_ADDRESS`.
+- **ETH on Unichain Sepolia.** The full deploy is about 17M gas; keep at least 0.02 ETH on every signer.
+- **Circle USDC** from the faucet, about 20 USDC per address every 2 hours. All of it can go into the vault.
+
+<Steps>
+
+### Rehearse on a private fork
+
+```sh
+ALLOW_ANVIL=1 UNICHAIN_SEPOLIA_RPC=http://127.0.0.1:8545 make deploy-sepolia
+```
+
+With `make local-env` running, this is the same flow against the private fork. It writes `deployments/sepolia-rehearsal.json` and predicts the real addresses, because every contract lands at a deterministic address.
+
+### Deploy
+
+```sh
+make deploy-sepolia
+```
+
+The script refuses to run without a terminal or against the wrong chain. It prints the signer's balances, the starting ETH price and the full simulation, and only broadcasts after you type `deploy`. It then:
+
+1. Deploys the demo WETH and USDC tokens.
+2. Deploys `UnderlyingOracleHook` at an address mined for its permission bits.
+3. Creates the ETH/USDC pool at the current ETH price.
+4. Deploys `PriceSteerer` and seeds the pool with full-range liquidity.
+5. Deploys the scheduler and the hook together, with the hook mined to permission mask `0x2AA8` and owned by the scheduler.
+
+Last, it checks every permission mask, the pool binding, the owners and the oracle's first price.
+
+### Fund the vault
+
+```sh
+make fund-sepolia FUND_USDC=40
+```
+
+### Check it
+
+```sh
+R=https://sepolia.unichain.org
+HOOK=$(node -p "require('./deployments/unichain-sepolia.json').predictionHook")
+SCHEDULER=$(node -p "require('./deployments/unichain-sepolia.json').marketScheduler")
+cast call $HOOK "owner()(address)" --rpc-url $R          # the scheduler
+cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R       # USDC in the vault
+cast call $SCHEDULER "canOpen()(bool)" --rpc-url $R       # true once the next slot is open
+```
+
+### Start the bots
+
+```sh
+make bots
+```
+
+Use separate keys for the price mirror and the keeper, so they never collide on a nonce. The keeper's key needs no role.
+
+</Steps>
+
+<Callout type="important">
+For the first 5 minutes the oracle quotes a fallback volatility of 60% a year. After that it uses the pool's realised volatility, clamped between 20% and 250%.
+</Callout>
+
+## Main settings
+
+Every setting is an environment variable read by the deploy script. The defaults are the demo values.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SCHEDULER_PERIOD_SEC` | 60 | One market per this many seconds |
+| `MARKET_TENOR_SEC` | 120 | How long each market lives |
+| `MARKET_WINDOW_SEC`, `MARKET_CUTOFF_BUFFER_SEC` | 10, 2 | Settlement window, and the gap before it when trading stops |
+| `QUOTE_H0`, `QUOTE_GAMMA_S` | 0.02, 0.00002 | Base half-spread and volatility-scaled spread |
+| `QUOTE_LAMBDA`, `QUOTE_Q_EPOCH_MAX`, `QUOTE_P_MIN` | 0.001, 100, 0.02 | Price impact, per-block limit and price band |
+| `MARKET_BUDGET_USDC`, `SCHEDULER_MIN_BUDGET_USDC` | 10, 1 | Largest and smallest budget per market |
+| `ORACLE_SIGMA_MIN`, `ORACLE_SIGMA_MAX`, `ORACLE_SIGMA_FALLBACK` | 0.2, 2.5, 0.6 | Volatility clamps and warm-up value |
+| `ORACLE_CARDINALITY` | 14400 | Price records kept, 4 hours of one-second writes |
+| `DEMO_LIQUIDITY` | 1e18 | Liquidity of the ETH/USDC pool the oracle reads |
+
+<Callout type="important">
+Size `MARKET_BUDGET_USDC` to the depth of the ETH/USDC pool. A market's budget is the most a price push can win, and a deep pool makes pushes expensive ([Security](/contracts/security#manipulation)).
+</Callout>
