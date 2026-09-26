@@ -33,6 +33,10 @@
     --x-color-neutral-900: var(--surface);
 }
 
+html {
+    scroll-padding-top: calc(var(--nextra-navbar-height) + 1.5rem);
+}
+
 body {
     background-color: var(--carbon);
     font-variant-numeric: tabular-nums;
@@ -178,27 +182,17 @@ pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
     mask-image: none;
 }
 
-.landing,
 .not-found {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 1.25rem;
+    min-height: calc(100dvh - var(--nextra-navbar-height));
+    padding: 0 1rem;
     text-align: center;
 }
 
-/* Fills the article: its padding and bottom spacer take 7rem */
-.landing {
-    min-height: calc(100dvh - var(--nextra-navbar-height) - 7rem);
-}
-
-.not-found {
-    min-height: calc(100dvh - var(--nextra-navbar-height));
-    padding: 0 1rem;
-}
-
-.landing h1,
 .not-found h1 {
     margin: 0;
     font-size: clamp(3rem, 12vw, 6rem);
@@ -206,16 +200,11 @@ pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
     color: var(--foreground);
 }
 
-.landing p,
 .not-found p {
     max-width: 34rem;
     margin: 0;
     font-size: clamp(1rem, 2.6vw, 1.25rem);
     line-height: 1.6;
-    color: var(--foreground);
-}
-
-.not-found p {
     color: var(--muted-foreground);
 }
 
@@ -227,4 +216,33 @@ pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
 
 .not-found a:hover {
     text-decoration: none;
+}
+
+/* GitHub permalink above each code excerpt */
+.source-link {
+    display: inline-block;
+    margin-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--orchid);
+    text-decoration: none;
+}
+
+.source-link:hover {
+    color: var(--foreground);
+}
+
+.source-link + div pre,
+.source-link + pre {
+    margin-top: 0.5rem;
+}
+
+.katex {
+    font-size: 1.05em;
+}
+
+.katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25rem 0;
 }

@@ -4,6 +4,7 @@ import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Layout, Navbar } from "nextra-theme-docs";
 
+import "katex/dist/katex.min.css";
 import "nextra-theme-docs/style.css";
 import "./globals.css";
 
@@ -14,7 +15,7 @@ const ubuntuMono = Ubuntu_Mono({ variable: "--font-ubuntu-mono", weight: ["400",
 
 export const metadata: Metadata = {
     title: { default: "Phinary Docs", template: "%s · Phinary Docs" },
-    description: "Binary prediction markets on Uniswap v4. No external oracles, no external services.",
+    description: "How the Phinary PredictionHook works, function by function.",
 };
 
 export const viewport: Viewport = {

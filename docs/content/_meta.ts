@@ -5,9 +5,8 @@ const meta: MetaRecord = {
         type: "page",
         display: "hidden",
         theme: {
-            layout: "full",
             sidebar: false,
-            toc: false,
+            toc: true,
             breadcrumb: false,
             pagination: false,
             timestamp: false,
