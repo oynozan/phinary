@@ -1,0 +1,835 @@
+---
+title: PredictionHook
+description: The Phinary hook contract, function by function.
+---
+
+# PredictionHook
+
+<Source path="src/PredictionHook.sol" /> is a singleton Uniswap v4 hook. Every market it runs is a pair of v4 pools, YES/USDC and NO/USDC, that answer one question, for example "ETH above 2,684.53 USD at 00:48?". A winning token redeems for exactly 1 USDC and a losing token for nothing.
+
+The hook is the only market maker. It prices every swap with a Black-Scholes binary formula, fills it through custom accounting, and backs every token with USDC from an LP vault inside the hook. The pools themselves hold no liquidity.
+
+New to the terms? Every one of them is in the [Glossary](/concepts/glossary). How each guarantee is tested or proved is in [Security and verification](/contracts/security).
+
+How it uses v4:
+
+- **NoOp swaps.** `beforeSwap` returns a delta that cancels the whole swap amount, so the concentrated-liquidity curve never runs and the hook sets the price.
+- **ERC-6909 claims.** The hook keeps all of its USDC and returned tokens as claims inside the PoolManager. A trade only adjusts claims, plus a mint of new outcome tokens straight into the PoolManager when inventory runs short.
+- **Self-initialised pools.** Only the hook can create its pools. v4 skips `beforeInitialize` on self-calls, and the hook reverts it for everyone else.
+- **Unchanged routing.** Traders use UniversalRouter and V4Quoter exactly as for any other v4 pool ([Integration](/integration)).
+- **One external read.** Prices and settlement come from an `IUnderlyingOracle`, itself a v4 hook on an ETH/USDC pool ([Oracle](/contracts/oracle)). There are no external oracles and no external services.
+
+## Lifecycle
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"background": "#191919", "primaryColor": "#201f21", "primaryTextColor": "#f4f2f5", "primaryBorderColor": "#9c30a5", "secondaryColor": "#282629", "tertiaryColor": "#201f21", "lineColor": "#c828d6", "textColor": "#f4f2f5", "edgeLabelBackground": "#191919"}}}%%
+flowchart TD
+    A["deposit()"] --> V[("vaultIdle")]
+    V -->|"budget"| C["createMarket()"]
+    C --> T["Trading: every swap runs _beforeSwap"]
+    T -->|"expiry − window − cutoffBuffer"| W["Averaging window, swaps revert"]
+    W -->|"expiry"| S["settle()"]
+    W -.->|"expiry + GRACE, oracle cannot answer"| I["settleInvalid()"]
+    S --> R["redeem() or swap-sell the winner at 1.00"]
+    I --> R2["redeem() or swap-sell at 0.50"]
+    R --> X["sweep()"]
+    R2 --> X
+    X --> V
+```
+
+1. LPs deposit USDC into the vault ([`deposit`](#deposit-withdraw-unlockcallback)).
+2. The owner calls [`createMarket`](#createmarket), which moves a budget from the vault into the new market and creates its two pools.
+3. Traders swap USDC for YES or NO. Each swap runs [`_beforeSwap`](#_beforeswap), which quotes, fills and books it.
+4. Trading stops before the settlement window starts. After expiry, [`settle`](#settle) compares the window's average price with the strike.
+5. Winners redeem with [`redeem`](#redeem) or sell back through a normal swap. [`sweep`](#sweep) returns the surplus to the vault.
+
+## Permissions
+
+### `getHookPermissions`
+
+<Source path="src/PredictionHook.sol" lines="119-126" />
+
+```solidity showLineNumbers{119}
+function getHookPermissions() public pure override returns (Hooks.Permissions memory p) {
+    p.beforeInitialize = true;
+    p.beforeAddLiquidity = true;
+    p.beforeRemoveLiquidity = true;
+    p.beforeSwap = true;
+    p.beforeSwapReturnDelta = true;
+    p.beforeDonate = true;
+}
+```
+
+v4 reads a hook's permissions from the low 14 bits of its address, so the hook is deployed with a mined CREATE2 salt that sets bits 13, 11, 9, 7, 5 and 3.
+
+- `beforeSwap` plus `beforeSwapReturnDelta` let the hook replace the curve and settle both legs of every swap.
+- `beforeInitialize`, `beforeAddLiquidity`, `beforeRemoveLiquidity` and `beforeDonate` are enabled only so they can **revert** ([blocked callbacks](#blocked-callbacks)).
+
+### Constructor and `setKeeper`
+
+<Source path="src/PredictionHook.sol" lines="114-134" />
+
+```solidity showLineNumbers{114}
+constructor(IPoolManager poolManager_, address usdc_, address owner_) BaseHook(poolManager_) {
+    usdc = usdc_;
+    owner = owner_;
+}
+
+function getHookPermissions() public pure override returns (Hooks.Permissions memory p) {
+    p.beforeInitialize = true;
+    p.beforeAddLiquidity = true;
+    p.beforeRemoveLiquidity = true;
+    p.beforeSwap = true;
+    p.beforeSwapReturnDelta = true;
+    p.beforeDonate = true;
+}
+
+/* Admin */
+
+function setKeeper(address keeper_) external {
+    if (msg.sender != owner) revert Unauthorized();
+    keeper = keeper_;
+    emit KeeperSet(keeper_);
+}
+```
+
+`owner` is immutable, and only the owner or the keeper can create markets. In the live deployment the owner is `MarketScheduler`, a contract with no admin that never calls `setKeeper`, so `keeper` stays `address(0)` ([Scheduler](/contracts/scheduler)). Nobody can then create a market outside the schedule, change a market's parameters or choose an outcome.
+
+## Market state
+
+### `Market` and `PoolRef`
+
+<Source path="src/PredictionHook.sol" lines="35-68" />
+
+```solidity showLineNumbers{35}
+struct Market {
+    address yes;
+    uint64 openTime;
+    uint32 window;
+    address no;
+    uint64 expiry;
+    uint32 cutoffBuffer;
+    address oracle;
+    uint32 nSamples;
+    uint8 sigmaMode;
+    Status status;
+    bool yesWon;
+    uint64 h0Wad;
+    uint64 gammaSWad;
+    uint64 pMinWad;
+    uint128 lambdaWad;
+    uint128 qEpochMax;
+    uint64 epochTs;
+    int192 epochFlow;
+    int256 lnStrikeWad;
+    int256 settleThreshold;
+    uint256 fixedVarE36;
+    uint256 budget;
+    uint256 bucket;
+    uint256 outYes;
+    uint256 outNo;
+    uint256 invYes;
+    uint256 invNo;
+}
+
+struct PoolRef {
+    uint128 marketId;
+    bool isYes;
+}
+```
+
+One hook serves every market. `_pools` maps each v4 `PoolId` to its market and side, so a swap on any YES or NO pool finds its market in one storage read.
+
+| Group | Fields | Meaning |
+|---|---|---|
+| Timing | `openTime`, `expiry`, `window`, `cutoffBuffer` | Trading runs from `openTime` until `expiry − window − cutoffBuffer`; settlement averages the last `window` seconds |
+| Pricing | `oracle`, `lnStrikeWad`, `nSamples`, `sigmaMode`, `fixedVarE36`, `h0Wad`, `gammaSWad` | Inputs of the Black-Scholes price and spread |
+| Impact | `lambdaWad`, `qEpochMax`, `pMinWad`, `epochTs`, `epochFlow` | Linear price impact inside one block timestamp, its cap and the tradable price band |
+| Ledger | `budget`, `bucket`, `outYes`, `outNo`, `invYes`, `invNo` | USDC owned by the market, tokens held by traders, tokens held back by the hook |
+| Outcome | `status`, `yesWon`, `settleThreshold` | `Trading`, `Settled` or `Invalid`, and the precomputed settlement test |
+
+**Solvency rule.** While trading, every mutation must end with
+
+$$
+\text{bucket} \ge \max(\text{outYes}, \text{outNo})
+$$
+
+One YES plus one NO always redeems for exactly 1 USDC and only one side can win, so the bucket has to cover the larger side, not the sum. With 8 YES and 3 NO outstanding, 8 USDC pays every winner whichever way the market settles.
+
+### Vault and global state
+
+<Source path="src/PredictionHook.sol" lines="97-112" />
+
+```solidity showLineNumbers{97}
+address public immutable usdc;
+address public immutable owner;
+address public keeper;
+
+uint256 public marketCount;
+uint256 public vaultIdle;
+uint256 public totalShares;
+mapping(address => uint256) public sharesOf;
+
+/// @dev Sum over markets of (bucket - min(outYes,outNo)) while trading, (bucket - required) once resolved
+uint256 internal _sumPlus;
+/// @dev Sum over markets of (bucket - max(outYes,outNo)) while trading, (bucket - required) once resolved
+uint256 internal _sumMinus;
+
+mapping(uint256 => Market) internal _markets;
+mapping(bytes32 => PoolRef) internal _pools;
+```
+
+`vaultIdle` is USDC not committed to any market. `_sumPlus` and `_sumMinus` are running totals that give the vault's value in O(1) ([NAV](#navplus-navminus-_contrib-_updatenav)).
+
+## Creating a market
+
+### `createMarket`
+
+<Source path="src/PredictionHook.sol" lines="137-186" />
+
+```solidity showLineNumbers{137}
+function createMarket(MarketParams calldata p) external returns (uint256 id) {
+    if (msg.sender != owner && msg.sender != keeper) revert Unauthorized();
+    if (p.kernel != 0) revert UnsupportedKernel();
+    if (
+        p.oracle == address(0) || p.window == 0 || p.expiry > type(uint32).max || p.sigmaMode > 1
+            || (p.sigmaMode == 1 && p.fixedVarE36 == 0) || p.quote.qEpochMax == 0 || p.quote.pMinWad == 0
+            || p.quote.pMinWad >= WAD / 2
+            || uint256(p.openTime > block.timestamp ? p.openTime : block.timestamp) + p.window + p.cutoffBuffer
+                >= p.expiry
+    ) revert InvalidParams();
+    if (p.budget > vaultIdle) revert InsufficientIdle();
+
+    id = ++marketCount;
+    Market storage m = _markets[id];
+    address yes = address(new OutcomeToken{salt: keccak256(abi.encode(id, true))}(p.yesName, p.yesSymbol, id, true));
+    address no = address(new OutcomeToken{salt: keccak256(abi.encode(id, false))}(p.noName, p.noSymbol, id, false));
+    m.yes = yes;
+    m.no = no;
+    m.oracle = p.oracle;
+    m.openTime = p.openTime;
+    m.expiry = p.expiry;
+    m.window = p.window;
+    m.cutoffBuffer = p.cutoffBuffer;
+    m.nSamples = p.nSamples;
+    m.sigmaMode = p.sigmaMode;
+    m.fixedVarE36 = p.fixedVarE36;
+    m.h0Wad = p.quote.h0Wad;
+    m.gammaSWad = p.quote.gammaSWad;
+    m.lambdaWad = p.quote.lambdaWad;
+    m.qEpochMax = p.quote.qEpochMax;
+    m.pMinWad = p.quote.pMinWad;
+    m.lnStrikeWad = p.lnStrikeWad;
+    m.settleThreshold = StrikeMath.threshold(p.lnStrikeWad, IUnderlyingOracle(p.oracle).decimalsShift(), p.window);
+    m.status = Status.Trading;
+    m.budget = p.budget;
+    m.bucket = p.budget;
+    vaultIdle -= p.budget;
+    _sumPlus += p.budget;
+    _sumMinus += p.budget;
+
+    PoolKey memory yesKey = _key(yes);
+    PoolKey memory noKey = _key(no);
+    bytes32 yesId = PoolId.unwrap(yesKey.toId());
+    bytes32 noId = PoolId.unwrap(noKey.toId());
+    _pools[yesId] = PoolRef(uint128(id), true);
+    _pools[noId] = PoolRef(uint128(id), false);
+    poolManager.initialize(yesKey, SQRT_PRICE_1_1);
+    poolManager.initialize(noKey, SQRT_PRICE_1_1);
+    emit MarketCreated(id, yes, no, yesId, noId, p.lnStrikeWad, p.expiry);
+}
+```
+
+1. **Checks.** Only the owner or the keeper may call. The trading window must be non-empty, `pMin` must be below 0.5, and only the Gaussian kernel is enabled.
+2. **Budget.** `budget` leaves `vaultIdle` and becomes the market's `bucket`, its first reserve.
+3. **Tokens.** YES and NO are deployed with CREATE2 salts `(id, isYes)`, so their addresses are deterministic.
+4. **Settlement test.** `settleThreshold` is computed once from the strike ([settlement rule](/contracts/oracle#settlement-rule)).
+5. **Pools.** Two `PoolKey`s with fee 0, tick spacing 60 and `hooks = this`, initialised at price 1:1. That price is cosmetic because the curve never runs. The hook calls `poolManager.initialize` itself, and v4's `noSelfCall` rule skips `beforeInitialize` for the hook's own calls.
+6. **Event.** `MarketCreated` carries both pool ids, so indexers can discover the pools.
+
+### Blocked callbacks
+
+<Source path="src/PredictionHook.sol" lines="190-219" />
+
+```solidity showLineNumbers{190}
+function _beforeInitialize(address, PoolKey calldata, uint160) internal pure override returns (bytes4) {
+    revert ForeignInitialize();
+}
+
+function _beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+    internal
+    pure
+    override
+    returns (bytes4)
+{
+    revert LiquidityDisabled();
+}
+
+function _beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+    internal
+    pure
+    override
+    returns (bytes4)
+{
+    revert LiquidityDisabled();
+}
+
+function _beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+    internal
+    pure
+    override
+    returns (bytes4)
+{
+    revert DonateDisabled();
+}
+```
+
+- **`beforeInitialize`** reverts, so nobody else can attach this hook to a pool and fake a market.
+- **`beforeAddLiquidity` and `beforeRemoveLiquidity`** revert. The hook is the only market maker, and LP capital enters through [`deposit`](#deposit-withdraw-unlockcallback).
+- **`beforeDonate`** reverts, which keeps the claim balances equal to the ledger.
+
+## The swap path
+
+### `_beforeSwap`
+
+<Source path="src/PredictionHook.sol" lines="221-247" />
+
+```solidity showLineNumbers{221}
+function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    internal
+    override
+    returns (bytes4, BeforeSwapDelta, uint24)
+{
+    bytes32 poolId = PoolId.unwrap(key.toId());
+    PoolRef memory ref = _pools[poolId];
+    if (ref.marketId == 0) revert UnknownPool();
+    Market storage m = _markets[ref.marketId];
+
+    bool exactIn = params.amountSpecified < 0;
+    uint256 amt = exactIn ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
+    bool isBuy = Currency.unwrap(params.zeroForOne ? key.currency0 : key.currency1) == usdc;
+
+    (uint256 q, uint256 cash) = _fill(m, ref.isYes, isBuy, exactIn, amt);
+    _book(m, ref.isYes, isBuy, q, cash);
+
+    (uint256 amtIn, uint256 amtOut) = isBuy ? (cash, q) : (q, cash);
+    BeforeSwapDelta delta = exactIn
+        ? toBeforeSwapDelta(amtIn.toInt128(), -amtOut.toInt128())
+        : toBeforeSwapDelta(-amtOut.toInt128(), amtIn.toInt128());
+    (int128 a0, int128 a1) =
+        params.zeroForOne ? (amtIn.toInt128(), -amtOut.toInt128()) : (-amtOut.toInt128(), amtIn.toInt128());
+    emit HookSwap(poolId, sender, a0, a1, 0, 0);
+    emit Trade(ref.marketId, sender, ref.isYes, isBuy, q, cash, cash * WAD / q);
+    return (IHooks.beforeSwap.selector, delta, 0);
+}
+```
+
+1. **Find the market** from the `PoolId`. Unknown pools revert. `hookData` is ignored.
+2. **Direction.** `exactIn` when `amountSpecified < 0`. `isBuy` when the input currency is USDC, which works for either token ordering.
+3. **Fill** with [`_fill`](#_fill) (how many tokens for how much USDC) and **book** with [`_book`](#_book) (ledger, solvency, claims).
+4. **Return the delta.** The specified delta is always `−amountSpecified`, so the PoolManager's amount left to swap is 0 and the curve is skipped:
+
+| Swap | Specified delta | Unspecified delta |
+|---|---|---|
+| Exact in | `+amtIn` | `−amtOut` |
+| Exact out | `−amtOut` | `+amtIn` |
+
+5. **Events.** `HookSwap` is OpenZeppelin's standard event for custom-accounting hooks, so indexers see real amounts even though the pool itself never trades. `Trade` is the hook's own event with the side, quantity and average price. Its `sender` is the router, not the end user; the hook never needs the user's address.
+
+**Example.** Alice spends 5 USDC on YES, exact in. `amountSpecified = −5,000,000` (6 decimals). The hook returns a specified delta of `+5,000,000` and an unspecified delta of about `−8,024,800`: it takes her 5 USDC and owes her about 8.0248 YES. The router's `SETTLE_ALL` pays the USDC and `TAKE_ALL` sends her the YES.
+
+### `_fill`
+
+<Source path="src/PredictionHook.sol" lines="249-260" />
+
+```solidity showLineNumbers{249}
+/// @dev Token and USDC amounts of a swap, the input equals `amt` for exact-in and the output does for exact-out
+function _fill(Market storage m, bool isYes, bool isBuy, bool exactIn, uint256 amt)
+    internal
+    returns (uint256 q, uint256 cash)
+{
+    Status st = m.status;
+    if (st == Status.Trading) return _fillTrading(m, isYes, isBuy, exactIn, amt);
+    if (isBuy || (st == Status.Settled && isYes != m.yesWon)) revert MarketClosed();
+    if (st == Status.Settled) return (amt, amt);
+    (q, cash) = exactIn ? (amt, amt / 2) : (amt * 2, amt);
+    if (cash == 0) revert ZeroAmount();
+}
+```
+
+| Status | Allowed swaps | Price |
+|---|---|---|
+| `Trading` | Buys and sells of YES and NO | Black-Scholes quote with impact ([`_fillTrading`](#_filltrading)) |
+| `Settled` | Only sells of the winning token | Exactly 1.00 USDC, no spread, no impact |
+| `Invalid` | Sells of either token | 0.50 USDC |
+
+After settlement, redemption works through a normal swap, so any wallet or the Uniswap interface can cash out without a custom call.
+
+### `_fillTrading`
+
+<Source path="src/PredictionHook.sol" lines="262-298" />
+
+```solidity showLineNumbers{262}
+function _fillTrading(Market storage m, bool isYes, bool isBuy, bool exactIn, uint256 amt)
+    internal
+    returns (uint256 q, uint256 cash)
+{
+    (uint256 ask, uint256 bid) = _askBid(m);
+    int256 flow = m.epochTs == block.timestamp ? int256(m.epochFlow) : int256(0);
+    uint256 price;
+    if (isYes) {
+        price = isBuy ? ask : bid;
+    } else if (isBuy) {
+        price = WAD - bid;
+    } else {
+        if (ask >= WAD) revert OutOfBand();
+        price = WAD - ask;
+    }
+    int256 i0 = isYes ? flow : -flow;
+    uint256 lam = m.lambdaWad;
+    uint256 pMin = m.pMinWad;
+    _checkBand(pMin, price, lam, i0);
+    if (isBuy) {
+        (q, cash) = exactIn
+            ? (QuoteMath.buyExactIn(price, lam, i0, amt), amt)
+            : (amt, QuoteMath.buyExactOut(price, lam, i0, amt));
+    } else {
+        (q, cash) = exactIn
+            ? (amt, QuoteMath.sellExactIn(price, lam, i0, amt))
+            : (QuoteMath.sellExactOut(price, lam, i0, amt), amt);
+    }
+    if (q == 0 || cash == 0) revert ZeroAmount();
+
+    int256 dq = SafeCast.toInt256(q);
+    int256 f = isYes == isBuy ? flow + dq : flow - dq;
+    if ((f < 0 ? uint256(-f) : uint256(f)) > m.qEpochMax) revert EpochCapExceeded();
+    _checkBand(pMin, price, lam, isYes ? f : -f);
+    m.epochTs = uint64(block.timestamp);
+    m.epochFlow = int192(f);
+}
+```
+
+- **One price, two pools.** The hook prices YES only. Buying NO costs `1 − bidYes` and selling NO pays `1 − askYes`. YES plus NO is always worth 1 USDC, so the two pools can never be arbitraged against each other.
+- **Epoch flow.** `epochFlow` is the net YES-equivalent amount traded in the current `block.timestamp` (a YES buy adds, a NO buy subtracts). The marginal price moves by `lambda` per whole token of flow and resets when the timestamp changes. The NO pool sees the flow mirrored, so YES buying makes NO cheaper within the same block.
+- **Exact amounts.** `QuoteMath` solves the fill on that straight line in integers, always rounding against the trader ([fill amounts](/contracts/pricing#fill-amounts)).
+- **Checks.** Every marginal price, before and after the fill, must stay inside `[pMin, 1 − pMin]` ([`_checkBand`](#_checkband)), `|flow|` must stay within `qEpochMax`, and both amounts must be non-zero.
+
+The mid price cannot move inside a block because the oracle reports the start-of-block price. The impact makes splitting one large order into many swaps in the same block pointless: every piece pays the flow that came before it.
+
+**Example.** With `lambda = 0.001`, `qEpochMax = 100` tokens and `pMin = 0.02`, take a moment where the YES ask is 0.6191 and the bid 0.5590 ([how these are computed](/contracts/pricing#example)).
+
+| Trade in one block | Flow before | Starting marginal price | Tokens for 5 USDC | Average price |
+|---|---|---|---|---|
+| Alice buys YES | 0 | 0.6191 | 8.0248 YES | 0.6231 |
+| Carol buys NO | +8.0248 | 0.4410 − 0.0080 = 0.4330 | 11.3984 NO | 0.4387 |
+
+In the next block the flow resets to 0 and the mid is read again from the oracle.
+
+### `_checkBand`
+
+<Source path="src/PredictionHook.sol" lines="300-304" />
+
+```solidity showLineNumbers{300}
+/// @dev The marginal price at mirrored flow x, price + lam * x / 1e6, must lie in [pMin, 1 - pMin]
+function _checkBand(uint256 pMin, uint256 price, uint256 lam, int256 x) internal pure {
+    int256 p = int256(price * QuoteMath.UNIT) + int256(lam) * x;
+    if (p < int256(pMin * QuoteMath.UNIT) || p > int256((WAD - pMin) * QuoteMath.UNIT)) revert OutOfBand();
+}
+```
+
+Checks the marginal price `price + lambda · x / 1e6` at a flow `x`. It runs with the flow before and after the trade, and because the price is linear in between, every executed price is inside the band.
+
+### `_book`
+
+<Source path="src/PredictionHook.sol" lines="306-349" />
+
+```solidity showLineNumbers{306}
+/// @dev Ledger effects, solvency post-check and NAV aggregates, then the PoolManager settlement of the hook's side
+function _book(Market storage m, bool isYes, bool isBuy, uint256 q, uint256 cash) internal {
+    (uint256 p0, uint256 n0) = _contrib(m);
+    address tok = isYes ? m.yes : m.no;
+    uint256 fromInv;
+    if (isBuy) {
+        m.bucket += cash;
+        uint256 inv = isYes ? m.invYes : m.invNo;
+        fromInv = q < inv ? q : inv;
+        if (isYes) {
+            m.outYes += q;
+            m.invYes = inv - fromInv;
+        } else {
+            m.outNo += q;
+            m.invNo = inv - fromInv;
+        }
+    } else {
+        if (cash > m.bucket) revert Insolvent();
+        m.bucket -= cash;
+        if (isYes) {
+            m.outYes -= q;
+            m.invYes += q;
+        } else {
+            m.outNo -= q;
+            m.invNo += q;
+        }
+    }
+    _updateNav(m, p0, n0);
+
+    uint256 usdcId = uint160(usdc);
+    if (isBuy) {
+        poolManager.mint(address(this), usdcId, cash);
+        if (fromInv != 0) poolManager.burn(address(this), uint160(tok), fromInv);
+        uint256 shortfall = q - fromInv;
+        if (shortfall != 0) {
+            poolManager.sync(Currency.wrap(tok));
+            OutcomeToken(tok).mint(address(poolManager), shortfall);
+            poolManager.settle();
+        }
+    } else {
+        poolManager.mint(address(this), uint160(tok), q);
+        poolManager.burn(address(this), usdcId, cash);
+    }
+}
+```
+
+**Ledger first.**
+
+- A buy adds the USDC to `bucket` and the tokens to `outYes` or `outNo`. Tokens that earlier sellers returned (`invYes`, `invNo`) are handed out first, and only the rest is minted.
+- A sell pays from `bucket`, reverting `Insolvent` if it cannot. The returned tokens go to inventory.
+- `_updateNav` recomputes the market's contribution to the vault value. [`_contrib`](#navplus-navminus-_contrib-_updatenav) reverts `Insolvent` if `bucket < max(outYes, outNo)`, so **solvency is checked after every trade**.
+
+**Then the PoolManager.**
+
+| Trade | Input leg | Output leg |
+|---|---|---|
+| Buy | `mint(hook, USDC, cash)` keeps the trader's USDC as claims | `burn(hook, token, fromInv)` pays from inventory; the shortfall is `sync`, `OutcomeToken.mint(poolManager, …)`, `settle` |
+| Sell | `mint(hook, token, q)` keeps the tokens as claims | `burn(hook, USDC, cash)` pays from the bucket's claims |
+
+Minting straight into the PoolManager and settling is what lets `TAKE_ALL` deliver a freshly minted token. All USDC stays in the PoolManager as the hook's ERC-6909 claims, and the buckets plus `vaultIdle` add up to the hook's USDC claim balance.
+
+**Example.** The market started with a 10 USDC budget. After Alice and Carol: `bucket = 20`, `outYes = 8.0248`, `outNo = 11.3984`. The bucket covers the larger side, 20 ≥ 11.3984.
+
+## Pricing
+
+### `_askBid`, `_price`, `_inTradingWindow`
+
+<Source path="src/PredictionHook.sol" lines="353-374" />
+
+```solidity showLineNumbers{353}
+function _askBid(Market storage m) internal view returns (uint256 ask, uint256 bid) {
+    if (!_inTradingWindow(m)) revert NotTradable();
+    (BinaryPricer.Result memory r,,) = _price(m, m.expiry - block.timestamp);
+    (ask, bid) = BinaryPricer.askBid(r, m.gammaSWad, m.h0Wad);
+}
+
+function _price(Market storage m, uint256 tau)
+    internal
+    view
+    returns (BinaryPricer.Result memory r, int256 x, uint256 varE36)
+{
+    IUnderlyingOracle o = IUnderlyingOracle(m.oracle);
+    x = o.lnSpotSoBWad() - m.lnStrikeWad;
+    if (m.sigmaMode == 0) (varE36,) = o.varianceE36();
+    else varE36 = m.fixedVarE36;
+    r = BinaryPricer.price(x, varE36, tau, m.window, m.nSamples);
+}
+
+function _inTradingWindow(Market storage m) internal view returns (bool) {
+    return m.status == Status.Trading && block.timestamp >= m.openTime
+        && block.timestamp + m.window + m.cutoffBuffer < m.expiry;
+}
+```
+
+- **Trading window.** `openTime ≤ now` and `now + window + cutoffBuffer < expiry`. Trading closes before the averaging window opens, so nobody trades while the settlement price is being measured.
+- **Moneyness.** $x = \ln(S / K)$, with $S$ the start-of-block price from `oracle.lnSpotSoBWad()`.
+- **Volatility.** Per-second variance from `oracle.varianceE36()`, the realised variance of the same pool, or a fixed value per market.
+- **Price.** `BinaryPricer` returns the fair YES price $\Phi(\mu / \sqrt{v})$ for a payoff on the **average** price over the final window, which is exactly what settles. The ask and bid add a volatility-scaled term and a flat half-spread `h0` ([Pricing](/contracts/pricing)).
+
+## Settlement
+
+### `settle`
+
+<Source path="src/PredictionHook.sol" lines="378-392" />
+
+```solidity showLineNumbers{378}
+/// @inheritdoc IPredictionHook
+function settle(uint256 marketId) external {
+    Market storage m = _market(marketId);
+    if (m.status != Status.Trading) revert MarketClosed();
+    if (block.timestamp < m.expiry) revert TooEarly();
+    IUnderlyingOracle o = IUnderlyingOracle(m.oracle);
+    uint32 t = uint32(m.expiry);
+    int256 d = int256(o.cumulativeAt(t)) - int256(o.cumulativeAt(t - m.window));
+    bool yesWon = d * 1e18 > m.settleThreshold;
+    (uint256 p0, uint256 n0) = _contrib(m);
+    m.status = Status.Settled;
+    m.yesWon = yesWon;
+    _updateNav(m, p0, n0);
+    emit MarketSettled(marketId, yesWon, d, false);
+}
+```
+
+Anyone can call it at or after `expiry`. `D = cum(T) − cum(T − window)` is the oracle's sum of tick × seconds over the window, so `D / window` is the average tick. Ticks are normalised so that "ETH up" is always "tick up", whichever token is `currency0`. YES wins if and only if `D · 1e18 > settleThreshold`, that is, when the average tick is above the strike tick minus half a tick. A tie resolves NO ([settlement rule](/contracts/oracle#settlement-rule)).
+
+### `settleInvalid` and `_oracleAnswers`
+
+<Source path="src/PredictionHook.sol" lines="394-418" />
+
+```solidity showLineNumbers{394}
+/// @inheritdoc IPredictionHook
+function settleInvalid(uint256 marketId) external {
+    Market storage m = _market(marketId);
+    if (m.status != Status.Trading) revert MarketClosed();
+    if (block.timestamp <= m.expiry + GRACE) revert TooEarly();
+    if (_oracleAnswers(m)) revert OracleAvailable();
+    (uint256 p0, uint256 n0) = _contrib(m);
+    m.status = Status.Invalid;
+    _updateNav(m, p0, n0);
+    emit MarketSettled(marketId, false, 0, true);
+}
+
+function _oracleAnswers(Market storage m) internal view returns (bool) {
+    IUnderlyingOracle o = IUnderlyingOracle(m.oracle);
+    uint32 t = uint32(m.expiry);
+    try o.cumulativeAt(t - m.window) returns (int56) {}
+    catch {
+        return false;
+    }
+    try o.cumulativeAt(t) returns (int56) {}
+    catch {
+        return false;
+    }
+    return true;
+}
+```
+
+A liveness fallback. If the oracle can no longer answer for `T − window` or `T` and one hour (`GRACE`) has passed since expiry, anyone can mark the market `Invalid`, and every token then pays 0.50. It reverts with `OracleAvailable` whenever a real settlement is possible, so it can never replace one.
+
+## Redemption and sweep
+
+### `redeem`
+
+<Source path="src/PredictionHook.sol" lines="420-452" />
+
+```solidity showLineNumbers{420}
+/// @inheritdoc IPredictionHook
+/// @dev Settled pays 1 USDC per winning token, Invalid pays floor(amount / 2) for tokens burned YES first then NO
+function redeem(uint256 marketId, uint256 amount) external returns (uint256 payout) {
+    Market storage m = _market(marketId);
+    if (amount == 0) revert ZeroAmount();
+    (uint256 p0, uint256 n0) = _contrib(m);
+    Status st = m.status;
+    if (st == Status.Settled) {
+        payout = amount;
+        if (m.yesWon) {
+            OutcomeToken(m.yes).burn(msg.sender, amount);
+            m.outYes -= amount;
+        } else {
+            OutcomeToken(m.no).burn(msg.sender, amount);
+            m.outNo -= amount;
+        }
+    } else if (st == Status.Invalid) {
+        payout = amount / 2;
+        if (payout == 0) revert ZeroAmount();
+        uint256 bal = OutcomeToken(m.yes).balanceOf(msg.sender);
+        uint256 fromYes = amount < bal ? amount : bal;
+        if (fromYes != 0) OutcomeToken(m.yes).burn(msg.sender, fromYes);
+        if (amount != fromYes) OutcomeToken(m.no).burn(msg.sender, amount - fromYes);
+        m.outYes -= fromYes;
+        m.outNo -= amount - fromYes;
+    } else {
+        revert NotSettled();
+    }
+    m.bucket -= payout;
+    _updateNav(m, p0, n0);
+    poolManager.unlock(abi.encode(msg.sender, payout, false));
+    emit Redeemed(marketId, msg.sender, amount, payout);
+}
+```
+
+- **Settled:** burns winning tokens and pays 1 USDC each.
+- **Invalid:** pays `floor(amount / 2)`, burning YES first and then NO.
+- The payout runs inside `poolManager.unlock`, where [`unlockCallback`](#deposit-withdraw-unlockcallback) burns the hook's USDC claims and `take`s real USDC to the caller. Selling the winner through a swap at 1.00 gives the same result.
+
+### `sweep`
+
+<Source path="src/PredictionHook.sol" lines="454-465" />
+
+```solidity showLineNumbers{454}
+/// @inheritdoc IPredictionHook
+function sweep(uint256 marketId) external returns (uint256 amount) {
+    Market storage m = _market(marketId);
+    Status st = m.status;
+    if (st != Status.Settled && st != Status.Invalid) revert NotSettled();
+    (uint256 p0, uint256 n0) = _contrib(m);
+    amount = p0;
+    m.bucket -= amount;
+    vaultIdle += amount;
+    _updateNav(m, p0, n0);
+    emit Swept(marketId, amount);
+}
+```
+
+After settlement, anything in the bucket above what winners can still claim goes back to `vaultIdle`. Anyone can call it.
+
+**Example.** Alice's market settles with `bucket = 20`:
+
+| Outcome | Still owed to winners | Swept to vault | LP result on the 10 USDC budget |
+|---|---|---|---|
+| YES wins | 8.0248 | 11.9752 | +1.9752 |
+| NO wins | 11.3984 | 8.6016 | −1.3984 |
+
+## LP vault
+
+### `deposit`, `withdraw`, `unlockCallback`
+
+<Source path="src/PredictionHook.sol" lines="469-509" />
+
+```solidity showLineNumbers{469}
+/// @inheritdoc IPredictionHook
+function deposit(uint256 assets) external returns (uint256 shares) {
+    if (assets == 0) revert ZeroAmount();
+    shares = assets * (totalShares + SHARE_OFFSET) / (navPlus() + 1);
+    if (shares == 0) revert ZeroAmount();
+    totalShares += shares;
+    sharesOf[msg.sender] += shares;
+    vaultIdle += assets;
+    SafeTransferLib.safeTransferFrom(usdc, msg.sender, address(this), assets);
+    poolManager.unlock(abi.encode(msg.sender, assets, true));
+    emit Deposit(msg.sender, assets, shares);
+}
+
+/// @inheritdoc IPredictionHook
+function withdraw(uint256 shares) external returns (uint256 assets) {
+    if (shares == 0) revert ZeroAmount();
+    if (shares > sharesOf[msg.sender]) revert InsufficientShares();
+    assets = shares * (navMinus() + 1) / (totalShares + SHARE_OFFSET);
+    if (assets == 0) revert ZeroAmount();
+    if (assets > vaultIdle) revert InsufficientIdle();
+    sharesOf[msg.sender] -= shares;
+    totalShares -= shares;
+    vaultIdle -= assets;
+    poolManager.unlock(abi.encode(msg.sender, assets, false));
+    emit Withdraw(msg.sender, assets, shares);
+}
+
+function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory) {
+    (address to, uint256 amount, bool isDeposit) = abi.decode(data, (address, uint256, bool));
+    Currency c = Currency.wrap(usdc);
+    if (isDeposit) {
+        poolManager.sync(c);
+        SafeTransferLib.safeTransfer(usdc, address(poolManager), amount);
+        poolManager.settle();
+        poolManager.mint(address(this), uint160(usdc), amount);
+    } else {
+        poolManager.burn(address(this), uint160(usdc), amount);
+        poolManager.take(c, to, amount);
+    }
+    return "";
+}
+```
+
+- **Deposit** mints shares priced at `navPlus`; **withdraw** burns shares priced at `navMinus` ([why](#navplus-navminus-_contrib-_updatenav)).
+- The `1e6` share offset and the `+ 1` on assets are a virtual position that blocks the first-depositor inflation attack.
+- Withdrawals are paid from `vaultIdle` only. USDC in a live market stays there until it is swept.
+- Deposited USDC is moved into the PoolManager (`sync`, transfer, `settle`) and kept as the hook's ERC-6909 claims, the same form the market buckets use.
+
+### `navPlus`, `navMinus`, `_contrib`, `_updateNav`
+
+<Source path="src/PredictionHook.sol" lines="511-543" />
+
+```solidity showLineNumbers{511}
+/// @inheritdoc IPredictionHook
+function navPlus() public view returns (uint256) {
+    return vaultIdle + _sumPlus;
+}
+
+/// @inheritdoc IPredictionHook
+function navMinus() public view returns (uint256) {
+    return vaultIdle + _sumMinus;
+}
+
+/// @dev A market's (NAV+, NAV-) contribution, reverting Insolvent when the bucket is below the requirement
+function _contrib(Market storage m) internal view returns (uint256 plus, uint256 minus) {
+    uint256 b = m.bucket;
+    uint256 y = m.outYes;
+    uint256 n = m.outNo;
+    Status st = m.status;
+    uint256 hi;
+    uint256 lo;
+    if (st == Status.Trading) {
+        (hi, lo) = y > n ? (y, n) : (n, y);
+    } else {
+        hi = st == Status.Settled ? (m.yesWon ? y : n) : (y + n + 1) / 2;
+        lo = hi;
+    }
+    if (b < hi) revert Insolvent();
+    return (b - lo, b - hi);
+}
+
+function _updateNav(Market storage m, uint256 p0, uint256 n0) internal {
+    (uint256 p1, uint256 n1) = _contrib(m);
+    _sumPlus = _sumPlus - p0 + p1;
+    _sumMinus = _sumMinus - n0 + n1;
+}
+```
+
+$$
+\text{NAV}^{+} = \text{idle} + \sum_{\text{markets}} \big(\text{bucket} - \min(\text{outYes}, \text{outNo})\big)
+$$
+
+$$
+\text{NAV}^{-} = \text{idle} + \sum_{\text{markets}} \big(\text{bucket} - \max(\text{outYes}, \text{outNo})\big)
+$$
+
+Each live market is valued at its best case (NAV⁺, the smaller side wins) and its worst case (NAV⁻, the larger side wins). Alice's market adds 11.9752 to NAV⁺ and 8.6016 to NAV⁻, exactly the two rows of the sweep table. Depositors pay the best case and withdrawers get the worst case, so nobody can buy vault shares cheaply before a good settlement or leave with money the vault may still owe.
+
+Neither number reads a price, so no oracle move can change the share price. Both are running sums updated on every trade, settlement, redemption and sweep, which keeps `deposit` and `withdraw` O(1) however many markets are open.
+
+## Views
+
+### `quote` and `quoteStrict`
+
+<Source path="src/PredictionHook.sol" lines="547-572" />
+
+```solidity showLineNumbers{547}
+/// @inheritdoc IPredictionHook
+/// @dev Never reverts for a known market: when pricing fails (oracle revert, zero variance) all fields but tau are 0
+function quote(uint256 marketId) external view returns (Quote memory qt) {
+    Market storage m = _market(marketId);
+    try this.quoteStrict(marketId) returns (Quote memory r) {
+        return r;
+    } catch {
+        if (block.timestamp < m.expiry) qt.tau = m.expiry - block.timestamp;
+    }
+}
+
+/// @notice quote() that reverts when pricing fails
+/// @dev Prices exclude the current epoch's impact and are zero once tau <= window
+function quoteStrict(uint256 marketId) external view returns (Quote memory qt) {
+    Market storage m = _market(marketId);
+    qt.tradable = _inTradingWindow(m);
+    if (block.timestamp >= m.expiry) return qt;
+    qt.tau = m.expiry - block.timestamp;
+    if (qt.tau <= m.window) return qt;
+    BinaryPricer.Result memory r;
+    (r, qt.xWad, qt.varE36) = _price(m, qt.tau);
+    qt.midYes = r.mid;
+    (qt.askYes, qt.bidYes) = BinaryPricer.askBid(r, m.gammaSWad, m.h0Wad);
+    qt.askNo = WAD - qt.bidYes;
+    qt.bidNo = qt.askYes >= WAD ? 0 : WAD - qt.askYes;
+}
+```
+
+`quote` never reverts for a known market: if pricing fails, it returns zeros and the time to expiry, which keeps front ends simple. It returns the YES mid, the ask and bid of both sides, the variance and the moneyness. It leaves out the current block's impact, so exact fill amounts come from V4Quoter.
+
+### `_key`
+
+<Source path="src/PredictionHook.sol" lines="642-645" />
+
+```solidity showLineNumbers{642}
+function _key(address outcome) internal view returns (PoolKey memory) {
+    (address c0, address c1) = outcome < usdc ? (outcome, usdc) : (usdc, outcome);
+    return PoolKey(Currency.wrap(c0), Currency.wrap(c1), 0, TICK_SPACING, IHooks(address(this)));
+}
+```
+
+Sorts the two currencies as v4 requires and fixes fee 0, tick spacing 60 and `hooks = this`, so anyone can rebuild a market's `PoolKey` from its token addresses. The other views are plain getters: `epochOf` (current epoch and flow), `settleThresholdOf`, `marketInfo` (ledger), `marketParams` (creation parameters), `poolKeys` and `marketOfPool` (<Source path="src/PredictionHook.sol" lines="574-640" />).

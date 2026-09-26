@@ -38,7 +38,7 @@ export async function startFixture(options: { marketSource?: 'isolated' | 'sched
         assert.ok(ready, 'Anvil failed to start');
         assert.match(await rpc('web3_clientVersion'), /anvil/i);
         if (options.wallClock) await rpc('evm_setNextBlockTimestamp', [Math.floor(Date.now() / 1000)]);
-        const config = { ...original, rpcUrl };
+        const config = { ...original, rpcUrl, rpcUrls: [rpcUrl] };
         const client = createPublicClient({ chain: unichainSepolia, transport: http(rpcUrl), pollingInterval: 100, cacheTime: 0 });
         const account = privateKeyToAccount(generatePrivateKey());
         const wallet = createWalletClient({ account, chain: unichainSepolia, transport: http(rpcUrl) });
@@ -59,7 +59,7 @@ export async function startFixture(options: { marketSource?: 'isolated' | 'sched
         assert.equal((await client.waitForTransactionReceipt({ hash: deposit })).status, 'success');
         if (options.marketSource === 'scheduler') {
             // Exercise the deployed scheduler and real oracle. No impersonation or code replacement.
-            const scheduler = config.marketScheduler;
+            const scheduler = config.marketScheduler ?? config.marketSchedulers[0];
             assert.ok(scheduler, 'Deployment must define MarketScheduler');
             const abi = parseAbi(['function open() returns (uint256)', 'function nextOpenTime() view returns (uint256)']);
             const next = await client.readContract({ address: scheduler, abi, functionName: 'nextOpenTime' });

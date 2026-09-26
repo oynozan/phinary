@@ -1,0 +1,119 @@
+---
+title: Trade in the Uniswap app
+description: Buy, sell and redeem Phinary tokens in the Uniswap web app, step by step.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Trade in the Uniswap app
+
+Phinary markets trade in the normal Uniswap web app. The demo runs a local copy of it in which USDC to YES or NO swaps on Unichain Sepolia are quoted by the hook and sent through UniversalRouter. Every other token and chain works exactly as on app.uniswap.org.
+
+## Before you start
+
+- **A wallet.** MetaMask with a plain account. Smart accounts and EIP-7702 delegated accounts cannot sign the Permit2 message this flow uses.
+- **Unichain Sepolia** selected, with a little testnet ETH for gas.
+- **Testnet USDC**, Circle's token at `0x31d0…768F`.
+- **The app** open at `http://localhost:3000`. It only works on localhost ([run it locally](/guides/run-locally)).
+
+## Buy, sell and collect
+
+<Steps>
+
+### Turn on testnet mode
+
+Connect the wallet, open **Settings** and switch on **Testnet mode**. Stay connected afterwards: disconnecting switches testnet mode off again.
+
+### Pick a market
+
+Put USDC in the **Sell** box and open the token picker in the **Buy** box.
+
+![The token picker lists open markets first and settled markets below](/screenshots/uniswap/token-picker.png)
+
+- **Prediction markets** lists the YES and NO tokens of the newest markets that are still open.
+- **Settled prediction markets (sell to redeem)** lists markets that already have a result.
+
+A token name is the whole question. `ETH > $2688.81 26 Sep 15:25` is the YES token (`ETHUP`): it pays 1 USDC if ETH is above 2,688.81 USD at 15:25 UTC. The matching `ETH < …` token (`ETHDOWN`) pays if it is not.
+
+### Read the market card
+
+Once a market token is selected, a card under the swap box shows the market live.
+
+![A 5 USDC quote for ETHUP with the market card below it](/screenshots/uniswap/quote.png)
+
+| On the card | Meaning |
+|---|---|
+| ETH above 2,689.62 USD at 15:28:00 UTC? | The question. `Trading` means it is open |
+| ETH 2,690.24 USD, 0.62 USD above strike | The current price and its distance from the strike |
+| Closes in 1:06 | Time left to trade |
+| Expires in 1:18 | Time until the result is measured |
+| YES 77.9% | The market's probability that YES wins, which is also its fair price |
+| Ask 0.819 · Bid 0.740 | You pay the ask per token when buying and get the bid when selling |
+
+### Enter an amount
+
+Type how much USDC to spend. The **Buy** box shows how many tokens you get, and the number refreshes every second.
+
+In the screenshot, 5 USDC buys 6.08285 ETHUP, an average of 0.822 per token. That is a little above the 0.819 ask, because every token bought in the same block moves the price up slightly ([price impact](/concepts/pricing#price-impact)).
+
+### Keep slippage on Auto
+
+![Max slippage set to Auto](/screenshots/uniswap/slippage.png)
+
+A two-minute market moves fast: its price can shift by 10 to 16 cents during a wallet confirmation. **Auto** sizes the tolerance for each quote. A fixed 1 to 5% makes most swaps in short markets revert with `V4TooLittleReceived` after you have signed.
+
+### Review
+
+Press **Review** to see the final amounts before anything is sent.
+
+![The review: 1.00 USDC in, 1.78985 ETHUP out, network cost under 0.001 ETH](/screenshots/uniswap/review.png)
+
+### Confirm in your wallet
+
+The first buy shows **Approve and swap** and takes three wallet steps:
+
+![Approval pending, step 1 of 3, then Sign message and Confirm swap](/screenshots/uniswap/steps.png)
+
+1. **Approve USDC** for Permit2, once per token.
+2. **Sign** a Permit2 message for UniversalRouter, valid for 30 days.
+3. **Confirm the swap.**
+
+Later buys show **Swap** and need one confirmation. Selling YES or NO shows **Sign and swap**, with no approval, because outcome tokens already allow Permit2.
+
+The price keeps moving while you confirm. In the run below the first quote was 1.81904 ETHUP, the review a moment later showed 1.78985, and the swap filled 1.78016, inside the Auto slippage limit.
+
+### Sell early, or hold
+
+Until trading closes you can sell back at the bid, by putting the token in **Sell** and USDC in **Buy**. After the cutoff the card says **Closed, awaiting settlement** and no swap is possible until the result is in, about 14 seconds later.
+
+![The market closed for trading, 8 seconds before expiry, with the ETHUP balance shown](/screenshots/uniswap/closed.png)
+
+### Collect your winnings
+
+After settlement the market moves to **Settled prediction markets**. Put the winning token in **Sell** and USDC in **Buy**: it sells for exactly **1.00 USDC per token**, with no spread and no price impact.
+
+![0.398302 ETHUP sells for 0.3983 USDC after YES won](/screenshots/uniswap/redeem.png)
+
+The losing token is worth nothing and cannot be sold.
+
+</Steps>
+
+<Callout type="important">
+Trade early in a market's life. Trading stops 12 seconds before expiry, and near the end a small ETH move swings the price a lot.
+</Callout>
+
+## A real run
+
+The review, wallet, closed-market and redemption screenshots come from this run on Unichain Sepolia on 26 Sep 2026, made in the Uniswap app with a test wallet.
+
+| Time (UTC) | Action | Result |
+|---|---|---|
+| 16:35:16 | Buy YES with 1.00 USDC in the 16:36 market, strike 2,693.37 USD ([tx](https://sepolia.uniscan.xyz/tx/0xc7e93ab1a44e33c6c7b151adb40b9128c82a39f870cfe91df0b610c3b55d26ad)) | 1.78016 ETHUP |
+| 16:36:00 | The market expires below the strike | NO wins, the ETHUP is worth 0 |
+| 16:37:54 and 16:38:03 | Buy YES and NO with 0.22 USDC each in the 16:39 market, strike 2,692.56 USD | 0.398302 ETHUP and 0.400481 ETHDOWN |
+| 16:39:04 | The keeper settles the market | YES wins |
+| 16:39:59 | Sell 0.398302 ETHUP ([tx](https://sepolia.uniscan.xyz/tx/0x73610737bde9fa1b528b7d9dcd9ef24160cada7bb6bf924ea6476b86c4077328)) | 0.398302 USDC, exactly 1.00 each |
+
+Buying both sides guaranteed a winner, but 0.44 USDC in came back as 0.398: each purchase paid the ask, which is above the fair price. That gap is the spread the vault earns.
+
+Something went wrong? See [Troubleshooting](/guides/troubleshooting).

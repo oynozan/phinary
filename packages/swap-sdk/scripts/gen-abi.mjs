@@ -46,6 +46,15 @@ emit(
   'src/interfaces/IMarketScheduler.sol',
 )
 
+const gatekeeper = artifact('IMarketGatekeeper.sol', 'IMarketGatekeeper')
+if (!gatekeeper) throw new Error(`missing ${out}/IMarketGatekeeper.sol/IMarketGatekeeper.json; run forge build first`)
+emit(
+  'marketGatekeeper.generated.ts',
+  'marketGatekeeperAbi',
+  gatekeeper.abi.map(strip),
+  'src/interfaces/IMarketGatekeeper.sol',
+)
+
 const token = artifact('OutcomeToken.sol', 'OutcomeToken')
 if (!token) throw new Error('missing OutcomeToken artifact')
 emit(

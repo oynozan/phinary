@@ -1,0 +1,42 @@
+---
+title: Settlement
+description: How a Phinary market gets its result, who triggers it, and how winners are paid.
+---
+
+# Settlement
+
+## The rule
+
+A market's result is the **average ETH price over the last 10 seconds before expiry**, read from the Uniswap v4 ETH/USDC pool.
+
+- **YES wins** if that average is above the strike.
+- **NO wins** if it is at or below the strike. A tie goes to NO.
+
+The strike and the result come from the same pool. No external oracle and no external service is involved.
+
+## Why an average of start-of-block prices
+
+The pool's price is recorded once per block, at the **start** of the block, before any swap in it runs. A trade can never move the price recorded for its own block. To move a 10-second average, someone would have to hold the pool away from the market price across many blocks while arbitrageurs trade against them, which gets expensive fast.
+
+## Example
+
+A real market from 26 Sep: strike 2,688.81 USD, expiry 15:25:00 UTC. The pool's recorded prices from 15:24:50 to 15:25:00 averaged 2,689.76 USD (tick −197,348, against a strike tick of −197,351.5). That is above the strike, so YES won.
+
+![The settled market card: YES won, YES pays 1.00 and NO pays 0.00](/screenshots/uniswap/settled-card.png)
+
+## Who settles
+
+Anyone. After expiry, `settle` is a public call that only reads the oracle and writes the result, so it costs a little gas and needs no permission. The keeper bot usually calls it within 2 seconds; if it is down, any wallet can do the same ([keeper calls](/integration/keeper-calls#settle-and-sweep)).
+
+## Getting paid
+
+| Way | How |
+|---|---|
+| In the Uniswap app | Sell the winning token for USDC at exactly 1.00 each; settled markets are listed as "sell to redeem" |
+| From a contract or script | Call `redeem(marketId, amount)` on the hook |
+
+Winning tokens never expire. Their USDC stays reserved in the market until they are redeemed.
+
+## If the oracle cannot answer
+
+The oracle keeps its last 14,400 price records, at least 4 hours of history. If a market is not settled before its window drops out of that history, the result can no longer be measured. One hour after expiry, anyone can then settle it as **Invalid**, and every YES and every NO token pays **0.50 USDC**. This path is blocked whenever a normal settlement is still possible.

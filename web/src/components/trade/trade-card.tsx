@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { WalletDialog } from "@/components/wallet/wallet-dialog";
 import { retryMarkets, useNow } from "@/lib/data";
 import { getConnectionConfig } from "@/lib/onchain/config";
-import { parseUsdc } from "@/lib/onchain/buy";
+import { parseUsdc, type Slippage } from "@/lib/onchain/buy";
 import { useBuyQuote } from "@/lib/onchain/use-buy-quote";
 import { useTokenBalance } from "@/lib/onchain/balances";
 import { useWalletSession, refreshWalletBalances, switchWalletNetwork } from "@/lib/onchain/wallet";
@@ -29,7 +29,7 @@ export function TradeCard({ market, form, onFormChange, className, holdings, sta
     const now = useNow();
     const refreshHoldings = holdings.refresh;
     const [open, setOpen] = useState(false);
-    const [slippage, setSlippage] = useState(100);
+    const [slippage, setSlippage] = useState<Slippage>("auto");
     const [reviewed, setReviewed] = useState<ReturnType<typeof useBuyQuote>["quote"]>();
     const wrongNetwork = wallet.chainId !== null && wallet.chainId !== getConnectionConfig().chainId;
     const supported = true;
@@ -85,7 +85,7 @@ export function TradeCard({ market, form, onFormChange, className, holdings, sta
             </div>
             <p id="trade-availability" className="detail-note" role="status">{reason && !quoteQuery.error ? reason : null}</p>
             <details className="detail-advanced"><summary>Advanced details</summary><div>
-                <label>Slippage tolerance<select aria-label="Slippage tolerance" value={slippage} disabled={locked} onChange={(event) => setSlippage(Number(event.target.value))}><option value={100}>1%</option><option value={500}>5%</option><option value={1000}>10%</option></select></label>
+                <label>Slippage tolerance<select aria-label="Slippage tolerance" value={slippage} disabled={locked} onChange={(event) => setSlippage(event.target.value === "auto" ? "auto" : Number(event.target.value))}><option value="auto">{slippage === "auto" && quote ? `Auto (${quote.slippageBps / 100}%)` : "Auto"}</option><option value={100}>1%</option><option value={500}>5%</option><option value={1000}>10%</option></select></label>
                 <p><span>Minimum receive</span><span>{supported && quote ? `${formatUnits(quote.minimumOut, 6)} ${outputLabel}` : "N/A"}</span></p>
                 <p><span>Your {form.side.toUpperCase()}</span><span>{selectedHoldings.data == null ? "N/A" : formatUnits(selectedHoldings.data, 6)}</span></p>
             </div></details>

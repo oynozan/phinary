@@ -1,0 +1,135 @@
+---
+title: Quote and swap
+description: Quote and trade Phinary markets from TypeScript with @phinary/swap-sdk, or with plain V4Quoter and UniversalRouter calls.
+---
+
+# Quote and swap
+
+`@phinary/swap-sdk` (<Source path="packages/swap-sdk/README.md" />) wraps everything below. It depends only on viem and runs in Node and in the browser. The Uniswap app fork uses a copy of it.
+
+## End to end
+
+A complete buy: list markets, find the route, quote, approve, sign the permit and send the swap.
+
+<Source path="packages/swap-sdk/README.md" lines="13-39" />
+
+```ts showLineNumbers{13}
+import { createPublicClient, http } from 'viem'
+import { unichainSepolia } from 'viem/chains'
+import {
+  buildPermitSingle, buildSwap, estimateSwapGas, findPredictionRoute, listMarkets, minOutWithSlippage, permitTypedData,
+  quoteExactIn, readAllowances, erc20ApproveTx, requireHook, UNICHAIN_SEPOLIA, UNICHAIN_SEPOLIA_RPC_URL,
+} from '@phinary/swap-sdk'
+import { loadDeployment } from '@phinary/swap-sdk/node' // Node only: reads <repo>/deployments/unichain-sepolia.json
+
+// `account` is the trader's address and `wallet` a viem WalletClient for it.
+const client = createPublicClient({ chain: unichainSepolia, transport: http(UNICHAIN_SEPOLIA_RPC_URL) })
+const hook = requireHook(loadDeployment())
+const markets = await listMarkets(client, { hook, limit: 20 })            // marketCount / marketInfo / poolKeys / quote
+const route = findPredictionRoute(markets, { tokenIn: UNICHAIN_SEPOLIA.usdc, tokenOut: markets[0].yes.address })!
+
+const q = await quoteExactIn(client, { poolKey: route.poolKey, zeroForOne: route.zeroForOne, amount: 10_000_000n, account })
+const allowance = await readAllowances(client, { owner: account, token: UNICHAIN_SEPOLIA.usdc, amount: q.amountIn })
+if (allowance.needsErc20Approval) await wallet.sendTransaction(erc20ApproveTx({ token: UNICHAIN_SEPOLIA.usdc }))
+const permit = allowance.needsPermit ? buildPermitSingle({ token: UNICHAIN_SEPOLIA.usdc, nonce: allowance.permit2Nonce }) : undefined
+const signature = permit && (await wallet.signTypedData(permitTypedData(permit)))
+
+const tx = buildSwap({
+  poolKey: route.poolKey, zeroForOne: route.zeroForOne, tradeType: 'EXACT_INPUT',
+  amount: q.amountIn, limit: minOutWithSlippage(q.amountOut, 100), deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
+  permit: permit && { permit, signature: signature! },
+})
+await estimateSwapGas(client, { tx, account })   // throws PredictionSwapError (code SLIPPAGE, MARKET_CLOSED, …) on revert
+await wallet.sendTransaction(tx)
+```
+
+`minOutWithSlippage(q.amountOut, 100)` allows 1% slippage, which only suits long markets. For two-minute markets use `autoSlippageBps`, which sizes the tolerance to how far the price can move in about 5 seconds at this trade's price, between 1% and 90%.
+
+## Quote
+
+<Source path="packages/swap-sdk/src/quote.ts" lines="37-49" />
+
+```ts showLineNumbers{37}
+const functionName = exactIn ? 'quoteExactInputSingle' : 'quoteExactOutputSingle'
+const data = encodeFunctionData({
+  abi: v4QuoterAbi,
+  functionName,
+  args: [
+    {
+      poolKey: req.poolKey,
+      zeroForOne: req.zeroForOne,
+      exactAmount: req.amount,
+      hookData: req.hookData ?? '0x',
+    },
+  ],
+})
+```
+
+A quote is a plain `V4Quoter.quoteExactInputSingle` or `quoteExactOutputSingle` call with the market's `PoolKey`. The quoter runs the same `beforeSwap` as a real swap, so the quote always matches the fill in the same block.
+
+For display prices without an amount, the hook's own `quote(id)` returns the mid, ask and bid of both sides and never reverts ([example](/integration/keeper-calls#read-a-market)).
+
+## Swap
+
+<Source path="packages/swap-sdk/src/swap.ts" lines="102-126" />
+
+```ts showLineNumbers{102}
+/** V4_SWAP input: [SWAP_EXACT_IN_SINGLE | SWAP_EXACT_OUT_SINGLE, SETTLE_ALL, TAKE_ALL]. */
+export function encodeV4SingleSwap(p: Omit<BuildSwapParams, 'deadline' | 'permit' | 'router'>): Hex {
+  if (p.amount <= 0n || p.amount > MAX_UINT128 || p.limit < 0n || p.limit > MAX_UINT128) {
+    throw new Error('swap amounts must fit in uint128')
+  }
+  const tokenIn = inputCurrency(p.poolKey, p.zeroForOne)
+  const tokenOut = outputCurrency(p.poolKey, p.zeroForOne)
+  const hookData = p.hookData ?? '0x'
+  const exactIn = p.tradeType === 'EXACT_INPUT'
+  const swap = exactIn
+    ? encodeAbiParameters(EXACT_IN_SINGLE, [
+        { poolKey: p.poolKey, zeroForOne: p.zeroForOne, amountIn: p.amount, amountOutMinimum: p.limit, hookData },
+      ])
+    : encodeAbiParameters(EXACT_OUT_SINGLE, [
+        { poolKey: p.poolKey, zeroForOne: p.zeroForOne, amountOut: p.amount, amountInMaximum: p.limit, hookData },
+      ])
+  const settle = encodeAbiParameters(CURRENCY_AMOUNT, [tokenIn, exactIn ? p.amount : p.limit])
+  const take = encodeAbiParameters(CURRENCY_AMOUNT, [tokenOut, exactIn ? p.limit : p.amount])
+  const actions = concatHex([
+    toHex(exactIn ? Actions.SWAP_EXACT_IN_SINGLE : Actions.SWAP_EXACT_OUT_SINGLE, { size: 1 }),
+    toHex(Actions.SETTLE_ALL, { size: 1 }),
+    toHex(Actions.TAKE_ALL, { size: 1 }),
+  ])
+  return encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], [actions, [swap, settle, take]])
+}
+```
+
+A swap is UniversalRouter command `0x10` (`V4_SWAP`) with three actions: `SWAP_EXACT_IN_SINGLE` or `SWAP_EXACT_OUT_SINGLE`, then `SETTLE_ALL` (pay the input) and `TAKE_ALL` (receive the output). With a `PERMIT2_PERMIT` in front, the commands are `0x0a10`.
+
+## Approvals
+
+<Source path="src/OutcomeToken.sol" lines="6-10" />
+
+```solidity showLineNumbers{6}
+/// @title OutcomeToken
+/// @notice YES/NO token of one prediction market. 6 decimals (same unit as USDC). Only the hook mints and burns.
+/// @dev Solady ERC20 gives Permit2 an infinite allowance by default, so UniversalRouter swaps need only a Permit2
+///      signature, not an ERC20 approve transaction.
+contract OutcomeToken is ERC20 {
+```
+
+- **Buying** needs USDC approved to Permit2 once, then a Permit2 signature for the router.
+- **Selling** YES or NO needs only the signature: outcome tokens give Permit2 an unlimited allowance from the start.
+
+## Errors
+
+Every failed quote or simulation becomes a `PredictionSwapError` with a `code`:
+
+| Code | Meaning |
+|---|---|
+| `MARKET_CLOSED` | Past the cutoff, or buying after settlement, or selling a losing token |
+| `OUT_OF_BAND` | The trade would push the price outside 0.02 to 0.98 |
+| `CAPACITY` | Over the per-block limit or the market's reserve |
+| `AMOUNT_TOO_LOW` | The amount rounds to zero tokens |
+| `SLIPPAGE` | The price moved past the limit |
+| `ORACLE` | The oracle could not price the market |
+| `NO_ROUTE`, `DEADLINE`, `ALLOWANCE`, `SIGNATURE`, `BALANCE`, `UNKNOWN` | Routing, wallet and other failures |
+
+The decoded revert chain is kept too, for example `UnexpectedRevertBytes -> WrappedError(hook) -> Band` (<Source path="packages/swap-sdk/src/errors.ts" />).

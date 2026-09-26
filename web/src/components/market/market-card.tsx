@@ -106,7 +106,7 @@ export function MarketCard({ market, onBuy, className }: { market: Market; onBuy
                 href={href}
                 className="-mx-2 rounded-xl px-2 transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-                <MarketQuestion strike={market.strike} expiry={market.expiry} className="text-xl sm:text-2xl" />
+                <MarketQuestion asset={market.asset} strike={market.strike} expiry={market.expiry} className="text-xl sm:text-2xl" />
             </Link>
 
             <div className="flex items-end justify-between gap-4">

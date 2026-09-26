@@ -1,21 +1,25 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { getAddress, zeroAddress } from "viem";
+import { poolId } from "../src/pricing.ts";
 import {
   BOT_DIR,
   loadDeployments,
   loadEnvFiles,
   loadKeeperConfig,
   loadMirrorConfig,
+  mirrorTargets,
   parseDeployments,
   readPrivateKey,
   requireAddress,
+  requireSchedulers,
 } from "../src/config.ts";
 
 const EXAMPLE = resolve(BOT_DIR, "config", "unichain-sepolia.example.json");
+const UNDERLYINGS = resolve(BOT_DIR, "test", "vectors", "deployments-underlyings.json");
 const KEY = `0x${"ab".repeat(32)}`;
 const WETH = getAddress("0xe000000000000000000000000000000000000001");
 const USDC = getAddress("0x1000000000000000000000000000000000000002");
@@ -91,12 +95,41 @@ test("bot configs need a key unless dry-running", () => {
   assert.equal(m.privateKey?.source, "DEPLOYER_PRIVATE_KEY");
   assert.deepEqual(m.sources, ["kraken", "binanceus"]);
   assert.equal(m.rpcUrl, "http://x");
+  const listed = loadMirrorConfig({ ...env, DRY_RUN: "1", RPC_URL: " https://a.example , https://b.example/v2/k, " });
+  assert.equal(listed.rpcUrl, "https://a.example,https://b.example/v2/k", "primary first, fallbacks in order");
+  assert.throws(() => loadMirrorConfig({ ...env, DRY_RUN: "1", RPC_URL: "https://a.example,wss://b" }), /RPC_URL must be comma-separated/);
   assert.throws(() => loadMirrorConfig({ ...env, DRY_RUN: "1", MIRROR_SOURCES: "ftx" }), /unknown sources: ftx/);
   const k = loadKeeperConfig({ ...env, KEEPER_PRIVATE_KEY: KEY, DEPLOYER_PRIVATE_KEY: `0x${"cd".repeat(32)}` });
   assert.equal(k.privateKey?.source, "KEEPER_PRIVATE_KEY");
-  assert.equal(k.periodSec, 60);
+  assert.equal(k.minTradeSec, 5);
+  assert.equal(loadKeeperConfig({ ...env, DRY_RUN: "1", KEEPER_MIN_TRADE_SEC: "0" }).minTradeSec, 0);
+  assert.throws(() => loadKeeperConfig({ ...env, DRY_RUN: "1", KEEPER_MIN_TRADE_SEC: "-1" }), /KEEPER_MIN_TRADE_SEC/);
   assert.equal(k.alignToPeriod, true);
   assert.equal(k.invalidAfterSec, 3601, "past PredictionHook.GRACE (1 h)");
+});
+
+test("marketGatekeeper and the marketSchedulers array, each with its env override", () => {
+  const S1 = getAddress("0x5c00000000000000000000000000000000000001");
+  const S2 = getAddress("0x5c00000000000000000000000000000000000002");
+  const G = getAddress("0x6a00000000000000000000000000000000000001");
+  const d = parseDeployments({ marketGatekeeper: G, marketSchedulers: [S1.toLowerCase(), S2] });
+  assert.equal(requireAddress(d, "marketGatekeeper"), G);
+  assert.deepEqual(requireSchedulers(d), [S1, S2], "checksummed, in the file's (gatekeeper) order");
+
+  const env = parseDeployments({ marketSchedulers: [S1, S2] }, { MARKET_GATEKEEPER: S1, MARKET_SCHEDULERS: ` ${S2} , ${S1},` });
+  assert.equal(env.marketGatekeeper, S1);
+  assert.deepEqual(env.marketSchedulers, [S2, S1], "MARKET_SCHEDULERS is a comma list that replaces the file's");
+  assert.deepEqual(parseDeployments({ marketSchedulers: [S1] }, { MARKET_SCHEDULERS: " " }).marketSchedulers, [S1], "blank is unset");
+
+  const none = parseDeployments({});
+  assert.deepEqual(none.marketSchedulers, []);
+  assert.throws(() => requireSchedulers(none), /marketSchedulers is empty.*MARKET_SCHEDULERS/);
+  assert.throws(() => requireAddress(none, "marketGatekeeper"), /not deployed.*MARKET_GATEKEEPER/);
+  assert.throws(() => parseDeployments({ marketSchedulers: S1 }, {}), /marketSchedulers must be an array/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [S1, "0x12"] }), /marketSchedulers\[1\] is not an address/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [zeroAddress] }), /marketSchedulers\[0\] is the zero address/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [S1, S1.toLowerCase()] }), /lists an address twice/);
+  assert.equal((parseDeployments({ marketScheduler: S1 }) as Record<string, unknown>).marketScheduler, undefined, "the single key is gone");
 });
 
 test("loadEnvFiles never overrides variables that are already set", () => {
@@ -107,4 +140,84 @@ test("loadEnvFiles never overrides variables that are already set", () => {
   assert.deepEqual(loadEnvFiles([file, join(dir, "missing.env")], env), [file]);
   assert.equal(env.A, "preset");
   assert.equal(env.B, "from-file");
+});
+
+const r = (num: bigint, den = 1n) => ({ num, den });
+
+test("without underlyings the mirror has one ETH target from the flat keys, as before", () => {
+  const d = parseDeployments({ demoWeth: WETH, demoUsdc: USDC, underlyingOracle: ORACLE });
+  assert.equal(d.underlyings, undefined);
+  const [eth, ...rest] = mirrorTargets(d);
+  assert.equal(rest.length, 0);
+  assert.deepEqual(eth, {
+    symbol: "ETH",
+    token: WETH,
+    oracle: ORACLE,
+    key: d.underlyingPool,
+    keyExplicit: false,
+    minPrice: r(100n),
+    maxPrice: r(100000n),
+  });
+  // The ETH-sized legacy bounds still apply to ETH, and the per-symbol ones win over them
+  const legacy = mirrorTargets(d, { MIRROR_MIN_PRICE: "500", MIRROR_MAX_PRICE: "9000.5" })[0]!;
+  assert.deepEqual([legacy.minPrice, legacy.maxPrice], [r(500n), r(90005n, 10n)]);
+  const own = mirrorTargets(d, { MIRROR_MIN_PRICE: "500", MIRROR_ETH_MIN_PRICE: "700" })[0]!;
+  assert.deepEqual(own.minPrice, r(700n));
+  assert.throws(() => mirrorTargets(d, { MIRROR_ETH_MIN_PRICE: "10", MIRROR_ETH_MAX_PRICE: "5" }), /must be below/);
+  assert.throws(() => mirrorTargets(d, { MIRROR_ETH_MIN_PRICE: "-1" }), /MIRROR_ETH_MIN_PRICE must be a plain decimal/);
+
+  const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: EXAMPLE, DRY_RUN: "1" });
+  assert.deepEqual(cfg.targets.map((t) => t.symbol), ["ETH"]);
+});
+
+test("an underlyings list becomes one target per asset, each with its own token, pool and price band", () => {
+  const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: UNDERLYINGS, DRY_RUN: "1", MIRROR_MIN_PRICE: "500" });
+  const d = cfg.deployments;
+  assert.equal(d.underlyings?.length, 2);
+  const [eth, sol] = cfg.targets;
+  assert.equal(cfg.targets.length, 2);
+  assert.equal(eth!.symbol, "ETH");
+  assert.equal(eth!.token, WETH);
+  assert.equal(eth!.keyExplicit, true);
+  assert.deepEqual(eth!.minPrice, r(500n), "legacy MIRROR_MIN_PRICE is ETH's");
+  assert.equal(sol!.symbol, "SOL");
+  assert.equal(sol!.token, getAddress("0x0500000000000000000000000000000000000003"));
+  assert.equal(sol!.oracle, getAddress("0x0000000000000000000000000000000000002080"));
+  assert.deepEqual(sol!.key, {
+    currency0: sol!.token,
+    currency1: USDC,
+    fee: 3000,
+    tickSpacing: 60,
+    hooks: sol!.oracle,
+  });
+  assert.equal(poolId(sol!.key), "0x67214df79c10f9f5ad2c7f94b1562ae36c45d4a8c425e70144182c0d80eec1dc");
+  assert.deepEqual([sol!.minPrice, sol!.maxPrice], [r(5n), r(2000n)], "SOL's own band, not ETH's");
+
+  const env = { MIRROR_SOL_MIN_PRICE: "20", MIRROR_SOL_MAX_PRICE: "900" };
+  const tuned = mirrorTargets(d, env);
+  assert.deepEqual([tuned[1]!.minPrice, tuned[1]!.maxPrice], [r(20n), r(900n)]);
+  assert.deepEqual(tuned[0]!.minPrice, r(100n));
+  assert.deepEqual(mirrorTargets(d, { MIRROR_SYMBOLS: "sol" }).map((t) => t.symbol), ["SOL"]);
+  assert.throws(() => mirrorTargets(d, { MIRROR_SYMBOLS: "ETH,BTC" }), /MIRROR_SYMBOLS has BTC/);
+});
+
+test("underlyings entries are validated", () => {
+  const good = JSON.parse(readFileSync(UNDERLYINGS, "utf8")) as { underlyings: Record<string, unknown>[] };
+  const withEntry = (patch: (e: Record<string, unknown>) => void) => {
+    const json = structuredClone(good);
+    patch(json.underlyings[1]!);
+    return json;
+  };
+  assert.throws(() => parseDeployments({ underlyings: [] }), /non-empty array/);
+  assert.throws(() => parseDeployments(withEntry((e) => (e.symbol = "eth"))), /ETH twice/);
+  assert.throws(() => parseDeployments(withEntry((e) => (e.token = WETH))), /token .* is not in its pool/);
+  assert.throws(() => parseDeployments(withEntry((e) => (e.oracle = ORACLE))), /pool.hooks .* is not its oracle/);
+  assert.throws(() => parseDeployments(withEntry((e) => (e.poolId = `0x${"00".repeat(32)}`))), /does not match its pool key/);
+  assert.throws(
+    () => parseDeployments(withEntry((e) => ((e.pool as Record<string, unknown>).currency0 = "0xffff000000000000000000000000000000000000"))),
+    /sorted/,
+  );
+  const doge = parseDeployments(withEntry((e) => (e.symbol = "DOGE")));
+  assert.throws(() => mirrorTargets(doge), /no default price band for DOGE: set MIRROR_DOGE_MIN_PRICE/);
+  assert.equal(mirrorTargets(doge, { MIRROR_DOGE_MIN_PRICE: "0.01", MIRROR_DOGE_MAX_PRICE: "10" })[1]!.symbol, "DOGE");
 });

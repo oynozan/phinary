@@ -96,7 +96,7 @@ function marketIdOf(item: ActivityItem): number {
 
 function FeedRow({ item, market, now, you }: { item: ActivityItem; market: Market | null; now: number; you: Address | null }) {
     const id = marketIdOf(item);
-    const question = market ? marketQuestion(market.strike, market.expiry) : `Market #${id}`;
+    const question = market ? marketQuestion(market.strike, market.expiry, market.asset) : `Market #${id}`;
     const ago = formatAgo(item.time, now);
     const time = (
         <time dateTime={new Date(item.time * 1000).toISOString()} className="num text-right font-secondary text-[11px] text-muted-foreground [grid-area:time]">

@@ -1,10 +1,11 @@
 import { erc20Abi, parseAbi } from 'viem'
 import { hookErrorsAbi } from './hookErrors.generated.ts'
+import { marketGatekeeperAbi } from './marketGatekeeper.generated.ts'
 import { marketSchedulerAbi } from './marketScheduler.generated.ts'
 import { outcomeTokenAbi } from './outcomeToken.generated.ts'
 import { predictionHookAbi } from './predictionHook.generated.ts'
 
-export { erc20Abi, hookErrorsAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi }
+export { erc20Abi, hookErrorsAbi, marketGatekeeperAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi }
 
 const POOL_KEY =
   'struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }'

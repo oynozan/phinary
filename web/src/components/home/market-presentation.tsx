@@ -35,6 +35,12 @@ export function MarketIdentity({
             <path d="M12 1v23l11-6L12 1Z" fill="#a49bfa" />
             <path d="m1 20 11 11 11-11-11 6-11-6Z" fill="currentColor" />
           </svg>
+        ) : asset.symbol === "SOL" ? (
+          <svg viewBox="0 0 24 20" fill="currentColor">
+            <path d="M5 1h18l-4 4H1l4-4Z" />
+            <path d="M1 8h18l4 4H5L1 8Z" fill="#a49bfa" />
+            <path d="M5 15h18l-4 4H1l4-4Z" />
+          </svg>
         ) : (
           "?"
         )}
@@ -101,13 +107,7 @@ export function MarketDeadline({ market }: { market: Market }) {
     </span>
   );
 }
-export function SpotPrice({
-  market,
-  ethSpot,
-}: {
-  market: Market;
-  ethSpot?: number;
-}) {
-  const price = market.quote?.spot ?? ethSpot;
-  return <>{price === undefined ? "N/A" : formatPrice(price)}</>;
+export function SpotPrice({ market }: { market: Market }) {
+  const price = market.quote?.spot ?? market.oracleSpot;
+  return <>{price === null ? "N/A" : formatPrice(price)}</>;
 }

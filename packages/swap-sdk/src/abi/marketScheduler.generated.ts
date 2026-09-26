@@ -2,13 +2,17 @@
 export const marketSchedulerAbi = [
   {"type":"function","name":"canOpen","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"bool"}]},
   {"type":"function","name":"config","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"tuple","components":[{"name":"period","type":"uint32"},{"name":"tenor","type":"uint32"},{"name":"window","type":"uint32"},{"name":"cutoffBuffer","type":"uint32"},{"name":"nSamples","type":"uint32"},{"name":"quote","type":"tuple","components":[{"name":"h0Wad","type":"uint64"},{"name":"gammaSWad","type":"uint64"},{"name":"lambdaWad","type":"uint128"},{"name":"qEpochMax","type":"uint128"},{"name":"pMinWad","type":"uint64"}]},{"name":"maxBudget","type":"uint256"},{"name":"minBudget","type":"uint256"},{"name":"ticker","type":"string"}]}]},
+  {"type":"function","name":"gatekeeper","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"address"}]},
   {"type":"function","name":"hook","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"address"}]},
   {"type":"function","name":"lastSlot","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"uint256"}]},
+  {"type":"function","name":"marketOfSlot","stateMutability":"view","inputs":[{"name":"slot","type":"uint256"}],"outputs":[{"name":"","type":"uint256"}]},
   {"type":"function","name":"nextOpenTime","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"uint256"}]},
   {"type":"function","name":"open","stateMutability":"nonpayable","inputs":[],"outputs":[{"name":"marketId","type":"uint256"}]},
+  {"type":"function","name":"openDeadline","stateMutability":"view","inputs":[{"name":"slot","type":"uint256"}],"outputs":[{"name":"","type":"uint256"}]},
   {"type":"function","name":"oracle","stateMutability":"view","inputs":[],"outputs":[{"name":"","type":"address"}]},
   {"type":"event","name":"MarketOpened","anonymous":false,"inputs":[{"name":"marketId","type":"uint256","indexed":true},{"name":"slot","type":"uint256","indexed":true},{"name":"caller","type":"address","indexed":true},{"name":"budget","type":"uint256","indexed":false},{"name":"strikeCents","type":"uint256","indexed":false}]},
   {"type":"error","name":"AlreadyOpened","inputs":[{"name":"slot","type":"uint256"}]},
   {"type":"error","name":"InsufficientIdle","inputs":[{"name":"budget","type":"uint256"},{"name":"minBudget","type":"uint256"}]},
   {"type":"error","name":"InvalidConfig","inputs":[]},
+  {"type":"error","name":"TooLate","inputs":[{"name":"slot","type":"uint256"}]},
 ] as const

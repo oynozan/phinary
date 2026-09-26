@@ -1,0 +1,205 @@
+---
+title: Security and verification
+description: What PredictionHook guarantees, how each guarantee is tested or proved, and what is not proven.
+---
+
+# Security and verification
+
+The hook holds real collateral and prices off a pool that anyone can trade, so every guarantee below is enforced in code and checked by a test, a stateful fuzz campaign or a machine proof. The contracts have **not been audited**.
+
+## Guarantees
+
+| Guarantee | How the code enforces it | Checked by |
+|---|---|---|
+| Every winning token is backed by 1 USDC | `_contrib` reverts `Insolvent` after any mutation that leaves `bucket < max(outYes, outNo)` | `invariant_ledgerAndSolvency` |
+| The hook's claims match the PoolManager's real balances | All USDC and returned tokens are ERC-6909 claims, and every leg nets to zero in one unlock | `invariant_poolManagerBacksClaims` |
+| No free round trip, no free complete set | Fills round against the trader; NO is priced from the YES ask and bid | `invariant_noProfitableSameEpochRoundTripOrSet` |
+| Only the PoolManager can call the hook | OpenZeppelin `BaseHook` guards every callback and `unlockCallback` | `test_directCallbacksRevert` |
+| No fake markets, no liquidity, no donations | `beforeInitialize`, `beforeAddLiquidity`, `beforeRemoveLiquidity` and `beforeDonate` revert | `test_foreignInitializeReverts`, `test_addLiquidityReverts`, `test_donateReverts` |
+| No trade can move the price its own block is quoted at | The oracle reports the start-of-block price | `test_atomicSandwich_*`, `testFuzz_sameBlockPush_quoteInvariant` |
+| Pushes at or after expiry cannot change a result | Settlement reads only `[T − window, T)` | `test_settlement_pushesInOrAfterTheSettlementBlockDoNotCount` |
+| Nobody trades while the result is measured | Trading closes `cutoffBuffer` seconds before the window opens | `test_cutoff_plusMinusOneSecond` |
+| Markets cannot touch each other's money | One bucket per market | `test_multiMarketIsolation` |
+| LP shares cannot be bought cheap or sold dear | Deposits at NAV⁺, withdrawals at NAV⁻, neither reads a price | `invariant_navOrdering`, `test_vaultNav_underOpenExposure` |
+| A frozen USDC holder only blocks themselves | Payouts go to the caller only | `test_blacklistedHolder_onlyBlocksThemselves` |
+| Nobody can change a market or choose an outcome | Immutable owner (the scheduler, which has no admin), immutable market parameters, no settlement override | `test_accessControl` |
+
+## Direct calls
+
+<Source path="test/hook/Security.t.sol" lines="87-102" />
+
+```solidity showLineNumbers{87}
+function test_directCallbacksRevert() public {
+    SwapParams memory p = _swapParams(kYes, true, true, 1e6);
+    vm.expectRevert(BaseHook.NotPoolManager.selector);
+    hook.beforeSwap(address(this), kYes, p, "");
+    vm.expectRevert(BaseHook.NotPoolManager.selector);
+    hook.beforeInitialize(address(this), kYes, SQRT_1_1);
+    vm.expectRevert(BaseHook.NotPoolManager.selector);
+    hook.beforeAddLiquidity(address(this), kYes, LIQUIDITY_PARAMS, "");
+    vm.expectRevert(BaseHook.NotPoolManager.selector);
+    hook.beforeDonate(address(this), kYes, 1, 1, "");
+    vm.expectRevert(BaseHook.NotPoolManager.selector);
+    hook.unlockCallback(abi.encode(stranger, uint256(1), false));
+    vm.expectRevert(BaseHook.HookNotImplemented.selector);
+    vm.prank(address(manager));
+    hook.afterSwap(address(this), kYes, p, BalanceDelta.wrap(0), "");
+}
+```
+
+Every hook entry point reverts `NotPoolManager` unless the PoolManager calls it, including `unlockCallback`, which pays out USDC.
+
+## Stateful fuzzing
+
+<Source path="test/hook/Invariant.t.sol" lines="709-758" />
+
+```solidity showLineNumbers{709}
+/// forge-config: default.invariant.fail-on-revert = true
+/// forge-config: ci.invariant.fail-on-revert = true
+function invariant_ledgerAndSolvency() public view {
+    _checkInvariants();
+}
+
+/// forge-config: default.invariant.fail-on-revert = true
+/// forge-config: ci.invariant.fail-on-revert = true
+function invariant_noUnexpectedReverts() public view {
+    assertEq(h.unexpected(), 0, string(h.lastUnexpected()));
+}
+
+/// forge-config: default.invariant.fail-on-revert = true
+/// forge-config: ci.invariant.fail-on-revert = true
+function invariant_noProfitableSameEpochRoundTripOrSet() public view {
+    assertEq(h.roundTripViolations(), 0, "round trip");
+    assertEq(h.setViolations(), 0, "complete set");
+}
+
+/// forge-config: default.invariant.fail-on-revert = true
+/// forge-config: ci.invariant.fail-on-revert = true
+function invariant_poolManagerBacksClaims() public view {
+    uint256 userUsdcClaims;
+    for (uint256 i; i < 3; ++i) {
+        userUsdcClaims += manager.balanceOf(h.actors(i), uint160(address(usdc)));
+    }
+    assertEq(
+        usdc.balanceOf(address(manager)),
+        manager.balanceOf(address(hook), uint160(address(usdc))) + userUsdcClaims,
+        "PM USDC == claims"
+    );
+    uint256 n = hook.marketCount();
+    for (uint256 id = 1; id <= n; ++id) {
+        IPredictionHook.MarketInfo memory mi = hook.marketInfo(id);
+        uint256 cy;
+        uint256 cn;
+        for (uint256 i; i < 3; ++i) {
+            cy += manager.balanceOf(h.actors(i), uint160(mi.yes));
+            cn += manager.balanceOf(h.actors(i), uint160(mi.no));
+        }
+        assertEq(OutcomeToken(mi.yes).balanceOf(address(manager)), mi.invYes + cy, "PM YES == claims");
+        assertEq(OutcomeToken(mi.no).balanceOf(address(manager)), mi.invNo + cn, "PM NO == claims");
+    }
+}
+
+/// forge-config: default.invariant.fail-on-revert = true
+/// forge-config: ci.invariant.fail-on-revert = true
+function invariant_navOrdering() public view {
+    assertGe(hook.navPlus(), hook.navMinus());
+}
+```
+
+A handler drives the real hook through random trades in both directions and both exact-in and exact-out, same-block round trips, complete sets, time warps, oracle moves, whole market lifecycles (trade, settle or invalidate, redeem through swaps and through `redeem`, sweep) and vault deposits and withdrawals. After every call the invariants above must hold, and any revert outside an allowlist fails the run. A final check fails the campaign if it never reached settlement, invalidation, redemption or sweep, so it cannot pass by doing nothing.
+
+## Manipulation
+
+The attack tests run a real v4 stack: the PoolManager, both hooks, a funded ETH/USDC pool and an attacker contract that trades inside one unlock.
+
+<Source path="test/security/Manipulation.t.sol" lines="193-215" />
+
+```solidity showLineNumbers{193}
+function test_atomicSandwich_sobOracle_attackerLoses() public {
+    uint256 id = _scaledMarket(address(oracle));
+    _nextBlock(10);
+    console2.log("Mallory: push ETH -0.5%, buy YES with 20 USDC, push back, all in one unlock (real SoB oracle)");
+    (PnL memory r, uint256 qModel) = _atomicSandwich(id, 20 * E6, -50);
+    _logPnl("SoB oracle", r);
+    assertEq(r.q, qModel, "the fill ignores the push: model on the start-of-block price");
+    assertLt(r.usdc, 0, "the round trip pays the spread");
+    assertLe(r.demo, 0, "the ETH-pool round trip pays fees");
+    assertLt(r.usdc + r.demo, 0, "attacker loses");
+    _checkLedger();
+}
+
+function test_atomicSandwich_liveSlot0_negativeControl_profits() public {
+    uint256 id = _scaledMarket(address(live));
+    _nextBlock(10);
+    console2.log("NEGATIVE CONTROL: the same attack against a market whose oracle reads the LIVE slot0");
+    (PnL memory r, uint256 qModel) = _atomicSandwich(id, 20 * E6, -50);
+    _logPnl("live slot0", r);
+    assertGt(r.q, qModel * 10, "the push made YES more than 10x cheaper");
+    assertGt(r.usdc + r.demo, int256(100 * E6), "attacker profits over 100 USDC");
+    _checkLedger();
+}
+```
+
+- **Atomic sandwich.** The attacker pushes ETH down 0.5%, buys YES cheaply and pushes it back, all in one transaction. Against the real start-of-block oracle the fill ignores the push and the attacker loses the spread and the pool fees. The **negative control** runs the same attack against a market that reads the live price: YES gets more than 10 times cheaper and the attacker makes over 100 USDC. That difference is the reason the oracle reports start-of-block prices.
+- **Same-block pushes.** A fuzz test pushes the pool up or down by up to 20% and checks that the hook's quote and V4Quoter's quote are unchanged within the block.
+- **Settlement.** Pushes inside or after the settlement block are ignored, pushes before the window do not count, and a tie resolves NO. Flipping a demo market that sits 3 ticks past the strike with a last-second push costs more than 5 times the market's whole budget.
+
+<Source path="test/security/Manipulation.t.sol" lines="451-470" />
+
+```solidity showLineNumbers{451}
+/// @dev RESIDUAL RISK, kept as an explicit expectation: on a thin pool with a 100x budget, a push that survives a
+///      block boundary (B, C) pays. The SoB oracle removes the atomic attack only; what bounds this one is the
+///      budget and epoch cap (gain saturates near 387 USDC here) against pool depth (cost grows ~quadratically).
+function test_multiBlockPush_thinPool_residualRisk() public {
+    _thinPool();
+    uint256 id = _scaledMarket(address(oracle));
+    _nextBlock(10);
+    int16[5] memory pushes = [int16(-3), -10, -25, -50, -100];
+    _header("thin pool (L = 5.2e16), 100x demo market (budget 1,000 USDC)");
+    for (uint256 i; i < pushes.length; ++i) {
+        (Row memory a, Row memory b, Row memory c) = _row(id, pushes[i]);
+        assertLt(a.gain, 0, "A: backrun -> fair SoB -> spread lost");
+        assertLe(b.gain, int256(1_000 * E6), "B: gain capped by the budget");
+        assertGt(b.cost, 0);
+        assertGt(c.cost, 0);
+        if (pushes[i] <= -10) {
+            assertGt(b.gain - b.cost, 0, "known: a cross-block push pays on a thin pool with a large budget");
+        }
+    }
+}
+```
+
+**Residual risk, stated as a test.** Holding the pool away from the market price across a block boundary is not stopped by the start-of-block oracle. At demo depth with a 10 USDC budget it loses money. On a thin pool with a 1,000 USDC budget, pushes of 0.1% or more do pay. What bounds this attack is the market budget and the per-block cap against the depth of the ETH/USDC pool, so a deployment has to size budgets to the depth of the pool it reads.
+
+## Machine-checked math
+
+<Source path="formal/run_all.sh" lines="2-8" />
+
+```sh showLineNumbers{2}
+# Runs every machine check in formal/ and records the outputs in formal/out/ (exit != 0 if any check fails).
+#   z3_integer_lemmas.py      QuoteMath Lemma S/A, Theorem N, E1 (NO mirror), E2, factored-band step (z3, QF_NIA)
+#   hart36/ratio_cert36.py    P3  Horner ratio num/den non-increasing at every wei on [0, SPLIT) (+ WAD-port control)
+#   hart36/expwad_cert.py     P2  expWad increasing inside each range-reduction segment (Sturm + Taylor enclosure)
+#   hart36/expwad_err.py      P2  rounding of expWad internals <= ~1 unit (vs >= 9.28e9 increase per wei)
+#   hart36/expwad_kcheck.py   P2  expWad non-decreasing across all 61 segment boundaries (exhaustive, ~1 min)
+#   hart36/seams.py           P1/P4/P5, band premises, constants == src/math/NormalCdf.sol
+```
+
+- **Fill amounts.** z3 proves the integer square-root solver in `QuoteMath` exact for buys, and the rounding never favours the trader, NO mirror included.
+- **Monotone prices.** Certificates show the normal CDF and `expWad` never decrease between adjacent wei inputs, so the ask and bid can only rise as ETH rises. Arbitrage cannot exploit a rounding dip.
+
+## Not proven
+
+- That LPs make money. That depends on who trades.
+- That no stronger adversary exists than the ones tested.
+- That the L2 sequencer orders transactions and sets timestamps honestly.
+- That Uniswap's hosted routing will list the hook.
+- The correctness of dependencies that are not formally verified here, such as Solady's `lnWad`.
+
+## Run it yourself
+
+```sh
+forge test --match-path 'test/security/*' -vv
+forge test --match-path test/hook/Invariant.t.sol
+formal/run_all.sh
+```

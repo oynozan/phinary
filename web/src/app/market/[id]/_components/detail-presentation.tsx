@@ -9,10 +9,10 @@ import type { Market } from "@/lib/types";
 
 export const blockExplorer = "https://sepolia.uniscan.xyz";
 export function underlying(market: Market) {
-    return underlyingOf(market, { [getConnectionConfig().underlyingOracle.toLowerCase()]: { symbol: "ETH", name: "Ethereum" } }).symbol;
+    return underlyingOf(market).symbol;
 }
 export function detailQuestion(market: Market) {
-    return questionOf(market, { [getConnectionConfig().underlyingOracle.toLowerCase()]: { symbol: "ETH", name: "Ethereum" } });
+    return questionOf(market);
 }
 export function utcDate(t: number) {
     return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "UTC" }).format(t * 1000) + " UTC";

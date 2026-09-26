@@ -41,6 +41,34 @@
     "tickSpacing": 10
   },
   "underlyingPoolId": "0xb2b89f12e31fa12e75c4e85bd234fa5fdc5ee19d65e11a12c4f57dfe0e437331",
+  "underlyings": [
+    {
+      "oracle": "0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080",
+      "pool": {
+        "currency0": "0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5",
+        "currency1": "0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D",
+        "fee": 500,
+        "hooks": "0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080",
+        "tickSpacing": 10
+      },
+      "poolId": "0xb2b89f12e31fa12e75c4e85bd234fa5fdc5ee19d65e11a12c4f57dfe0e437331",
+      "symbol": "ETH",
+      "token": "0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5"
+    },
+    {
+      "oracle": "0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080",
+      "pool": {
+        "currency0": "0x49f3768635A2Db5e4bdcB76A4F191EC48B770417",
+        "currency1": "0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D",
+        "fee": 500,
+        "hooks": "0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080",
+        "tickSpacing": 10
+      },
+      "poolId": "0x9453ba24ab75a174fec0d7ccdac237961e41fa4dd094e8146708c246cde35394",
+      "symbol": "SOL",
+      "token": "0x49f3768635A2Db5e4bdcB76A4F191EC48B770417"
+    }
+  ],
   "universalRouter": "0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D",
   "usdc": "0x31d0220469e10c4E71834a79b1f276d740d3768F",
   "v4Quoter": "0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472"

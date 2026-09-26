@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import { createChainClient } from "./client.ts";
-import { fetchBuyQuote, describeBuyError, parseUsdc, type BuyQuote } from "./buy.ts";
+import { fetchBuyQuote, describeBuyError, parseUsdc, type BuyQuote, type Slippage } from "./buy.ts";
 
-export function useBuyQuote(marketId: number, amount: string, slippage: number, account: Address | null, enabled: boolean, side: "up" | "down" = "up", mode: "buy" | "sell" = "buy") {
+export function useBuyQuote(marketId: number, amount: string, slippage: Slippage, account: Address | null, enabled: boolean, side: "up" | "down" = "up", mode: "buy" | "sell" = "buy") {
     const key = `${marketId}:${amount}:${slippage}:${account ?? ""}:${enabled}:${side}:${mode}`;
     const [state, setState] = useState<{ key: string; quote?: BuyQuote; error?: string }>({ key: "" });
     useEffect(() => {

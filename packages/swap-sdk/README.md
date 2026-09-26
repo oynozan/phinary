@@ -57,7 +57,14 @@ Every quote or simulation failure becomes a `PredictionSwapError`:
 common key spellings:
 - `predictionHook` (also `PredictionHook`, `hook`);
 - `underlyingOracle` (also `UnderlyingOracleHook`, `oracle`);
-- `usdc`, `poolManager`, `v4Quoter`, `universalRouter`, `permit2`, `deployBlock`.
+- `usdc`, `poolManager`, `v4Quoter`, `universalRouter`, `permit2`, `deployBlock`;
+- `marketGatekeeper`, the `marketSchedulers` list in gatekeeper order, and the `legacyMarketSchedulers` and
+  `legacyPredictionHooks` lists (missing or not an array gives `[]`);
+- `underlyings`, one `{symbol, token, oracle, pool, poolId}` per price source. A `poolId` that contradicts its pool
+  key throws.
+
+A single `marketScheduler` key is not read, so a file from before the gatekeeper has no tracks and
+`requireGatekeeper` / `requireSchedulers` throw.
 
 Placeholders are tolerated: missing values, `""`, `"TBD"`, `0x0…0` and `0xf…f`. Uniswap addresses fall back to the
 Stack A defaults, and our own addresses become `undefined`. The Stack B router `0x8B84…1E6b` is rejected.
@@ -66,12 +73,24 @@ Stack A defaults, and our own addresses become `undefined`. The Stack B router `
 { "chainId": 1301, "predictionHook": "0x…", "underlyingOracle": "0x…", "usdc": "0x31d0220469e10c4E71834a79b1f276d740d3768F", "deployBlock": 63600000 }
 ```
 
+## Tracks
+
+Each MarketScheduler behind the gatekeeper is one track, such as ETH1M or SOL15M.
+- `readTracks(client, deployment)` reads every scheduler's `config()` and `oracle()` into `{scheduler, oracle, ticker,
+  asset, label, period, tenor, window, cutoffBuffer, nSamples, maxBudget, minBudget}`. For example ticker `SOL1M` with
+  period 60 gives asset `SOL` and label `1m`.
+- `recentTrackMarketIds(client, track, nowSec, k)` returns the market ids of the last `k` slots through
+  `marketOfSlot`, newest first.
+- `schedulerOfMarkets(client, gatekeeper, ids)` returns `gatekeeper.schedulerOf(id)` for each id.
+- `classifyBySymbol(symbol, tracks)` matches `${ticker}UP` / `${ticker}DOWN` exactly. Expiries coincide at quarter
+  hours and one ticker can prefix another (`ETH`, `ETH15M`), so never classify by expiry or prefix.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `bun install` (or `npm install`) | Installs viem, typescript and @types/node locally |
-| `npm test` | 42 unit tests (`node --test`); see the table below |
+| `npm test` | Unit tests (`node --test`); see the table below |
 | `npm run test:fork` | Starts anvil forking 1301 (needs network and `anvil`), then runs 4 end-to-end tests against the real contracts: hookless pool, first-time ERC20 approve + signed `PERMIT2_PERMIT + V4_SWAP` exact-in (output equals the quote), exact-out without a permit, slippage and deadline reverts decoded, uninitialised pool -> `NO_ROUTE` |
 | `SWAP_SDK_HOOK_OUT=<forge out/> npm run test:hook` | Anvil fork of 1301 with a real `PredictionHook` build: CREATE2-mines the hook to its flag address, deploys `MockUSDC` and `MockOracle` from the same `out/`, funds the vault and creates a market, then runs 9 tests through the deployed V4Quoter and UR 2.0: registry reads, first-time buy exact-in (approve + signed permit), buy exact-out, OutcomeToken sell with only a signed permit, sell exact-out, hook reverts decoded by name, `NotTradable` at the cutoff, redemption sell after `settle` and a refused losing-token sell. Prints gas used per swap |
 | `npm run typecheck` | `tsc --noEmit` (strict, with `noUncheckedIndexedAccess` and `noPropertyAccessFromIndexSignature`, as in the fork) |
@@ -86,5 +105,6 @@ What the unit tests cover:
 | `errors.test.ts` | Revert decoding; core PoolManager/router errors are never read as a market state |
 | `slippage.test.ts` | `autoSlippageBps`: time-to-window and price-level scaling, floors and caps, all four trade shapes |
 | `markets.test.ts` | `listMarkets`, `resolveOutcomeToken`, quoting and allowances over a mocked chain |
-| `deployments.test.ts` | Deployment parsing |
+| `deployments.test.ts` | Deployment parsing, including the gatekeeper, scheduler lists and `underlyings` of `fixtures/deployments-tracks.json` |
+| `tracks.test.ts` | `readTracks`, `recentTrackMarketIds`, `schedulerOfMarkets` and `classifyBySymbol` for four tracks sharing a quarter-hour expiry |
 | `abi.test.ts` | ABI drift vs the Foundry build |

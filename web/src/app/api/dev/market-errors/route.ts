@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         const numeric = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
         if (!numeric(value.at) || !numeric(value.elapsedMs) || !(value.marketId === null || numeric(value.marketId)) ||
             !(value.httpStatus === null || numeric(value.httpStatus)) || !(value.rpcCode === null || numeric(value.rpcCode)) ||
-            !failureKinds.includes(value.kind) || !['chain', 'head', 'count', 'markets', 'oracle', 'market-info', 'market-params', 'snapshot'].includes(value.stage)) return new Response(null, { status: 400 });
+            !failureKinds.includes(value.kind) || !['chain', 'head', 'tracks', 'count', 'markets', 'oracle', 'market-info', 'market-params', 'snapshot'].includes(value.stage)) return new Response(null, { status: 400 });
         const errorNames = Array.isArray(value.errorNames) ? value.errorNames.filter((v: unknown) => typeof v === 'string' && /^[A-Za-z]{1,70}Error$/.test(v)).slice(0,12) : [];
         const summaries = Array.isArray(value.summaries) ? value.summaries.filter((v: unknown) => typeof v === 'string').slice(0,8).map((s: string) => s.slice(0,220)) : [];
         const event: MarketFailure = { errorNames, summaries, at: value.at, elapsedMs: value.elapsedMs, marketId: value.marketId, httpStatus: value.httpStatus, rpcCode: value.rpcCode, kind: value.kind, stage: value.stage };

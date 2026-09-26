@@ -6,6 +6,6 @@ import { getConnectionConfig } from "./config.ts";
 export function createChainClient(config = getConnectionConfig()) {
     return createPublicClient({
         chain: unichainSepolia,
-        transport: createReadTransport(config.rpcUrl, config.chainId),
+        transport: createReadTransport(config.rpcUrls, config.chainId),
     });
 }

@@ -29,3 +29,9 @@ test('only the canonical Sepolia RPC gets a public fallback; forks and custom RP
     assert.equal(publicTransport.value?.transports.length,2);
     assert.equal(forkTransport.value?.transports.length,1);
 });
+
+test('explicit RPC lists preserve configured order without appending public endpoints', () => {
+    const urls = ['http://localhost:8545', 'http://localhost:8546'];
+    const transport = createReadTransport(urls, 1301)({});
+    assert.deepEqual(transport.value?.transports.map((t: { value?: { url?: string } }) => t.value?.url), urls);
+});

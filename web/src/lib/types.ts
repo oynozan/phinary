@@ -65,7 +65,7 @@ export interface Quote {
     bidUp: number;
     askDown: number;
     bidDown: number;
-    /** ETH price implied by x: K * e^x */
+    /** underlying price implied by x: K * e^x */
     spot: number;
     /** annualised volatility implied by variance */
     sigma: number;
@@ -82,13 +82,19 @@ export interface Market extends MarketInfo {
     tokenName: string;
     upTicker: string;
     downTicker: string;
+    /** underlying symbol such as "ETH" or "SOL", empty when neither the track nor the oracle is known */
+    asset: string;
+    /** track period label such as "1m" or "15m", null when the market's scheduler is unknown */
+    track: string | null;
+    /** spot price from this market's own oracle at the snapshot block */
+    oracleSpot: number | null;
     /** live quote while pricing is defined, otherwise the last one before the window (tradable = false) */
     quote: Quote | null;
     /** probability of UP to display: live mid, last mid, or the outcome once resolved */
     upChance: number | null;
     volume: number | null;
     tradeCount: number | null;
-    /** geometric average ETH price over the window, once expiry has passed */
+    /** geometric average underlying price over the window, once expiry has passed */
     settlementPrice: number | null;
     settledAt: number | null;
 }

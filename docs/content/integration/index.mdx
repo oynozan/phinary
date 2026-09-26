@@ -1,0 +1,46 @@
+---
+title: Overview
+description: The contracts, addresses and building blocks for integrating with Phinary.
+---
+
+import { Cards } from 'nextra/components'
+
+# Integration
+
+Phinary pools are ordinary Uniswap v4 pools with a hook, so integrating uses the standard Uniswap contracts: V4Quoter for quotes, UniversalRouter for swaps and Permit2 for approvals. The hook adds a few read functions for market data.
+
+## Addresses on Unichain Sepolia (1301)
+
+| Contract | Address |
+|---|---|
+| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` |
+| MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` |
+| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| USDC (Circle, testnet) | `0x31d0220469e10c4E71834a79b1f276d740d3768F` |
+| PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` |
+| V4Quoter | `0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472` |
+| UniversalRouter 2.0 | `0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D` |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+
+The current values always live in [`deployments/unichain-sepolia.json`](https://github.com/oynozan/phinary/blob/main/deployments/unichain-sepolia.json).
+
+## Contracts
+
+| Contract | Role |
+|---|---|
+| <Source path="src/PredictionHook.sol" /> | Markets, swaps, settlement, redemption and the LP vault ([reference](/contracts/prediction-hook)) |
+| <Source path="src/oracle/UnderlyingOracleHook.sol" /> | Start-of-block price, tick cumulatives and realised variance of the ETH/USDC pool ([reference](/contracts/oracle)) |
+| <Source path="src/MarketScheduler.sol" /> | Opens one market per slot for anyone ([reference](/contracts/scheduler)) |
+| <Source path="src/OutcomeToken.sol" /> | The YES and NO ERC-20s (6 decimals), minted and burned only by the hook |
+
+## Routing
+
+Uniswap's hosted routing skips hook-priced pools that hold no liquidity unless the hook is allowlisted. Phinary therefore quotes with V4Quoter directly, and runs a fork of the Uniswap web app (`interface-patches/`) that answers USDC to YES or NO requests in the page and builds the UniversalRouter transaction locally. Every other pair still goes through Uniswap's normal routing.
+
+## In this section
+
+<Cards num={3}>
+  <Cards.Card title="Quote and swap" href="/integration/quote-and-swap" arrow />
+  <Cards.Card title="Events and indexing" href="/integration/events" arrow />
+  <Cards.Card title="Keeper calls" href="/integration/keeper-calls" arrow />
+</Cards>

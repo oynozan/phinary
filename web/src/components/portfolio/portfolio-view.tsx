@@ -28,7 +28,7 @@ export function PortfolioView() {
         return ({
         quoteSell: async (row, amount) => {
             const session = ensureAccount();
-            const review = await fetchBuyQuote(session.client, row.marketId, amount, 100, session.account, undefined, row.side, "sell");
+            const review = await fetchBuyQuote(session.client, row.marketId, amount, "auto", session.account, undefined, row.side, "sell");
             return { usdc: Number(review.amountOut) / 1e6, averagePrice: Number(review.amountOut) / Number(amount), review };
         },
         sell: async (row, amount, quote) => {

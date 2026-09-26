@@ -18,12 +18,12 @@ import {
 import { marketSchedulerAbi, predictionHookAbi } from "../src/abi.ts";
 import { makeClients, readSlot0, type Clients } from "../src/chain.ts";
 import { loadMirrorConfig } from "../src/config.ts";
-import { invalidAfterFor, isAlreadyOpened, Keeper, keeperGasLimit, keeperTick, schedulerPeriodFor } from "../src/keeper.ts";
+import { invalidAfterFor, isAlreadyOpened, Keeper, keeperGasLimit, keeperTick, loadTracks } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
 import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
 import { mirrorTick, setupMirror, steerGasLimit } from "../src/mirror.ts";
-import { orientationFor, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
+import { orientationFor, poolId, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
 import { ANVIL_KEY, deploy, findAnvil, read, send, startAnvil } from "./helpers/anvil.ts";
 import { loadArtifact, type Artifact } from "./helpers/artifacts.ts";
 
@@ -34,7 +34,8 @@ const ARTIFACTS = {
   hook: ["MockPredictionHook.sol", "MockPredictionHook"],
   oracle: ["MockUnderlyingOracle.sol", "MockUnderlyingOracle"],
   sobHook: ["MockSobHook.sol", "MockSobHook"],
-  /** The real Task 3 scheduler; MockPredictionHook stands in for the PredictionHook it owns. */
+  /** The real gatekeeper and its schedulers; MockPredictionHook stands in for the PredictionHook it owns. */
+  gatekeeper: ["MarketGatekeeper.sol", "MarketGatekeeper"],
   scheduler: ["MarketScheduler.sol", "MarketScheduler"],
 } as const;
 
@@ -56,6 +57,25 @@ async function deployHook(c: Clients, art: Artifact, args: Hex, flags: bigint): 
     assert.notEqual(await c.publicClient.getCode({ address: at }), undefined);
     return at;
   }
+}
+
+const MOCK_USDC: Address = "0x31d0220469e10c4E71834a79b1f276d740d3768F";
+
+/** DeployTracks' order: the gatekeeper and its schedulers at nonce n, then the hook at n + 1 owned by the gatekeeper */
+async function deployTracks(
+  c: Clients,
+  a: Record<keyof typeof ARTIFACTS, Artifact>,
+  tracks: readonly { oracle: Address; config: unknown }[],
+  idle: bigint,
+): Promise<{ hook: Address; gatekeeper: Address; schedulers: Address[] }> {
+  const nonce = await c.publicClient.getTransactionCount({ address: c.account!.address });
+  const predicted = getContractAddress({ from: c.account!.address, nonce: BigInt(nonce) + 1n });
+  const gatekeeper = await deploy(c, a.gatekeeper, [predicted, tracks]);
+  const hook = await deploy(c, a.hook, [gatekeeper, MOCK_USDC, idle]);
+  assert.equal(hook, predicted, "hook landed at the predicted nonce address");
+  const schedulers = tracks.map((_, i) => getContractAddress({ from: gatekeeper, nonce: BigInt(i + 1) }));
+  assert.deepEqual(await read<Address[]>(c, gatekeeper, a.gatekeeper.abi, "schedulers"), schedulers, "scheduler i at computeCreateAddress(gatekeeper, i + 1)");
+  return { hook, gatekeeper, schedulers };
 }
 
 const price = (s: string): Rational => {
@@ -124,8 +144,11 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       );
       const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: file, DEPLOYER_PRIVATE_KEY: ANVIL_KEY, MIRROR_THRESHOLD_BPS: "2" });
       const ctx = await setupMirror(cfg, log);
-      assert.equal(ctx.orientation.baseIsToken0, o.baseIsToken0);
-      assert.deepEqual(ctx.key, key);
+      assert.equal(ctx.targets.length, 1, "no underlyings: the single ETH pool from the flat keys");
+      const eth = ctx.targets[0]!;
+      assert.equal(eth.symbol, "ETH");
+      assert.equal(eth.orientation.baseIsToken0, o.baseIsToken0);
+      assert.deepEqual(eth.key, key);
       const pinned = loadMirrorConfig({
         DEPLOYMENTS_FILE: file,
         DEPLOYER_PRIVATE_KEY: ANVIL_KEY,
@@ -134,7 +157,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       await assert.rejects(setupMirror(pinned, log), /differs from the oracle's/);
 
       let feed = "2701.35";
-      ctx.getPrice = async () => ({ quote: { source: "coinbase", raw: feed, price: price(feed) }, failures: [] });
+      eth.getPrice = async () => ({ quote: { symbol: "ETH", source: "coinbase", raw: feed, price: price(feed) }, failures: [] });
 
       const expectAt = async (s: string) => {
         const slot0 = await readSlot0(c.publicClient, pm, key);
@@ -144,32 +167,87 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
 
       await testClient.increaseTime({ seconds: 1 });
       await testClient.mine({ blocks: 1 });
-      const up = await mirrorTick(ctx);
-      assert.equal(up.decision.action, "steer");
-      assert.ok(up.hash);
+      const [up] = await mirrorTick(ctx);
+      assert.equal(up!.decision?.action, "steer");
+      assert.ok(up!.hash);
       await expectAt("2701.35");
       const [tx, receipt] = await Promise.all([
-        c.publicClient.getTransaction({ hash: up.hash }),
-        c.publicClient.getTransactionReceipt({ hash: up.hash }),
+        c.publicClient.getTransaction({ hash: up!.hash }),
+        c.publicClient.getTransactionReceipt({ hash: up!.hash }),
       ]);
       assert.ok(tx.gas >= steerGasLimit(receipt.gasUsed), "steer gas is padded");
       assert.equal(await read<bigint>(c, hook, a.sobHook.abi, "writes"), 1n, "hook wrote on the steer");
 
       feed = "2701.40";
-      const hold = await mirrorTick(ctx);
-      assert.equal(hold.decision.action, "hold");
-      assert.equal(hold.hash, undefined);
+      const [hold] = await mirrorTick(ctx);
+      assert.equal(hold!.decision?.action, "hold");
+      assert.equal(hold!.hash, undefined);
       await expectAt("2701.35");
 
       feed = "2650.07";
-      const down = await mirrorTick(ctx);
-      assert.equal(down.decision.action, "steer");
+      const [down] = await mirrorTick(ctx);
+      assert.equal(down!.decision?.action, "steer");
       await expectAt("2650.07");
     }
     assert.ok(lines.some((l) => l.includes("] steered ")));
   });
 
-  await t.test("keeper: create, settle, sweep and invalid fallback through the Task 3 scheduler pair", async () => {
+  await t.test("mirror: one process steers ETH and SOL pools listed in underlyings, with consecutive nonces", async () => {
+    const pm = await deploy(c, a.poolManager, [me]);
+    const steerer = await deploy(c, a.steerer, [pm, me]);
+    const usdc = await deploy(c, a.demoToken, ["Demo USDC", "dUSDC", 6, 0n, 0n, me]);
+    const assets = [
+      { symbol: "ETH", decimals: 18, start: "2000", feed: "2701.35" },
+      { symbol: "SOL", decimals: 9, start: "150", feed: "148.27" },
+    ];
+    const pools: { symbol: string; token: Address; oracle: Address; key: PoolKey; o: ReturnType<typeof orientationFor>; feed: string }[] = [];
+    await send(c, usdc, a.demoToken.abi, "setMinter", [steerer, true]);
+    for (const asset of assets) {
+      const token = await deploy(c, a.demoToken, [`Demo ${asset.symbol}`, `d${asset.symbol}`, asset.decimals, 0n, 0n, me]);
+      await send(c, token, a.demoToken.abi, "setMinter", [steerer, true]);
+      const oracle = await deployHook(c, a.sobHook, encodeAbiParameters([{ type: "address" }], [pm]), ORACLE_FLAGS);
+      const [currency0, currency1] = BigInt(token) < BigInt(usdc) ? [token, usdc] : [usdc, token];
+      const key: PoolKey = { currency0, currency1, fee: 500, tickSpacing: 10, hooks: oracle };
+      const o = orientationFor(key, token, asset.decimals, 6);
+      await send(c, pm, a.poolManager.abi, "initialize", [key, sqrtPriceX96FromPrice(price(asset.start), o)]);
+      await send(c, steerer, a.steerer.abi, "addLiquidityFullRange", [key, 10n ** 15n]);
+      pools.push({ symbol: asset.symbol, token, oracle, key, o, feed: asset.feed });
+    }
+    const dir = mkdtempSync(join(tmpdir(), "bot-deploy-"));
+    const file = join(dir, "deployments.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        chainId: 31337,
+        rpcUrl: url,
+        poolManager: pm,
+        priceSteerer: steerer,
+        demoUsdc: usdc,
+        underlyings: pools.map((p) => ({ symbol: p.symbol, token: p.token, oracle: p.oracle, pool: p.key, poolId: poolId(p.key) })),
+      }),
+    );
+    const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: file, DEPLOYER_PRIVATE_KEY: ANVIL_KEY });
+    const ctx = await setupMirror(cfg, log);
+    assert.deepEqual(ctx.targets.map((x) => x.symbol), ["ETH", "SOL"]);
+    for (const [i, p] of pools.entries()) {
+      const target = ctx.targets[i]!;
+      assert.deepEqual(target.key, p.key);
+      assert.deepEqual(target.orientation, p.o);
+      target.getPrice = async () => ({ quote: { symbol: p.symbol, source: "coinbase", raw: p.feed, price: price(p.feed) }, failures: [] });
+    }
+    const nonceBefore = await c.publicClient.getTransactionCount({ address: me });
+    const results = await mirrorTick(ctx);
+    assert.deepEqual(results.map((r) => [r.symbol, r.decision?.action, r.error]), [["ETH", "steer", undefined], ["SOL", "steer", undefined]]);
+    const txs = await Promise.all(results.map((r) => c.publicClient.getTransaction({ hash: r.hash! })));
+    assert.deepEqual(txs.map((x) => x.nonce), [nonceBefore, nonceBefore + 1]);
+    for (const p of pools) {
+      const slot0 = await readSlot0(c.publicClient, pm, p.key);
+      assert.equal(slot0.sqrtPriceX96, sqrtPriceX96FromPrice(price(p.feed), p.o), `${p.symbol} pool at ${p.feed}`);
+    }
+    assert.ok(lines.some((l) => /\] steered symbol=SOL /.test(l)));
+  });
+
+  await t.test("keeper: create, settle, sweep and invalid fallback through a MarketGatekeeper track", async () => {
     const QUOTE = { h0Wad: 2n * 10n ** 16n, gammaSWad: 5n * 10n ** 13n, lambdaWad: 10n ** 15n, qEpochMax: 100_000000n, pMinWad: 2n * 10n ** 16n };
     // period=1 so slot === block.timestamp: expiry stays "now + tenor" like the old fixed-openTime market did.
     const CONFIG = { period: 1, tenor: 60, window: 10, cutoffBuffer: 2, nSamples: 10, quote: QUOTE, maxBudget: 10_000000n, minBudget: 1_000000n, ticker: "ETH" };
@@ -177,25 +255,29 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const lnSpot = lnWad(price("2701.347"));
     await send(c, oracle, a.oracle.abi, "set", [lnSpot, varE36FromAnnualVol("0.6"), true]);
 
-    // MarketScheduler's constructor takes the hook's address, and the mock hook's constructor takes the scheduler's
-    // address as owner: the scheduler is predicted from the deployer's next nonce, the hook is deployed with that as
-    // owner, then the scheduler is deployed and lands at the predicted address. Task 3's SchedulerPair.sol does the
-    // same dance with a CREATE2-mined hook (for its address flags); MockPredictionHook needs no flags, so a plain
-    // CREATE (the next nonce) is enough here.
-    const nonce = await c.publicClient.getTransactionCount({ address: me });
-    const predicted = getContractAddress({ from: me, nonce: BigInt(nonce) + 1n });
-    const hook = await deploy(c, a.hook, [predicted, "0x31d0220469e10c4E71834a79b1f276d740d3768F", 100_000000n]);
-    const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
-    assert.equal(scheduler, predicted, "scheduler landed at the predicted nonce address");
-    assert.equal(await read<Address>(c, hook, a.hook.abi, "owner"), scheduler, "hook owner is the scheduler");
-    assert.equal(await schedulerPeriodFor(c.publicClient, scheduler, 60), 1, "the keeper reads the scheduler's own period");
+    const {
+      hook,
+      gatekeeper,
+      schedulers: [scheduler],
+    } = await deployTracks(c, a, [{ oracle, config: CONFIG }], 100_000000n);
+    assert.equal(await read<Address>(c, hook, a.hook.abi, "owner"), gatekeeper, "hook owner is the gatekeeper");
+    const tracks = await loadTracks(c.publicClient, { hook, gatekeeper, schedulers: [scheduler!] });
+    assert.deepEqual(
+      tracks.map((x) => [x.ticker, x.periodSec, x.tenorSec, x.windowSec, x.cutoffBufferSec]),
+      [["ETH", 1, 60, 10, 2]],
+      "the keeper reads each scheduler's own config",
+    );
+    await assert.rejects(loadTracks(c.publicClient, { hook, gatekeeper, schedulers: [scheduler!, oracle] }), /but marketSchedulers is/);
+    await assert.rejects(loadTracks(c.publicClient, { hook, gatekeeper: oracle, schedulers: [scheduler!] }), /gatekeeper 0x\w+ (hook|schedulers)\(\) failed/);
+    const track = tracks[0]!;
 
     const keeper = new Keeper({
       clients: c,
       hook,
-      scheduler,
-      periodSec: 60,
+      gatekeeper,
+      tracks,
       alignToPeriod: false,
+      minTradeSec: 5,
       scanBack: 50,
       invalidAfterSec: 40,
       dryRun: false,
@@ -204,12 +286,12 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     });
 
     const now = (await c.publicClient.getBlock()).timestamp;
-    const id = await keeper.createMarket(now);
+    const id = await keeper.createMarket(track, now);
     assert.equal(id, 0n);
     // `now` is read before open()'s transaction, which can land a block later, so openTime is derived from the
     // block that actually mined the MarketOpened event rather than from that pre-read clock.
     const [openedLog] = await c.publicClient.getContractEvents({
-      address: scheduler,
+      address: scheduler!,
       abi: marketSchedulerAbi,
       eventName: "MarketOpened",
       args: { marketId: id },
@@ -274,7 +356,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(keeper.tracked.has(0n), false);
 
     const now1 = (await c.publicClient.getBlock()).timestamp;
-    assert.equal(await keeper.createMarket(now1), 1n);
+    assert.equal(await keeper.createMarket(track, now1), 1n);
     await send(c, hook, a.hook.abi, "setBlockSettle", [true]);
     await testClient.increaseTime({ seconds: 65 });
     await testClient.mine({ blocks: 1 });
@@ -295,16 +377,13 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     // explicit sender still simulates successfully.
     const keyless = makeClients({ rpcUrl: url, chainId: 31337 });
     const dry = new Keeper({ ...keeper.opts, clients: keyless, dryRun: true });
-    assert.equal(await dry.createMarket((await c.publicClient.getBlock()).timestamp), 2n, "no auth check: any account can simulate open()");
+    assert.equal(await dry.createMarket(track, (await c.publicClient.getBlock()).timestamp), 2n, "no auth check: any account can simulate open()");
     assert.equal(await read<bigint>(c, hook, a.hook.abi, "marketCount"), 2n, "dry runs send nothing");
   });
 
   await t.test("createMarket: InsufficientIdle propagates and is not mistaken for AlreadyOpened", async () => {
     const oracle = await deploy(c, a.oracle, []);
     await send(c, oracle, a.oracle.abi, "set", [lnWad(price("2700")), varE36FromAnnualVol("0.6"), true]);
-    const nonce = await c.publicClient.getTransactionCount({ address: me });
-    const predicted = getContractAddress({ from: me, nonce: BigInt(nonce) + 1n });
-    const hook = await deploy(c, a.hook, [predicted, "0x31d0220469e10c4E71834a79b1f276d740d3768F", 1_000000n]);
     const CONFIG = {
       period: 60,
       tenor: 120,
@@ -316,14 +395,15 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       minBudget: 5_000000n, // half of the 1 USDC vault (0.5) can never afford this
       ticker: "ETH",
     };
-    const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
-    assert.equal(scheduler, predicted);
+    const { hook, gatekeeper, schedulers } = await deployTracks(c, a, [{ oracle, config: CONFIG }], 1_000000n);
+    const scheduler = schedulers[0]!;
+    const tracks = await loadTracks(c.publicClient, { hook, gatekeeper, schedulers });
     const keeper = new Keeper({
       clients: c,
       hook,
-      scheduler,
-      periodSec: 60,
+      tracks,
       alignToPeriod: false,
+      minTradeSec: 5,
       scanBack: 50,
       invalidAfterSec: 3601,
       dryRun: true,
@@ -334,7 +414,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const now = (await c.publicClient.getBlock()).timestamp;
     let threw: unknown;
     try {
-      await keeper.createMarket(now, () => (submitted = true));
+      await keeper.createMarket(tracks[0]!, now, () => (submitted = true));
       assert.fail("expected InsufficientIdle");
     } catch (e) {
       threw = e;

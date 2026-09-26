@@ -31,10 +31,11 @@ export function validatedReadTransport(base: Transport): Transport {
         }, transport.value);
     };
 }
-export function createReadTransport(rpcUrl: string, chainId: number): Transport {
+export function createReadTransport(rpcUrl: string | readonly string[], chainId: number): Transport {
     // A local fork may share chain ID 1301. Never escape a custom RPC to public Sepolia.
-    const canonical = chainId === 1301 && new URL(rpcUrl).href === 'https://sepolia.unichain.org/';
-    const urls = canonical ? [rpcUrl, SECONDARY_SEPOLIA_RPC] : [rpcUrl];
+    const configured = typeof rpcUrl === 'string' ? [rpcUrl] : [...rpcUrl];
+    const canonical = configured.length === 1 && chainId === 1301 && new URL(configured[0]).href === 'https://sepolia.unichain.org/';
+    const urls = canonical ? [...configured, SECONDARY_SEPOLIA_RPC] : configured;
     const transports = urls.map(url => validatedReadTransport(http(url, { timeout: 15_000, retryCount: 0 })));
     // Retry the identical request/block on an independent endpoint, including empty HTTP-200 results.
     return fallback(transports, { retryCount: canonical ? 0 : 1, rank: false });

@@ -1,14 +1,31 @@
-import { type Address, getAddress, isAddress, zeroAddress } from 'viem'
+import { type Address, getAddress, type Hex, isAddress, zeroAddress } from 'viem'
 import { type ChainContracts, FORBIDDEN_ROUTERS, UNICHAIN_SEPOLIA } from './constants.ts'
+import { type PoolKey, poolId } from './pool.ts'
+
+/** One `underlyings` entry, a demo token with its oracle hook and the pool that hook sits on */
+export interface Underlying {
+  /** Upper-case asset symbol such as "ETH" or "SOL" */
+  symbol: string
+  token: Address
+  oracle: Address
+  pool: PoolKey
+  poolId: Hex
+}
 
 /** Our contracts on one chain. Addresses that are missing or placeholders in the JSON are `undefined`. */
 export interface PredictionDeployment extends ChainContracts {
   predictionHook?: Address
   underlyingOracle?: Address
-  /** The ownerless MarketScheduler that owns `predictionHook` and is the only account able to open markets. */
-  marketScheduler?: Address
-  /** Prior `predictionHook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
+  /** The ownerless MarketGatekeeper that owns `predictionHook` and forwards `createMarket` from its schedulers only */
+  marketGatekeeper?: Address
+  /** One MarketScheduler per track in gatekeeper order, empty for a file with none */
+  marketSchedulers: Address[]
+  /** Schedulers of earlier hooks, oldest first */
+  legacyMarketSchedulers: Address[]
+  /** Prior `predictionHook` addresses the vault migrated away from, oldest first */
   legacyPredictionHooks: Address[]
+  /** Price sources in file order, empty when the file has no `underlyings` list */
+  underlyings: Underlying[]
   deployBlock?: bigint
   /** Keys that were present but held a placeholder value. */
   placeholders: string[]
@@ -17,7 +34,8 @@ export interface PredictionDeployment extends ChainContracts {
 const ALIASES: Record<string, string[]> = {
   predictionHook: ['predictionHook', 'PredictionHook', 'prediction_hook', 'hook'],
   underlyingOracle: ['underlyingOracle', 'UnderlyingOracleHook', 'underlyingOracleHook', 'oracleHook', 'oracle'],
-  marketScheduler: ['marketScheduler', 'MarketScheduler'],
+  marketGatekeeper: ['marketGatekeeper', 'MarketGatekeeper'],
+  marketSchedulers: ['marketSchedulers', 'MarketSchedulers'],
   usdc: ['usdc', 'USDC', 'collateral'],
   poolManager: ['poolManager', 'PoolManager'],
   v4Quoter: ['v4Quoter', 'V4Quoter', 'quoter'],
@@ -60,13 +78,63 @@ function pick(flat: Record<string, unknown>, key: string): { present: boolean; v
   return { present: false, value: undefined }
 }
 
-/** `legacyPredictionHooks` checksummed, skipping placeholders and non-address entries. Missing or not an array yields []. */
-function legacyPredictionHooks(flat: Record<string, unknown>): Address[] {
-  const { value } = pick(flat, 'legacyPredictionHooks')
+/** Checksummed addresses of a list key, skipping placeholders, [] when missing or not an array */
+function addressList(flat: Record<string, unknown>, key: string): Address[] {
+  const { value } = pick(flat, key)
   if (!Array.isArray(value)) {
     return []
   }
   return value.filter((v): v is string => !isPlaceholderAddress(v)).map((v) => getAddress(v))
+}
+
+function asInteger(v: unknown): number | undefined {
+  const n = typeof v === 'string' && /^-?\d+$/.test(v.trim()) ? Number(v) : v
+  return typeof n === 'number' && Number.isSafeInteger(n) ? n : undefined
+}
+
+function asPoolKey(v: unknown): PoolKey | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) {
+    return undefined
+  }
+  const p = v as Record<string, unknown>
+  const addr = (x: unknown) => (typeof x === 'string' && isAddress(x, { strict: false }) ? getAddress(x) : undefined)
+  const currency0 = addr(p['currency0'])
+  const currency1 = addr(p['currency1'])
+  const hooks = addr(p['hooks'])
+  const fee = asInteger(p['fee'])
+  const tickSpacing = asInteger(p['tickSpacing'])
+  if (!currency0 || !currency1 || !hooks || fee === undefined || tickSpacing === undefined) {
+    return undefined
+  }
+  return { currency0, currency1, fee, tickSpacing, hooks }
+}
+
+/** Skips malformed or placeholder entries but throws on a `poolId` that contradicts its pool key */
+function underlyings(flat: Record<string, unknown>): Underlying[] {
+  const list = flat['underlyings']
+  if (!Array.isArray(list)) {
+    return []
+  }
+  const out: Underlying[] = []
+  list.forEach((entry: unknown, i) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return
+    }
+    const e = entry as Record<string, unknown>
+    const symbol = typeof e['symbol'] === 'string' ? e['symbol'].trim().toUpperCase() : ''
+    const pool = asPoolKey(e['pool'])
+    if (!symbol || !pool || isPlaceholderAddress(e['token']) || isPlaceholderAddress(e['oracle'])) {
+      return
+    }
+    const id = poolId(pool)
+    const given = e['poolId']
+    if (given !== undefined && (typeof given !== 'string' || given.toLowerCase() !== id)) {
+      throw new Error(`underlyings[${i}] (${symbol}) poolId ${String(given)} does not match its pool key (${id})`)
+    }
+    const token = getAddress(e['token'] as string)
+    out.push({ symbol, token, oracle: getAddress(e['oracle'] as string), pool, poolId: id })
+  })
+  return out
 }
 
 /**
@@ -106,8 +174,11 @@ export function parseDeployment(json: unknown, defaults: ChainContracts = UNICHA
     chainId,
     predictionHook: address('predictionHook'),
     underlyingOracle: address('underlyingOracle'),
-    marketScheduler: address('marketScheduler'),
-    legacyPredictionHooks: legacyPredictionHooks(flat),
+    marketGatekeeper: address('marketGatekeeper'),
+    marketSchedulers: addressList(flat, 'marketSchedulers'),
+    legacyMarketSchedulers: addressList(flat, 'legacyMarketSchedulers'),
+    legacyPredictionHooks: addressList(flat, 'legacyPredictionHooks'),
+    underlyings: underlyings(flat),
     usdc: address('usdc') ?? defaults.usdc,
     poolManager: address('poolManager') ?? defaults.poolManager,
     v4Quoter: address('v4Quoter') ?? defaults.v4Quoter,
@@ -125,4 +196,20 @@ export function requireHook(d: PredictionDeployment): Address {
     throw new Error('PredictionHook address is missing or a placeholder in the deployment file')
   }
   return d.predictionHook
+}
+
+/** Throws a readable error when the gatekeeper address is not deployed yet */
+export function requireGatekeeper(d: PredictionDeployment): Address {
+  if (!d.marketGatekeeper) {
+    throw new Error('MarketGatekeeper address is missing or a placeholder in the deployment file')
+  }
+  return d.marketGatekeeper
+}
+
+/** Throws a readable error when the deployment file lists no market schedulers */
+export function requireSchedulers(d: PredictionDeployment): Address[] {
+  if (!d.marketSchedulers.length) {
+    throw new Error('marketSchedulers is missing or empty in the deployment file')
+  }
+  return d.marketSchedulers
 }

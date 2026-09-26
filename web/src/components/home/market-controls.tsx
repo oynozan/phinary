@@ -6,35 +6,58 @@ export const MARKET_TABS: { value: MarketTab; label: string }[] = [
   { value: "upcoming", label: "Upcoming" },
   { value: "resolved", label: "Resolved" },
 ];
-export function MarketControls({
+/** Asset and duration pills, one market track is shown at a time */
+export function TrackFilter({
   filters,
   onChange,
   assets,
-  volumeAvailable,
+  durations,
 }: {
   filters: ExplorerFilters;
   onChange: (next: ExplorerFilters) => void;
   assets: string[];
-  volumeAvailable: boolean;
+  durations: string[];
 }) {
   return (
-    <div className="market-controls">
-      <div
-        className="underlying-controls"
-        role="group"
-        aria-label="Underlying asset"
-      >
-        {["all", ...assets].map((a) => (
+    <div className="track-filter">
+      <div role="group" aria-label="Asset">
+        {assets.map((a) => (
           <button
             type="button"
             key={a}
             aria-pressed={filters.underlying === a}
             onClick={() => onChange({ ...filters, underlying: a })}
           >
-            {a === "all" ? "All" : a}
+            {a}
           </button>
         ))}
       </div>
+      <div role="group" aria-label="Duration">
+        {durations.map((d) => (
+          <button
+            type="button"
+            key={d}
+            aria-pressed={filters.track === d}
+            onClick={() => onChange({ ...filters, track: d })}
+          >
+            {d}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+export function MarketControls({
+  filters,
+  onChange,
+  volumeAvailable,
+}: {
+  filters: ExplorerFilters;
+  onChange: (next: ExplorerFilters) => void;
+  volumeAvailable: boolean;
+}) {
+  return (
+    <div className="market-controls">
       <div className="market-utilities">
         <div
           className="market-state-controls"

@@ -12,6 +12,7 @@ import {SchedulerPair} from "../../script/base/SchedulerPair.sol";
 import {PredictionHook} from "../../src/PredictionHook.sol";
 import {MarketScheduler} from "../../src/MarketScheduler.sol";
 import {IMarketScheduler} from "../../src/interfaces/IMarketScheduler.sol";
+import {IMarketGatekeeper} from "../../src/interfaces/IMarketGatekeeper.sol";
 import {IPredictionHook} from "../../src/interfaces/IPredictionHook.sol";
 import {UnderlyingOracleHook} from "../../src/oracle/UnderlyingOracleHook.sol";
 import {MockOracle} from "../hook/mocks/MockOracle.sol";
@@ -393,7 +394,11 @@ contract RenounceOracleTest is OracleTestBase {
     }
 
     function _seed(string memory name, address schedulerOracle) internal returns (string memory path) {
-        address scheduler = address(new MarketScheduler(IPredictionHook(address(0x1234)), schedulerOracle, demoConfig()));
+        address scheduler = address(
+            new MarketScheduler(
+                IPredictionHook(address(0x1234)), IMarketGatekeeper(address(0x5678)), schedulerOracle, demoConfig()
+            )
+        );
         path = string.concat(dir, "/renounce-oracle-", name, ".json");
         vm.writeFile(
             path,

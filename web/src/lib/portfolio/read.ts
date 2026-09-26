@@ -22,12 +22,13 @@ export async function readPortfolio(account: Address, client = createChainClient
         held.forEach((position, i) => {
             const result = quotes[i];
             const market = toMarket(position.id, position.info, 0, result?.status === 'success' ? result.result as HookQuote : undefined, Number(block.timestamp));
+            const asset = config.oracleAssets[market.oracle?.toLowerCase()];
             for (const side of ['up', 'down'] as const) {
                 const quantity = position[side];
                 if (!quantity) continue;
                 const payout = payoutPerToken(market.phase, side);
                 const currentPrice = payout ?? market.quote?.[side === 'up' ? 'bidUp' : 'bidDown'] ?? null;
-                rows.push({ id: `${market.id}:${side}`, marketId: market.id, question: market.oracle?.toLowerCase() === config.underlyingOracle.toLowerCase() ? `ETH > $${market.strike.toFixed(2)} at ${new Date(market.expiry * 1000).toISOString()}` : `Market #${market.id}`, expiry: market.expiry, cutoff: market.cutoff, openTime: market.openTime, phase: market.phase, tradable: Boolean(market.quote?.tradable), side, quantity, avgCost: null, currentPrice, value: currentPrice === null ? null : Number(quantity) / 1e6 * currentPrice, profit: null, profitPercent: null, settledAt: null, disposition: 'held' });
+                rows.push({ id: `${market.id}:${side}`, marketId: market.id, question: asset ? `${asset} > $${market.strike.toFixed(2)} at ${new Date(market.expiry * 1000).toISOString()}` : `Market #${market.id}`, expiry: market.expiry, cutoff: market.cutoff, openTime: market.openTime, phase: market.phase, tradable: Boolean(market.quote?.tradable), side, quantity, avgCost: null, currentPrice, value: currentPrice === null ? null : Number(quantity) / 1e6 * currentPrice, profit: null, profitPercent: null, settledAt: null, disposition: 'held' });
             }
         });
     }

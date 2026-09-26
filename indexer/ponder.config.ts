@@ -16,7 +16,7 @@ export default createConfig({
   chains: {
     unichainSepolia: {
       id: deployment.chainId,
-      rpc: deployment.rpcUrl,
+      rpc: deployment.rpcUrls,
     },
   },
   contracts: {

@@ -64,6 +64,11 @@ export function useQuote(id: number): Query<Quote | null> {
     const query = useMarket(id);
     return { ...query, data: query.data ? query.data.quote : query.data };
 }
+/** Market tracks in deployment order, frozen at deploy */
+export function useTracks(): Query<MarketSnapshot["tracks"]> {
+    const query = useSnapshot();
+    return { ...query, data: query.data?.tracks };
+}
 export function useEthPrice(): Query<NonNullable<MarketSnapshot["eth"]>> {
     const query = useSnapshot();
     return { ...query, data: query.data?.eth, error: query.error ?? (query.data && !query.data.eth ? new Error("ETH price unavailable") : undefined) };

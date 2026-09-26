@@ -1,0 +1,54 @@
+---
+title: FAQ
+description: Short answers to the questions people ask most about Phinary.
+---
+
+# FAQ
+
+## Where does the price come from?
+
+From a Uniswap v4 ETH/USDC pool. A second hook on that pool records its start-of-block price, its tick history and its volatility, and `PredictionHook` reads only that. There are no external oracles and no external services ([Oracle](/contracts/oracle)).
+
+## Who controls the markets?
+
+Nobody. The hook's only owner is `MarketScheduler`, a contract with no admin and no setters. Anyone can open the next market, settle it and sweep it, and nobody can change a live market or choose its outcome.
+
+## What if the keeper bot stops?
+
+Markets stop opening on their own, but nothing breaks. Anyone can call `open()`, `settle` and `sweep` with any wallet ([Keeper calls](/integration/keeper-calls)).
+
+## Why do the pools show no liquidity?
+
+The hook fills every swap itself, so the pool's own curve never runs. The other side of each trade is the LP vault inside the hook ([The LP vault](/concepts/vault)).
+
+## Why is Phinary not on app.uniswap.org?
+
+Uniswap's hosted routing skips hook-priced pools that hold no liquidity unless Uniswap Labs allowlists the hook. The pools are ordinary v4 pools, so V4Quoter and UniversalRouter work unchanged, and the demo uses a local fork of the Uniswap app that routes them ([Trade in the Uniswap app](/guides/uniswap-app)).
+
+## Can someone manipulate the result?
+
+Not within one block: no trade can move the price recorded for its own block, and the result averages 10 seconds of those prices. Holding the pool away from the market price across several blocks is possible but costly, and the most it can win is one market's budget. [Security](/contracts/security#manipulation) has the tests, including the case where it pays.
+
+## What does a trade cost?
+
+The spread (2 cents a side plus a part that grows near the strike and near expiry), a small price impact within the block, and gas. The pools charge no LP fee.
+
+## Can I lose more than I paid?
+
+No. A token is worth between 0 and 1 USDC, so the most you can lose is what you paid.
+
+## Why does the price jump so much near the end?
+
+With little time left, ETH has little time to cross back over the strike. The same 1 USD move that shifts the price by 0.13 with 110 seconds left shifts it by 0.33 with 20 seconds left ([Pricing, simply](/concepts/pricing)).
+
+## What if I never redeem?
+
+Winning tokens never expire. Their USDC stays in the market until you sell them at 1.00 or call `redeem`.
+
+## Can markets be longer, or on other assets?
+
+Timing and pricing are deployment parameters of the scheduler, so a week-long market needs a new scheduler, not new code. Another asset needs its own oracle hook on a pool of that asset against USDC.
+
+## Is it on mainnet?
+
+No. It runs on Unichain Sepolia, a testnet, with Circle's testnet USDC. The contracts have not been audited.

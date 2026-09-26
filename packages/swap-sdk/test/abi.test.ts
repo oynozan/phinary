@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { type Abi, toFunctionSelector, toEventSelector } from 'viem'
-import { outcomeTokenAbi, predictionHookAbi } from '../src/index.ts'
+import { marketGatekeeperAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi } from '../src/index.ts'
 
 const out = join(dirname(fileURLToPath(import.meta.url)), '../../../out')
 
@@ -18,6 +18,8 @@ describe('generated ABIs match the Foundry build', () => {
   for (const [file, name, abi] of [
     ['IPredictionHook.sol', 'IPredictionHook', predictionHookAbi],
     ['OutcomeToken.sol', 'OutcomeToken', outcomeTokenAbi],
+    ['IMarketScheduler.sol', 'IMarketScheduler', marketSchedulerAbi],
+    ['IMarketGatekeeper.sol', 'IMarketGatekeeper', marketGatekeeperAbi],
   ] as const) {
     const path = join(out, file, `${name}.json`)
     it(name, { skip: !existsSync(path) && 'forge build output missing' }, () => {

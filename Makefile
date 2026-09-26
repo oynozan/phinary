@@ -9,7 +9,7 @@ SHELL_SCRIPTS := script/local-env.sh script/local-env-stop.sh script/bots.sh scr
 
 .DEFAULT_GOAL := help
 .PHONY: help build test test-scripts test-all local-env local-stop local-status local-wallet rehearse market-local \
-	deploy-sepolia fund-sepolia market-sepolia bots bots-stop bots-status bots-logs vendor-interface backup-app
+	deploy-sepolia fund-sepolia market-sepolia underlying-sepolia seed-underlying-sepolia renounce-underlying-sepolia bots bots-stop bots-status bots-logs vendor-interface backup-app
 
 help: ## List the targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN { FS = ":.*## " } { printf "  %-18s %s\n", $$1, $$2 }'
@@ -75,6 +75,15 @@ fund-sepolia: ## GUARDED vault deposit of FUND_USDC (default 20) Circle USDC
 
 market-sepolia: ## GUARDED one-off market on Unichain Sepolia
 	script/sepolia.sh market
+
+underlying-sepolia: ## GUARDED new price source UNDERLYING_SYMBOL (token, oracle, pool at UNDERLYING_PRICE_USD)
+	script/sepolia.sh underlying
+
+seed-underlying-sepolia: ## GUARDED demoLiquidity into UNDERLYING_SYMBOL's pool, signed by the mirror key
+	script/sepolia.sh seed-underlying
+
+renounce-underlying-sepolia: ## GUARDED IRREVERSIBLE renounce of UNDERLYING_SYMBOL's oracle
+	script/sepolia.sh renounce-underlying
 
 # Bots and front ends
 
