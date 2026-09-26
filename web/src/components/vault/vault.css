@@ -15,3 +15,10 @@
 @media (max-width:1023px) {
   .vault-quick button, .vault-tabs button, .vault-filters button, .vault-learn, .vault-primary, .vault-error button, .vault-exposure footer button { min-height:44px; }
 }
+
+/* Let the shared transparent header reveal the same canvas as the Vault. */
+body:has(.vault-page) {
+  background: radial-gradient(ellipse 900px 600px at 95% 120px, #66259328, transparent 60%), #0d0e15;
+}
+body:has(.vault-page)::before { display: none; }
+.vault-page { background: transparent; }
