@@ -42,3 +42,15 @@ Impeccable detector ran once on changed detail components and TradeCard. Reporte
 ## Boundary
 
 Only `web/` presentation, display helpers, tests and documentation changed. Smart contracts, protocol math, backend, indexer, SDK, ABI, addresses and transaction mechanics were not modified. Existing header and Markets/Portfolio/Activity/Vault bodies are unchanged.
+
+## Settlement companion refinement
+
+User requested a character to fill the empty area below the resolved Settlement sidebar. Added a static generated orbital robot, shown only for resolved/invalid states, with an Explore markets link to `/`. Image is a 640px WebP (~30 KB), exact prompt and provenance sidecar shipped alongside it.
+
+- Parent visually inspected 1536px desktop and 390px mobile; clientWidth and scrollWidth match. Mobile uses a compact horizontal row. Viewport restored.
+- Independent `companion_review`: ship, no material findings. Independently inspected desktop at 1680px and clicked Explore markets to confirm navigation. Mobile evidence is parent's capture.
+- Lint, typecheck and all 24 existing tests passed. No new tests for this presentational-only change.
+- Standard Turbopack build failed on an internal process port binding with Operation not permitted, including a retry outside the default sandbox. `npm run build -- --webpack` passed. It emitted warnings from unchanged Akt font metadata and viem/ox dependency loading.
+- Detector: one advisory for existing #000 mask color, no non-advisory findings. No detector-driven source changes.
+- Documentation follow-up agent could not start because the thread limit was reached; parent completed the small documented component extension using the skill's documenter fallback.
+- Transaction code and underlying data hooks are unchanged.

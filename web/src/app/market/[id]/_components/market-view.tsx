@@ -6,6 +6,8 @@ import { emptyForm, TradeCard, type TradeForm } from "@/components/trade";
 import { BRAND_NAME } from "@/config/brand";
 import { useMarket } from "@/lib/data";
 import { useTokenBalance } from "@/lib/onchain/balances";
+import { isResolved } from "@/lib/phase";
+import { SettlementCompanion } from "./settlement-companion";
 import type { Market, Side } from "@/lib/types";
 import { ChartPanel } from "./chart-panel";
 import { MarketHero } from "./market-hero";
@@ -39,7 +41,7 @@ function MarketContent({ market, initialSide }: { market: Market; initialSide: S
         <div className="detail-grid">
             <div className="detail-overview-slot"><Overview market={market} /></div>
             <div className="detail-chart-slot"><ChartPanel market={market} /></div>
-            <div className="detail-trade-slot"><TradeCard market={market} form={form} onFormChange={setForm} holdings={upBalance} /></div>
+            <div className="detail-trade-slot"><TradeCard market={market} form={form} onFormChange={setForm} holdings={upBalance} />{isResolved(market.phase) && <SettlementCompanion />}</div>
             <div className="detail-position-slot"><PositionPanel market={market} upBalance={upBalance} /></div>
             <div className="detail-pricing-slot"><PricingExplanation market={market} /></div>
         </div>

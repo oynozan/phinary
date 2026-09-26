@@ -21,3 +21,7 @@ Detail adds scoped 10px panels, compact typography roles and tonal states for se
 ## Evidence and review
 
 Source: the user-approved Market Detail brief, attached as pasted-text.txt in the active task; implemented market-detail.css, detail-presentation.tsx and trade-card.tsx. Independent design review disposition reported by the coordinating agent: ship, no material findings. The detector was already run once; this documentation incorporates its advisory without rerunning it. Application verification evidence is recorded in `.impeccable/market-detail-verification.md`: 24 tests, lint, typecheck and production build passed, as reported by the coordinating agent.
+
+## Settlement companion refinement
+
+User requested a character to occupy the unused right-column space after resolution. A static moon-seated orbital robot now appears below Settlement for resolved and invalid markets, with What’s next? and an Explore markets link to `/`. Desktop image width is 260px; stacked layouts use a horizontal 150px image, reduced to 112px on phones. The decorative image has empty alt text and no motion. Generated art and exact provenance are stored under `public/markets/orbital-companion.*`. Purchase and settlement behavior is unchanged.

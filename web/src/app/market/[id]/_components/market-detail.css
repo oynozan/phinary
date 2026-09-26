@@ -201,3 +201,21 @@ body:has(.market-detail-page)::before { display: none; }
   .market-detail-page *, .market-detail-page *::before, .market-detail-page *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .market-detail-page button:not(:disabled):active { transform: none; }
 }
+
+/* Resolved markets retain a useful next step in the shorter trading column. */
+.detail-companion { display: flex; flex-direction: column; align-items: center; padding: 4px 16px 16px; text-align: center; }
+.detail-companion img { width: 260px; max-width: 100%; height: auto; mix-blend-mode: lighten; }
+.detail-companion h2 { font-size: 18px; }
+.detail-companion p { color: #b4bdd3; font-size: 12px; margin: 4px 0 12px; }
+.detail-companion a { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 20px; border: 1px solid #4a365d; border-radius: 8px; color: #e6d9f2; background: #151925; font-weight: 600; }
+.detail-companion a:hover { border-color: #b986dd; background: #2c1b3d; }
+@media (max-width: 1023px) {
+  .detail-companion { flex-direction: row; justify-content: center; gap: 20px; padding: 12px 8px; text-align: left; }
+  .detail-companion img { width: 150px; }
+}
+@media (max-width: 639px) {
+  .detail-companion { gap: 12px; }
+  .detail-companion img { width: 112px; }
+  .detail-companion h2 { font-size: 16px; }
+  .detail-companion a { font-size: 12px; padding: 7px 14px; }
+}

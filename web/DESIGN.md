@@ -235,6 +235,8 @@ The header keeps a Phi mark and wordmark, luminous active underline and existing
 
 Market Detail includes a question/date/status header, overview metrics, chart mode and range controls, position rows, pricing inputs/output, settlement rules and text-only onchain links. Its rectangular trade card has Buy/Sell controls, explicit UP/DOWN side selection, a USDC amount, quick amounts, a quote summary and a full-width primary action. Its chart controls retain visible selected and disabled states when history is unavailable. The primary action uses the scoped gradient, then an opaque muted fill when disabled. Focus is a 2px violet outline with a 3px offset; amount focus also highlights its border. Transaction steps appear only after an action starts. Data availability and action support are defined in PRODUCT.md and the surface brief.
 
+The user-approved settlement companion is a static orbital robot below the resolved/invalid Settlement panel. It uses the existing palette and a secondary Explore markets link, with a 260px image on desktop, 150px below 1024px and 112px below 640px. Stacked layouts place the image and copy side by side. This character is a scoped exception to the earlier no-decoration direction; trading screens and other route bodies are unchanged.
+
 ## Do's and Don'ts
 
 - Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.
