@@ -120,7 +120,9 @@ role: the contract verifies every seal and proof, so a faulty bot can stall the 
 - A block hash comes from `BLOCKHASH` for 256 blocks, then from EIP-2935 for 8,191. Past those, and 32 blocks early to
   leave time to land, it first stores the missing hashes with `checkpointHeaders`, walking back from the oldest block a
   window still serves.
-- Gas is estimated before every transaction; a `proveMany` whose estimate exceeds half the block gas limit is halved.
+- Gas is estimated before every transaction and padded, and no limit exceeds the block's or EIP-7825's 16,777,216 per
+  transaction. A `proveMany` is halved while its estimate fails or exceeds half the block gas limit or 5/6 of that cap,
+  so the padded batch always fits one transaction. A single proof that still fails is retried next round.
 
 ## Seeding the underlying pool
 
