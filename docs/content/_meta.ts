@@ -1,18 +1,17 @@
 import type { MetaRecord } from "nextra";
 
+const theme = {
+    breadcrumb: false,
+    timestamp: false,
+    copyPage: false,
+};
+
 const meta: MetaRecord = {
-    index: {
-        type: "page",
-        display: "hidden",
-        theme: {
-            sidebar: false,
-            toc: true,
-            breadcrumb: false,
-            pagination: false,
-            timestamp: false,
-            copyPage: false,
-        },
-    },
+    index: { title: "PredictionHook", theme },
+    pricing: { title: "Pricing", theme },
+    oracle: { title: "Oracle", theme },
+    scheduler: { title: "Scheduler", theme },
+    integration: { title: "Integration", theme },
 };
 
 export default meta;

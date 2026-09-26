@@ -232,6 +232,11 @@ pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
     color: var(--foreground);
 }
 
+:is(p, li, td) .source-link {
+    display: inline;
+    margin-top: 0;
+}
+
 .source-link + div pre,
 .source-link + pre {
     margin-top: 0.5rem;

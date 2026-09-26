@@ -4,4 +4,4 @@ This version (16.3) has breaking changes: APIs, conventions, and file structure 
 
 `npm run dev` unsets the agent environment variables so `next dev` does not re-insert its stock notice (which contains em dashes) into this file.
 
-The code excerpts in `content/index.mdx` are copied from the commit pinned in `components/source.tsx`, and every `<Source>` link points at that commit. When the hook changes, update the excerpts, their line ranges and the pinned commit together.
+The code excerpts in `content/*.mdx` are copied from the commit pinned in `components/source.tsx`, and every `<Source>` link points at that commit. When the hook changes, update the excerpts, their line ranges and the pinned commit together.

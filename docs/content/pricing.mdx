@@ -1,0 +1,144 @@
+---
+title: Pricing
+description: How the hook computes the fair price, the spread and the exact fill amounts.
+---
+
+# Pricing
+
+Two pure libraries turn the oracle's numbers into trades. `BinaryPricer` gives the fair YES price and the ask and bid around it. `QuoteMath` gives the exact token and USDC amounts of a fill. Both work in integers and round in the vault's favour.
+
+## Settlement-matched binary
+
+<Source path="src/math/BinaryPricer.sol" lines="36-73" />
+
+```solidity showLineNumbers{36}
+function effectiveTimes(uint256 tau, uint256 window, uint256 n)
+    internal
+    pure
+    returns (uint256 tDriftE18, uint256 tVarE18)
+{
+    if (tau <= window) revert TooLate();
+    uint256 base = (tau - window) * 1e18;
+    if (n == 0) {
+        tDriftE18 = base + window * 1e18 / 2;
+        tVarE18 = base + window * 1e18 / 3;
+    } else {
+        // (n-1)*Delta/2 = w*(n-1)/(2n) ; Delta*(n-1)*(2n-1)/(6n) = w*(n-1)*(2n-1)/(6n^2)
+        tDriftE18 = base + window * 1e18 * (n - 1) / (2 * n);
+        tVarE18 = base + F.fullMulDiv(window * 1e18, (n - 1) * (2 * n - 1), 6 * n * n);
+    }
+}
+
+function _moments(int256 x, uint256 varE36, uint256 tau, uint256 window, uint256 n)
+    private
+    pure
+    returns (Result memory r)
+{
+    (uint256 tDrift, uint256 tVar) = effectiveTimes(tau, window, n);
+    r.sqrtV = F.sqrt(F.fullMulDiv(varE36, tVar, 1e18));
+    if (r.sqrtV == 0) revert ZeroVariance();
+    int256 mu = x - SafeCastLib.toInt256(F.fullMulDiv(varE36, tDrift, 2e36));
+    r.d = mu * WAD / int256(r.sqrtV);
+}
+
+function price(int256 x, uint256 varE36, uint256 tau, uint256 window, uint256 n)
+    internal
+    pure
+    returns (Result memory r)
+{
+    r = _moments(x, varE36, tau, window, n);
+    r.mid = NormalCdf.cdf(r.d);
+    r.pdf = NormalCdf.pdf(r.d);
+}
+```
+
+A market does not pay on the price at one instant. It pays if the **average log price over the last `window` seconds**, sampled `n` times, is above the strike. Under Black-Scholes with zero rates that average is normally distributed, so the fair YES price is:
+
+$$
+\text{mid} = \Phi\!\left(\frac{\mu}{\sqrt{v}}\right), \qquad \mu = x - \tfrac{1}{2}\sigma^2 T_D, \qquad v = \sigma^2 T_V
+$$
+
+$$
+T_D = (\tau - w) + \frac{w(n-1)}{2n}, \qquad T_V = (\tau - w) + \frac{w(n-1)(2n-1)}{6n^2}
+$$
+
+- $x = \ln(S / K)$ is the moneyness, $\sigma^2$ the per-second variance and $\tau$ the time to expiry.
+- `effectiveTimes` computes $T_D$ and $T_V$. As the window shrinks to 0 this becomes the textbook European binary $N(d_2)$.
+- Pricing exactly what settles leaves no gap between what traders pay and what the market pays out.
+
+## Spread
+
+<Source path="src/math/BinaryPricer.sol" lines="94-107" />
+
+```solidity showLineNumbers{94}
+function askBid(Result memory r, uint256 gammaSWad, uint256 h0Wad) internal pure returns (uint256 ask, uint256 bid) {
+    if (r.kernel == 0) {
+        uint256 kappa = gammaSWad > GAMMA_MAX
+            ? type(uint256).max
+            : F.divUp(F.divUp(gammaSWad * 1e45, r.sqrtV), uint256(NormalCdf.SQRT_2PI_WAD));
+        (uint256 up, uint256 dn) = NormalCdf.band(r.d, kappa);
+        ask = up + h0Wad;
+        bid = dn > h0Wad ? dn - h0Wad : 0;
+    } else {
+        ask = r.mid + F.fullMulDivUp(gammaSWad, r.pdf, r.sqrtV) + h0Wad;
+        uint256 sub = F.fullMulDiv(gammaSWad, r.pdf, r.sqrtV) + h0Wad;
+        bid = r.mid > sub ? r.mid - sub : 0;
+    }
+}
+```
+
+$$
+\text{ask} = \Phi(d) + k\,\varphi(d) + h_0, \qquad \text{bid} = \Phi(d) - k\,\varphi(d) - h_0, \qquad k = \frac{\gamma_S}{\sqrt{v}}
+$$
+
+- $k\,\varphi(d)$ is how much the price would move if the spot were off by $\gamma_S$ in log terms. It widens the spread where the binary is most sensitive: near the strike and close to expiry.
+- $h_0$ is a flat base half-spread.
+- NO is priced from YES: $\text{askNo} = 1 - \text{bid}$ and $\text{bidNo} = 1 - \text{ask}$.
+- For the Gaussian kernel, $\Phi \pm k\varphi$ is rounded once inside `NormalCdf.band`, so ask and bid are monotone in the price. The certificates are in `formal/hart36/`.
+
+## Example
+
+Strike 2,684.53 USD, start-of-block price 2,685.00 USD, 60 s to expiry, a 10 s window with 10 samples, and σ = 60% a year. Spread parameters: `h0 = 0.02`, `gammaS = 0.00002`.
+
+| Step | Value |
+|---|---|
+| $x = \ln(2685.00 / 2684.53)$ | 0.000175 |
+| $T_D$, $T_V$ | 54.5 s, 52.85 s |
+| $\sqrt{v}$ | 0.000776 |
+| $d$ | 0.2251 |
+| mid (YES) | 0.5890 |
+| $k\,\varphi(d)$ | 0.0100 |
+| YES ask / bid | 0.6191 / 0.5590 |
+| NO ask / bid | 0.4410 / 0.3809 |
+
+## Fill amounts
+
+<Source path="src/math/QuoteMath.sol" lines="40-52" />
+
+```solidity showLineNumbers{40}
+/// @notice USDC the trader pays for exactly q tokens (ceil).
+function buyExactOut(uint256 a, uint256 lam, int256 i0, uint256 q) internal pure returns (uint256) {
+    uint256 b = _beta(a, lam, i0, q);
+    return FixedPointMathLib.divUp(lam * q * q + b * q, D);
+}
+
+/// @notice Max tokens q with cost(q) <= amtIn.
+function buyExactIn(uint256 a, uint256 lam, int256 i0, uint256 amtIn) internal pure returns (uint256 q) {
+    uint256 b = _beta(a, lam, i0, amtIn);
+    uint256 r = amtIn * D;
+    if (lam == 0) return r / b;
+    q = (FixedPointMathLib.sqrt(b * b + 4 * lam * r) - b) / (2 * lam);
+}
+```
+
+Inside one block the marginal price rises linearly with the net flow $i$: $p(i) = p + \lambda i$. The cost of `q` tokens starting at flow $i_0$ is the area under that line, in 6-decimal units:
+
+$$
+\text{cost}(q) = \frac{\lambda q^2 + \beta q}{D}, \qquad \beta = 2 \cdot 10^6 \, p + 2 \lambda i_0, \qquad D = 2 \cdot 10^{24}
+$$
+
+- **Exact-out buys** evaluate the cost and round up.
+- **Exact-in buys** invert it with an integer square root and round down. A z3 proof shows the floor square root is exact for buys (<Source path="formal/z3_integer_lemmas.py" />).
+- **Sells** use the mirrored formulas and stay on the rising branch of the curve, which the hook's price band guarantees.
+
+**Example.** At the YES ask of 0.6191 with $\lambda = 0.001$ and no earlier flow, 5 USDC buys 8.0248 YES at an average of 0.6231, and the marginal price ends at 0.6271.

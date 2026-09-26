@@ -1,60 +1,45 @@
 ---
 title: PredictionHook
-description: How the Phinary PredictionHook works, function by function.
+description: The Phinary hook contract, function by function.
 ---
 
 # PredictionHook
 
-PredictionHook is a Uniswap v4 hook that turns two plain v4 pools, YES/USDC and NO/USDC, into a binary prediction market on the price of ETH. A market asks one question, for example "ETH above 2,684.53 USD at 00:48?". A winning token redeems for exactly 1 USDC and a losing token for nothing.
+<Source path="src/PredictionHook.sol" /> is a singleton Uniswap v4 hook. Every market it runs is a pair of v4 pools, YES/USDC and NO/USDC, that answer one question, for example "ETH above 2,684.53 USD at 00:48?". A winning token redeems for exactly 1 USDC and a losing token for nothing.
 
-The hook prices every swap itself with a Black-Scholes binary formula, fills it through v4 custom accounting, and backs every token with USDC from an LP vault that lives inside the hook. The pools hold no liquidity. The only price source is a second v4 hook on an ETH/USDC pool, so the markets need **no external oracles and no external services**.
+The hook is the only market maker. It prices every swap with a Black-Scholes binary formula, fills it through custom accounting, and backs every token with USDC from an LP vault inside the hook. The pools themselves hold no liquidity.
 
-The v4 mechanics it relies on:
+How it uses v4:
 
 - **NoOp swaps.** `beforeSwap` returns a delta that cancels the whole swap amount, so the concentrated-liquidity curve never runs and the hook sets the price.
 - **ERC-6909 claims.** The hook keeps all of its USDC and returned tokens as claims inside the PoolManager. A trade only adjusts claims, plus a mint of new outcome tokens straight into the PoolManager when inventory runs short.
 - **Self-initialised pools.** Only the hook can create its pools. v4 skips `beforeInitialize` on self-calls, and the hook reverts it for everyone else.
-- **A pool as the oracle.** `UnderlyingOracleHook` records the start-of-block ETH price, v3-style tick cumulatives and realised variance from one v4 pool.
-- **Standard routing.** Traders use UniversalRouter and V4Quoter exactly like any other v4 pool.
+- **Unchanged routing.** Traders use UniversalRouter and V4Quoter exactly as for any other v4 pool ([Integration](/integration)).
+- **One external read.** Prices and settlement come from an `IUnderlyingOracle`, itself a v4 hook on an ETH/USDC pool ([Oracle](/oracle)). There are no external oracles and no external services.
 
 ## Lifecycle
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"background": "#191919", "primaryColor": "#201f21", "primaryTextColor": "#f4f2f5", "primaryBorderColor": "#9c30a5", "secondaryColor": "#282629", "tertiaryColor": "#201f21", "lineColor": "#c828d6", "textColor": "#f4f2f5", "edgeLabelBackground": "#191919"}}}%%
 flowchart TD
-    A["LP calls deposit()"] --> V[("Vault idle USDC")]
-    V -->|"budget: min(max, idle/2)"| C["MarketScheduler.open() calls createMarket()"]
-    C --> T["Trading: swaps on YES/USDC and NO/USDC"]
-    T -->|"expiry − window − cutoffBuffer"| W["Averaging window, no trading"]
-    W -->|"expiry"| S["settle(): window average vs strike"]
-    W -.->|"expiry + 1 h, oracle cannot answer"| I["settleInvalid(): 50/50"]
-    S --> R["redeem() or sell the winner at 1.00"]
-    I --> R
-    R --> X["sweep(): surplus back to the vault"]
+    A["deposit()"] --> V[("vaultIdle")]
+    V -->|"budget"| C["createMarket()"]
+    C --> T["Trading: every swap runs _beforeSwap"]
+    T -->|"expiry − window − cutoffBuffer"| W["Averaging window, swaps revert"]
+    W -->|"expiry"| S["settle()"]
+    W -.->|"expiry + GRACE, oracle cannot answer"| I["settleInvalid()"]
+    S --> R["redeem() or swap-sell the winner at 1.00"]
+    I --> R2["redeem() or swap-sell at 0.50"]
+    R --> X["sweep()"]
+    R2 --> X
     X --> V
 ```
 
-1. LPs deposit USDC into the vault inside the hook ([`deposit`](#deposit-withdraw-unlockcallback)).
-2. Anyone calls `MarketScheduler.open()` once per time slot. It sets the strike at the current price and calls [`createMarket`](#createmarket), which moves a budget from the vault into the new market.
-3. Traders swap USDC for YES or NO through UniversalRouter. Each swap runs [`_beforeSwap`](#_beforeswap), which quotes, fills and books it.
-4. Trading stops before the settlement window starts. [`settle`](#settle) then compares the window's average price with the strike.
-5. Winners redeem with [`redeem`](#redeem) or sell back through a normal swap at 1.00. [`sweep`](#sweep) returns the surplus to the vault.
-
-The demo configuration (<Source path="script/base/SchedulerPair.sol" />) opens a market every 60 s. Each market lasts 120 s, trading stops 12 s before expiry (a 10 s window plus a 2 s buffer), and two markets overlap, so one is always tradable.
-
-## Contracts around the hook
-
-| Contract | Role |
-|---|---|
-| <Source path="src/PredictionHook.sol" /> | Markets, swaps, settlement, redemption and the LP vault |
-| <Source path="src/oracle/UnderlyingOracleHook.sol" /> | Second v4 hook on the ETH/USDC pool: start-of-block price, tick cumulatives, realised variance |
-| <Source path="src/MarketScheduler.sol" /> | Ownerless owner of the hook; `open()` creates one market per slot, callable by anyone |
-| <Source path="src/OutcomeToken.sol" /> | The YES and NO ERC-20s (6 decimals), minted and burned only by the hook |
-| <Source path="src/math/BinaryPricer.sol" /> | Black-Scholes binary price and spread |
-| <Source path="src/math/QuoteMath.sol" /> | Exact integer fill amounts with linear price impact |
-| <Source path="src/hook/StrikeMath.sol" /> | Settlement threshold in oracle ticks |
-
-Off chain, the keeper bot (<Source path="bot/src/keeper.ts" />) opens, settles and sweeps markets. The mirror bot (<Source path="bot/src/mirror.ts" />) keeps the testnet ETH/USDC pool near the real ETH price through `PriceSteerer`, a job arbitrageurs do on mainnet. `@phinary/swap-sdk` (<Source path="packages/swap-sdk/src/swap.ts" />) quotes and encodes swaps, the Ponder indexer (<Source path="indexer/src/trades.ts" />) turns hook events into history, and the dashboard in `web/` and a fork of the Uniswap interface (`interface-patches/`) trade through the same pools.
+1. LPs deposit USDC into the vault ([`deposit`](#deposit-withdraw-unlockcallback)).
+2. The owner calls [`createMarket`](#createmarket), which moves a budget from the vault into the new market and creates its two pools.
+3. Traders swap USDC for YES or NO. Each swap runs [`_beforeSwap`](#_beforeswap), which quotes, fills and books it.
+4. Trading stops before the settlement window starts. After expiry, [`settle`](#settle) compares the window's average price with the strike.
+5. Winners redeem with [`redeem`](#redeem) or sell back through a normal swap. [`sweep`](#sweep) returns the surplus to the vault.
 
 ## Permissions
 
@@ -73,10 +58,10 @@ function getHookPermissions() public pure override returns (Hooks.Permissions me
 }
 ```
 
-v4 reads a hook's permissions from the low 14 bits of its address, so the deploy script mines a CREATE2 salt that sets bits 13, 11, 9, 7, 5 and 3 (<Source path="script/base/SchedulerPair.sol" />).
+v4 reads a hook's permissions from the low 14 bits of its address, so the hook is deployed with a mined CREATE2 salt that sets bits 13, 11, 9, 7, 5 and 3.
 
 - `beforeSwap` plus `beforeSwapReturnDelta` let the hook replace the curve and settle both legs of every swap.
-- `beforeInitialize`, `beforeAddLiquidity`, `beforeRemoveLiquidity` and `beforeDonate` are enabled only to **revert** ([blocked callbacks](#blocked-callbacks)).
+- `beforeInitialize`, `beforeAddLiquidity`, `beforeRemoveLiquidity` and `beforeDonate` are enabled only so they can **revert** ([blocked callbacks](#blocked-callbacks)).
 
 ### Constructor and `setKeeper`
 
@@ -106,7 +91,7 @@ function setKeeper(address keeper_) external {
 }
 ```
 
-`owner` is immutable. In the permissionless deployment (<Source path="script/DeployScheduler.s.sol" />) the owner is the `MarketScheduler`, which has no admin, no setter and never calls `setKeeper`, so `keeper` stays `address(0)`. Nobody can create a market outside the schedule, change a market's parameters or choose an outcome.
+`owner` is immutable, and only the owner or the keeper can create markets. In the permissionless deployment the owner is `MarketScheduler`, a contract with no admin that never calls `setKeeper`, so `keeper` stays `address(0)` ([Scheduler](/scheduler)). Nobody can then create a market outside the schedule, change a market's parameters or choose an outcome.
 
 ## Market state
 
@@ -196,25 +181,6 @@ mapping(bytes32 => PoolRef) internal _pools;
 
 ## Creating a market
 
-### `MarketScheduler.open`
-
-<Source path="src/MarketScheduler.sol" lines="63-72" />
-
-```solidity showLineNumbers{63}
-function open() external returns (uint256 marketId) {
-    uint256 slot = block.timestamp / _period;
-    if (slot <= lastSlot) revert AlreadyOpened(slot);
-    lastSlot = slot;
-
-    uint256 budget = _budget();
-    uint256 expiry = slot * _period + _tenor;
-    uint256 cents = MarketNames.strikeCents(IUnderlyingOracle(oracle).lnSpotSoBWad());
-    (string memory yesName, string memory noName, string memory yesSymbol, string memory noSymbol) =
-        MarketNames.names(_ticker(), cents, expiry);
-```
-
-`open()` is permissionless and succeeds once per `period`-second slot. The strike is the oracle's current start-of-block price rounded to cents, so every market starts at the money. The budget is `min(maxBudget, vaultIdle / 2)`, so one market never takes the whole vault. The keeper bot calls it on every slot, but any account can.
-
 ### `createMarket`
 
 <Source path="src/PredictionHook.sol" lines="137-186" />
@@ -272,12 +238,12 @@ function createMarket(MarketParams calldata p) external returns (uint256 id) {
 }
 ```
 
-1. **Checks.** Only the owner (the scheduler) or the keeper may call. The trading window must be non-empty, `pMin` must be below 0.5 and only the Gaussian kernel is enabled in this build.
-2. **Budget.** `budget` leaves `vaultIdle` and becomes the market's `bucket`, which is also its first reserve.
+1. **Checks.** Only the owner or the keeper may call. The trading window must be non-empty, `pMin` must be below 0.5, and only the Gaussian kernel is enabled.
+2. **Budget.** `budget` leaves `vaultIdle` and becomes the market's `bucket`, its first reserve.
 3. **Tokens.** YES and NO are deployed with CREATE2 salts `(id, isYes)`, so their addresses are deterministic.
-4. **Settlement test.** `settleThreshold` is computed once from the strike ([StrikeMath](#strikemaththreshold)).
-5. **Pools.** Two `PoolKey`s with fee 0, tick spacing 60 and `hooks = this`, initialised at price 1:1. The price is cosmetic because the curve never runs. The hook calls `poolManager.initialize` itself, and v4's `noSelfCall` rule skips `beforeInitialize` for the hook's own calls.
-6. **Event.** `MarketCreated` carries both pool ids; the indexer builds its market table from it.
+4. **Settlement test.** `settleThreshold` is computed once from the strike ([settlement rule](/oracle#settlement-rule)).
+5. **Pools.** Two `PoolKey`s with fee 0, tick spacing 60 and `hooks = this`, initialised at price 1:1. That price is cosmetic because the curve never runs. The hook calls `poolManager.initialize` itself, and v4's `noSelfCall` rule skips `beforeInitialize` for the hook's own calls.
+6. **Event.** `MarketCreated` carries both pool ids, so indexers can discover the pools.
 
 ### Blocked callbacks
 
@@ -321,8 +287,6 @@ function _beforeDonate(address, PoolKey calldata, uint256, uint256, bytes callda
 - **`beforeDonate`** reverts, which keeps the claim balances equal to the ledger.
 
 ## The swap path
-
-A trader swaps through UniversalRouter with `V4_SWAP` and the actions `SWAP_EXACT_IN_SINGLE` (or `EXACT_OUT`), `SETTLE_ALL` and `TAKE_ALL`, the same as for any v4 pool. V4Quoter simulates the same `beforeSwap`, so quotes and fills always agree.
 
 ### `_beforeSwap`
 
@@ -368,7 +332,7 @@ function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata p
 | Exact in | `+amtIn` | `−amtOut` |
 | Exact out | `−amtOut` | `+amtIn` |
 
-5. **Events.** `HookSwap` is OpenZeppelin's standard event for custom-accounting hooks, so indexers see real amounts even though the pool itself never trades. `Trade` is the project's own event. Its `sender` is the router, not the user. The hook never needs the end user's address, and the indexer finds it from the token transfers (<Source path="indexer/src/lib/attribution.ts" />).
+5. **Events.** `HookSwap` is OpenZeppelin's standard event for custom-accounting hooks, so indexers see real amounts even though the pool itself never trades. `Trade` is the hook's own event with the side, quantity and average price. Its `sender` is the router, not the end user; the hook never needs the user's address.
 
 **Example.** Alice spends 5 USDC on YES, exact in. `amountSpecified = −5,000,000` (6 decimals). The hook returns a specified delta of `+5,000,000` and an unspecified delta of about `−8,024,800`: it takes her 5 USDC and owes her about 8.0248 YES. The router's `SETTLE_ALL` pays the USDC and `TAKE_ALL` sends her the YES.
 
@@ -445,12 +409,12 @@ function _fillTrading(Market storage m, bool isYes, bool isBuy, bool exactIn, ui
 
 - **One price, two pools.** The hook prices YES only. Buying NO costs `1 − bidYes` and selling NO pays `1 − askYes`. YES plus NO is always worth 1 USDC, so the two pools can never be arbitraged against each other.
 - **Epoch flow.** `epochFlow` is the net YES-equivalent amount traded in the current `block.timestamp` (a YES buy adds, a NO buy subtracts). The marginal price moves by `lambda` per whole token of flow and resets when the timestamp changes. The NO pool sees the flow mirrored, so YES buying makes NO cheaper within the same block.
-- **Exact amounts.** [`QuoteMath`](#quotemath) solves the fill on that straight line in integers, always rounding against the trader.
+- **Exact amounts.** `QuoteMath` solves the fill on that straight line in integers, always rounding against the trader ([fill amounts](/pricing#fill-amounts)).
 - **Checks.** Every marginal price, before and after the fill, must stay inside `[pMin, 1 − pMin]` ([`_checkBand`](#_checkband)), `|flow|` must stay within `qEpochMax`, and both amounts must be non-zero.
 
 The mid price cannot move inside a block because the oracle reports the start-of-block price. The impact makes splitting one large order into many swaps in the same block pointless: every piece pays the flow that came before it.
 
-**Example.** Demo parameters: `lambda = 0.001`, `qEpochMax = 100` tokens, `pMin = 0.02`. The YES ask is 0.6191 and the bid 0.5590 ([pricing example](#pricing-example)).
+**Example.** With `lambda = 0.001`, `qEpochMax = 100` tokens and `pMin = 0.02`, take a moment where the YES ask is 0.6191 and the bid 0.5590 ([how these are computed](/pricing#example)).
 
 | Trade in one block | Flow before | Starting marginal price | Tokens for 5 USDC | Average price |
 |---|---|---|---|---|
@@ -471,35 +435,7 @@ function _checkBand(uint256 pMin, uint256 price, uint256 lam, int256 x) internal
 }
 ```
 
-Checks the marginal price `price + lambda · x / 1e6` at a flow `x`. It is called with the flow before and after the trade, and because the price is linear in between, every executed price is inside the band.
-
-### `QuoteMath`
-
-<Source path="src/math/QuoteMath.sol" lines="40-52" />
-
-```solidity showLineNumbers{40}
-/// @notice USDC the trader pays for exactly q tokens (ceil).
-function buyExactOut(uint256 a, uint256 lam, int256 i0, uint256 q) internal pure returns (uint256) {
-    uint256 b = _beta(a, lam, i0, q);
-    return FixedPointMathLib.divUp(lam * q * q + b * q, D);
-}
-
-/// @notice Max tokens q with cost(q) <= amtIn.
-function buyExactIn(uint256 a, uint256 lam, int256 i0, uint256 amtIn) internal pure returns (uint256 q) {
-    uint256 b = _beta(a, lam, i0, amtIn);
-    uint256 r = amtIn * D;
-    if (lam == 0) return r / b;
-    q = (FixedPointMathLib.sqrt(b * b + 4 * lam * r) - b) / (2 * lam);
-}
-```
-
-The cost of `q` tokens starting at flow `i0` is the area under the price line:
-
-$$
-\text{cost}(q) = \frac{\lambda q^2 + \beta q}{D}, \qquad \beta = 2 \cdot 10^6 \, p + 2 \lambda i_0, \qquad D = 2 \cdot 10^{24}
-$$
-
-Exact-out buys evaluate it and round up. Exact-in buys invert it with an integer square root and round down. A z3 proof shows the floor square root is exact for buys (<Source path="formal/z3_integer_lemmas.py" />). Sells use the mirrored formulas and stay on the rising branch of the curve.
+Checks the marginal price `price + lambda · x / 1e6` at a flow `x`. It runs with the flow before and after the trade, and because the price is linear in between, every executed price is inside the band.
 
 ### `_book`
 
@@ -565,7 +501,7 @@ function _book(Market storage m, bool isYes, bool isBuy, uint256 q, uint256 cash
 | Buy | `mint(hook, USDC, cash)` keeps the trader's USDC as claims | `burn(hook, token, fromInv)` pays from inventory; the shortfall is `sync`, `OutcomeToken.mint(poolManager, …)`, `settle` |
 | Sell | `mint(hook, token, q)` keeps the tokens as claims | `burn(hook, USDC, cash)` pays from the bucket's claims |
 
-Minting straight into the PoolManager and settling is what lets `TAKE_ALL` deliver a freshly minted token. All USDC stays in the PoolManager as the hook's ERC-6909 claims, and the sum of all buckets plus `vaultIdle` equals the hook's USDC claim balance.
+Minting straight into the PoolManager and settling is what lets `TAKE_ALL` deliver a freshly minted token. All USDC stays in the PoolManager as the hook's ERC-6909 claims, and the buckets plus `vaultIdle` add up to the hook's USDC claim balance.
 
 **Example.** The market started with a 10 USDC budget. After Alice and Carol: `bucket = 20`, `outYes = 8.0248`, `outNo = 11.3984`. The bucket covers the larger side, 20 ≥ 11.3984.
 
@@ -601,107 +537,9 @@ function _inTradingWindow(Market storage m) internal view returns (bool) {
 ```
 
 - **Trading window.** `openTime ≤ now` and `now + window + cutoffBuffer < expiry`. Trading closes before the averaging window opens, so nobody trades while the settlement price is being measured.
-- **Moneyness.** $x = \ln(S / K)$, with $S$ from `oracle.lnSpotSoBWad()`: the start-of-block price, taken from `sqrtPriceX96` without tick rounding.
-- **Volatility.** Per-second variance from `oracle.varianceE36()`, the realised variance of the same pool ([oracle](#the-oracle-side)), or a fixed value per market.
-
-### `BinaryPricer`
-
-<Source path="src/math/BinaryPricer.sol" lines="36-73" />
-
-```solidity showLineNumbers{36}
-function effectiveTimes(uint256 tau, uint256 window, uint256 n)
-    internal
-    pure
-    returns (uint256 tDriftE18, uint256 tVarE18)
-{
-    if (tau <= window) revert TooLate();
-    uint256 base = (tau - window) * 1e18;
-    if (n == 0) {
-        tDriftE18 = base + window * 1e18 / 2;
-        tVarE18 = base + window * 1e18 / 3;
-    } else {
-        // (n-1)*Delta/2 = w*(n-1)/(2n) ; Delta*(n-1)*(2n-1)/(6n) = w*(n-1)*(2n-1)/(6n^2)
-        tDriftE18 = base + window * 1e18 * (n - 1) / (2 * n);
-        tVarE18 = base + F.fullMulDiv(window * 1e18, (n - 1) * (2 * n - 1), 6 * n * n);
-    }
-}
-
-function _moments(int256 x, uint256 varE36, uint256 tau, uint256 window, uint256 n)
-    private
-    pure
-    returns (Result memory r)
-{
-    (uint256 tDrift, uint256 tVar) = effectiveTimes(tau, window, n);
-    r.sqrtV = F.sqrt(F.fullMulDiv(varE36, tVar, 1e18));
-    if (r.sqrtV == 0) revert ZeroVariance();
-    int256 mu = x - SafeCastLib.toInt256(F.fullMulDiv(varE36, tDrift, 2e36));
-    r.d = mu * WAD / int256(r.sqrtV);
-}
-
-function price(int256 x, uint256 varE36, uint256 tau, uint256 window, uint256 n)
-    internal
-    pure
-    returns (Result memory r)
-{
-    r = _moments(x, varE36, tau, window, n);
-    r.mid = NormalCdf.cdf(r.d);
-    r.pdf = NormalCdf.pdf(r.d);
-}
-```
-
-The market does not pay on the price at one instant. It pays if the **average log price over the last `window` seconds**, sampled `n` times, is above the strike. Under Black-Scholes with zero rates that average is normally distributed, so the fair YES price is:
-
-$$
-\text{mid} = \Phi\!\left(\frac{\mu}{\sqrt{v}}\right), \qquad \mu = x - \tfrac{1}{2}\sigma^2 T_D, \qquad v = \sigma^2 T_V
-$$
-
-$$
-T_D = (\tau - w) + \frac{w(n-1)}{2n}, \qquad T_V = (\tau - w) + \frac{w(n-1)(2n-1)}{6n^2}
-$$
-
-`effectiveTimes` computes $T_D$ and $T_V$. When the window shrinks to 0 this is the textbook European binary $N(d_2)$. Pricing the exact thing that settles leaves no gap between what traders pay and what the market pays out.
-
-<Source path="src/math/BinaryPricer.sol" lines="94-107" />
-
-```solidity showLineNumbers{94}
-function askBid(Result memory r, uint256 gammaSWad, uint256 h0Wad) internal pure returns (uint256 ask, uint256 bid) {
-    if (r.kernel == 0) {
-        uint256 kappa = gammaSWad > GAMMA_MAX
-            ? type(uint256).max
-            : F.divUp(F.divUp(gammaSWad * 1e45, r.sqrtV), uint256(NormalCdf.SQRT_2PI_WAD));
-        (uint256 up, uint256 dn) = NormalCdf.band(r.d, kappa);
-        ask = up + h0Wad;
-        bid = dn > h0Wad ? dn - h0Wad : 0;
-    } else {
-        ask = r.mid + F.fullMulDivUp(gammaSWad, r.pdf, r.sqrtV) + h0Wad;
-        uint256 sub = F.fullMulDiv(gammaSWad, r.pdf, r.sqrtV) + h0Wad;
-        bid = r.mid > sub ? r.mid - sub : 0;
-    }
-}
-```
-
-$$
-\text{ask} = \Phi(d) + k\,\varphi(d) + h_0, \qquad \text{bid} = \Phi(d) - k\,\varphi(d) - h_0, \qquad k = \frac{\gamma_S}{\sqrt{v}}
-$$
-
-- $k\,\varphi(d)$ is how much the price would move if the spot were off by $\gamma_S$ in log terms. It widens the spread where the binary is most sensitive: near the strike and close to expiry.
-- $h_0$ is a flat base half-spread.
-- For the Gaussian kernel, $\Phi \pm k\varphi$ is rounded once inside `NormalCdf.band`, so ask and bid are monotone in the price. Certificates are in `formal/hart36/`.
-
-### Pricing example
-
-Strike 2,684.53 USD, start-of-block price 2,685.00 USD, 60 s to expiry, a 10 s window with 10 samples, and σ = 60% a year (the oracle's warm-up value). Demo spread parameters: `h0 = 0.02`, `gammaS = 0.00002`.
-
-| Step | Value |
-|---|---|
-| $x = \ln(2685.00 / 2684.53)$ | 0.000175 |
-| $T_D$, $T_V$ | 54.5 s, 52.85 s |
-| $\sqrt{v}$ | 0.000776 |
-| $d$ | 0.2251 |
-| mid (YES) | 0.5890 |
-| $k\,\varphi(d)$ | 0.0100 |
-| YES ask / bid | 0.6191 / 0.5590 |
-| NO ask / bid | 0.4410 / 0.3809 |
+- **Moneyness.** $x = \ln(S / K)$, with $S$ the start-of-block price from `oracle.lnSpotSoBWad()`.
+- **Volatility.** Per-second variance from `oracle.varianceE36()`, the realised variance of the same pool, or a fixed value per market.
+- **Price.** `BinaryPricer` returns the fair YES price $\Phi(\mu / \sqrt{v})$ for a payoff on the **average** price over the final window, which is exactly what settles. The ask and bid add a volatility-scaled term and a flat half-spread `h0` ([Pricing](/pricing)).
 
 ## Settlement
 
@@ -727,68 +565,7 @@ function settle(uint256 marketId) external {
 }
 ```
 
-Anyone can call it at or after `expiry`; the keeper bot does. `D = cum(T) − cum(T − window)` is the oracle's sum of tick × seconds over the window, so `D / window` is the average tick. Ticks are **normalised** so that "ETH up" is always "tick up", whichever token is `currency0`. YES wins if and only if `D · 1e18 > settleThreshold`.
-
-### `StrikeMath.threshold`
-
-<Source path="src/hook/StrikeMath.sol" lines="11-19" />
-
-```solidity showLineNumbers{11}
-/// @notice Strike as a normalised oracle tick in WAD, (lnStrikeWad - decimalsShift * ln10) / ln(1.0001)
-function strikeTickWad(int256 lnStrikeWad, int16 decimalsShift) internal pure returns (int256) {
-    return (lnStrikeWad * 1e18 - int256(decimalsShift) * LN10_E36) * 1e18 / LN_1_0001_E36;
-}
-
-/// @notice YES iff D * 1e18 > threshold with D = cum(T) - cum(T - window), a tie resolves NO
-function threshold(int256 lnStrikeWad, int16 decimalsShift, uint32 window) internal pure returns (int256) {
-    return int256(uint256(window)) * (strikeTickWad(lnStrikeWad, decimalsShift) - 0.5e18);
-}
-```
-
-The strike becomes a fractional tick, and the threshold is `window · (strikeTick − 0.5)`. The oracle stores whole ticks rounded down, so the average reads half a tick low on average; the `− 0.5` removes that bias. A tie resolves NO.
-
-**Example.** On the demo pool (WETH 18 decimals, USDC 6, `decimalsShift = 12`) a strike of 2,684.53 USD is tick −197,367.47. With a 10 s window, YES needs an average tick above −197,367.97.
-
-### The oracle side
-
-<Source path="src/oracle/UnderlyingOracleHook.sol" lines="202-221" />
-
-```solidity showLineNumbers{202}
-function _beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
-    internal
-    override
-    returns (bytes4, BeforeSwapDelta, uint24)
-{
-    Sob memory s = _sob;
-    uint32 t = uint32(block.timestamp);
-    if (s.time != t) _write(s, t, key.toId());
-    return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
-}
-
-/* IUnderlyingOracle */
-
-function lnSpotSoBWad() external view returns (int256) {
-    Sob memory s = _boundSob();
-    uint160 sp = s.sqrtPriceX96;
-    if (s.time != uint32(block.timestamp)) (sp,,,) = poolManager.getSlot0(poolId);
-    int256 lnRaw = 2 * (F.lnWad(int256(uint256(sp))) + LN_WAD_TO_Q96);
-    return int256(s.sign) * lnRaw + int256(_feed.decimalsShift) * LN10_WAD;
-}
-```
-
-On the **first swap of each timestamp** the oracle hook records the pool's pre-swap `slot0`, which is the start-of-block state, and appends an observation `{time, tickCumulative}` just like v3's `Oracle.sol`. A read in a block with no write yet uses `slot0` directly, which is still the start-of-block state because every swap runs `beforeSwap` first. **Nothing traded earlier in the current block can move the price the hook quotes or settles against.**
-
-<Source path="src/oracle/UnderlyingOracleHook.sol" lines="278-282" />
-
-```solidity showLineNumbers{278}
-uint256 hh = uint256(h);
-varPerSecE36 = F.fullMulDiv(3 * (wEnd - wStart), LN_TICK_SQ_E36, 2 * hh * hh * hh * n);
-if (varPerSecE36 < varMinE36) varPerSecE36 = varMinE36;
-else if (varPerSecE36 > varMaxE36) varPerSecE36 = varMaxE36;
-warm = true;
-```
-
-Volatility is the realised variance of 10 s average-price returns over the last 30 minutes (180 windows), scaled by 3/2 because averaging damps variance, with each window's move winsorised and the result clamped. Until 30 windows exist it returns a fallback of 60% a year.
+Anyone can call it at or after `expiry`. `D = cum(T) − cum(T − window)` is the oracle's sum of tick × seconds over the window, so `D / window` is the average tick. Ticks are normalised so that "ETH up" is always "tick up", whichever token is `currency0`. YES wins if and only if `D · 1e18 > settleThreshold`, that is, when the average tick is above the strike tick minus half a tick. A tie resolves NO ([settlement rule](/oracle#settlement-rule)).
 
 ### `settleInvalid` and `_oracleAnswers`
 
@@ -822,7 +599,7 @@ function _oracleAnswers(Market storage m) internal view returns (bool) {
 }
 ```
 
-A liveness fallback. If the oracle can no longer answer for `T − window` or `T` (the observation ring has moved past them) and one hour (`GRACE`) has passed since expiry, anyone can mark the market `Invalid`, and every token then pays 0.50. It reverts with `OracleAvailable` whenever a real settlement is possible, so it can never replace one.
+A liveness fallback. If the oracle can no longer answer for `T − window` or `T` and one hour (`GRACE`) has passed since expiry, anyone can mark the market `Invalid`, and every token then pays 0.50. It reverts with `OracleAvailable` whenever a real settlement is possible, so it can never replace one.
 
 ## Redemption and sweep
 
@@ -889,7 +666,7 @@ function sweep(uint256 marketId) external returns (uint256 amount) {
 }
 ```
 
-After settlement, anything in the bucket above what winners can still claim goes back to `vaultIdle`. The keeper bot sweeps every settled market.
+After settlement, anything in the bucket above what winners can still claim goes back to `vaultIdle`. Anyone can call it.
 
 **Example.** Alice's market settles with `bucket = 20`:
 
@@ -948,7 +725,7 @@ function unlockCallback(bytes calldata data) external onlyPoolManager returns (b
 }
 ```
 
-- **Deposit** mints shares priced at `navPlus`; **withdraw** burns shares priced at `navMinus`. The difference is explained [below](#navplus-navminus-_contrib-_updatenav).
+- **Deposit** mints shares priced at `navPlus`; **withdraw** burns shares priced at `navMinus` ([why](#navplus-navminus-_contrib-_updatenav)).
 - The `1e6` share offset and the `+ 1` on assets are a virtual position that blocks the first-depositor inflation attack.
 - Withdrawals are paid from `vaultIdle` only. USDC in a live market stays there until it is swept.
 - Deposited USDC is moved into the PoolManager (`sync`, transfer, `settle`) and kept as the hook's ERC-6909 claims, the same form the market buckets use.
@@ -1003,7 +780,7 @@ $$
 
 Each live market is valued at its best case (NAV⁺, the smaller side wins) and its worst case (NAV⁻, the larger side wins). Alice's market adds 11.9752 to NAV⁺ and 8.6016 to NAV⁻, exactly the two rows of the sweep table. Depositors pay the best case and withdrawers get the worst case, so nobody can buy vault shares cheaply before a good settlement or leave with money the vault may still owe.
 
-Neither number reads a price, so no oracle move can change the share price. Both are kept as running sums updated on every trade, settlement, redemption and sweep, which keeps `deposit` and `withdraw` O(1) however many markets are open.
+Neither number reads a price, so no oracle move can change the share price. Both are running sums updated on every trade, settlement, redemption and sweep, which keeps `deposit` and `withdraw` O(1) however many markets are open.
 
 ## Views
 
@@ -1040,95 +817,17 @@ function quoteStrict(uint256 marketId) external view returns (Quote memory qt) {
 }
 ```
 
-`quote` never reverts for a known market: if pricing fails, it returns zeros and the time to expiry. It gives the YES mid, ask and bid for both sides, the variance and the moneyness, and `@phinary/swap-sdk` reads it for the dashboard (<Source path="packages/swap-sdk/src/markets.ts" />). It leaves out the current block's impact, so exact fill amounts come from V4Quoter.
+`quote` never reverts for a known market: if pricing fails, it returns zeros and the time to expiry, which keeps front ends simple. It returns the YES mid, the ask and bid of both sides, the variance and the moneyness. It leaves out the current block's impact, so exact fill amounts come from V4Quoter.
 
-### Market lookups
+### `_key`
 
-<Source path="src/PredictionHook.sol" lines="574-645" />
+<Source path="src/PredictionHook.sol" lines="642-645" />
 
-```solidity showLineNumbers{574}
-/// @notice Current epoch (block.timestamp of the last trade) and its signed YES-equivalent flow
-function epochOf(uint256 marketId) external view returns (uint64 ts, int256 flow) {
-    Market storage m = _market(marketId);
-    return (m.epochTs, m.epochFlow);
-}
-
-/// @notice The settlement threshold, YES iff (cum(T) - cum(T - window)) * 1e18 > threshold
-function settleThresholdOf(uint256 marketId) external view returns (int256) {
-    return _market(marketId).settleThreshold;
-}
-
-/// @inheritdoc IPredictionHook
-function marketInfo(uint256 marketId) external view returns (MarketInfo memory i) {
-    Market storage m = _market(marketId);
-    i.yes = m.yes;
-    i.no = m.no;
-    i.oracle = m.oracle;
-    i.lnStrikeWad = m.lnStrikeWad;
-    i.openTime = m.openTime;
-    i.expiry = m.expiry;
-    i.window = m.window;
-    i.cutoffBuffer = m.cutoffBuffer;
-    i.status = m.status;
-    i.yesWon = m.yesWon;
-    i.bucket = m.bucket;
-    i.outYes = m.outYes;
-    i.outNo = m.outNo;
-    i.invYes = m.invYes;
-    i.invNo = m.invNo;
-}
-
-/// @inheritdoc IPredictionHook
-function marketParams(uint256 marketId) external view returns (MarketParams memory p) {
-    Market storage m = _market(marketId);
-    p.oracle = m.oracle;
-    p.lnStrikeWad = m.lnStrikeWad;
-    p.openTime = m.openTime;
-    p.expiry = m.expiry;
-    p.window = m.window;
-    p.cutoffBuffer = m.cutoffBuffer;
-    p.nSamples = m.nSamples;
-    p.budget = m.budget;
-    p.quote = QuoteParams(m.h0Wad, m.gammaSWad, m.lambdaWad, m.qEpochMax, m.pMinWad);
-    p.sigmaMode = m.sigmaMode;
-    p.fixedVarE36 = m.fixedVarE36;
-    p.yesName = OutcomeToken(m.yes).name();
-    p.yesSymbol = OutcomeToken(m.yes).symbol();
-    p.noName = OutcomeToken(m.no).name();
-    p.noSymbol = OutcomeToken(m.no).symbol();
-}
-
-/// @inheritdoc IPredictionHook
-function poolKeys(uint256 marketId) external view returns (PoolKey memory yesKey, PoolKey memory noKey) {
-    Market storage m = _market(marketId);
-    return (_key(m.yes), _key(m.no));
-}
-
-/// @inheritdoc IPredictionHook
-function marketOfPool(bytes32 poolId) external view returns (uint256 marketId, bool isYes) {
-    PoolRef memory ref = _pools[poolId];
-    return (ref.marketId, ref.isYes);
-}
-
-function _market(uint256 marketId) internal view returns (Market storage m) {
-    if (marketId == 0 || marketId > marketCount) revert UnknownMarket();
-    return _markets[marketId];
-}
-
+```solidity showLineNumbers{642}
 function _key(address outcome) internal view returns (PoolKey memory) {
     (address c0, address c1) = outcome < usdc ? (outcome, usdc) : (usdc, outcome);
     return PoolKey(Currency.wrap(c0), Currency.wrap(c1), 0, TICK_SPACING, IHooks(address(this)));
 }
 ```
 
-- `epochOf`: the current epoch timestamp and its net flow.
-- `settleThresholdOf`: the precomputed settlement threshold.
-- `marketInfo`, `marketParams`: the market's ledger and its creation parameters.
-- `poolKeys`, `marketOfPool`: the two `PoolKey`s of a market, and the reverse lookup from a pool id.
-- `_key` sorts the two currencies as v4 requires and fixes fee 0, tick spacing 60 and `hooks = this`, so anyone can rebuild a market's `PoolKey` from its token addresses.
-
-## Integration notes
-
-- **Quotes.** `V4Quoter.quoteExactInputSingle` and `quoteExactOutputSingle` with the market's `PoolKey`. Hook errors come back wrapped, and `@phinary/swap-sdk` decodes them (<Source path="packages/swap-sdk/src/errors.ts" />).
-- **Swaps.** UniversalRouter command `0x10` (`V4_SWAP`), or `0x0a10` with `PERMIT2_PERMIT` first. Outcome tokens are Solady ERC-20s that give Permit2 an infinite allowance, so selling YES or NO needs only a Permit2 signature.
-- **Routing.** The hosted Uniswap routing skips hook-priced pools that hold no liquidity unless the hook is allowlisted. Phinary therefore quotes with V4Quoter directly and runs its own fork of the Uniswap interface (`interface-patches/`) with these pools injected.
+Sorts the two currencies as v4 requires and fixes fee 0, tick spacing 60 and `hooks = this`, so anyone can rebuild a market's `PoolKey` from its token addresses. The other views are plain getters: `epochOf` (current epoch and flow), `settleThresholdOf`, `marketInfo` (ledger), `marketParams` (creation parameters), `poolKeys` and `marketOfPool` (<Source path="src/PredictionHook.sol" lines="574-640" />).
