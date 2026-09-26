@@ -26,9 +26,19 @@ export function buy(b: Bucket, qty: bigint, usdc: bigint): Bucket {
  * Remove qty with realized gain/loss.
  * Cost removed is `cost * qty / b.qty` (floor division).
  * Realized gain/loss is `usdcOut - costOut`.
- * Guard: qty must not exceed b.qty, and b.qty must not be 0n.
+ * A 0n debit is a no-op: returns the bucket unchanged.
+ * Guard: qty must not exceed b.qty. Throws if qty > 0n but b.qty === 0n.
+ * Guard: if qty === 0n but usdcOut > 0n, throws (money without tokens is a bug).
  */
 export function sell(b: Bucket, qty: bigint, usdcOut: bigint): Bucket {
+  // Zero-quantity debit: only valid if usdcOut is also 0n
+  if (qty === 0n) {
+    if (usdcOut > 0n) {
+      throw new Error('Cannot receive USDC without selling tokens')
+    }
+    return b
+  }
+
   if (b.qty === 0n) {
     throw new Error('Cannot sell from an empty bucket')
   }
@@ -48,8 +58,15 @@ export function sell(b: Bucket, qty: bigint, usdcOut: bigint): Bucket {
 
 /**
  * Transfer out qty at proportional cost (same as sell, but realizes nothing).
+ * A 0n debit is a no-op: returns the bucket unchanged.
+ * Guard: qty must not exceed b.qty. Throws if qty > 0n but b.qty === 0n.
  */
 export function transferOut(b: Bucket, qty: bigint): Bucket {
+  // Zero-quantity debit: no-op
+  if (qty === 0n) {
+    return b
+  }
+
   if (b.qty === 0n) {
     throw new Error('Cannot transfer out from an empty bucket')
   }

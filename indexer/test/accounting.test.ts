@@ -24,4 +24,22 @@ describe('accounting', () => {
   })
 
   test('invalid pays half', () => expect(payoutFor('invalid', false, 7n)).toBe(3n))
+
+  test('zero-quantity debits are no-ops', () => {
+    expect(sell(EMPTY, 0n, 0n)).toEqual(EMPTY)
+    expect(transferOut(EMPTY, 0n)).toEqual(EMPTY)
+  })
+
+  test('sell throws on insufficient qty', () => {
+    expect(() => sell(EMPTY, 1n, 1n)).toThrow()
+    expect(() => sell({ qty: 5n, cost: 5n, realized: 0n }, 6n, 6n)).toThrow()
+  })
+
+  test('transferOut throws on insufficient qty', () => {
+    expect(() => transferOut(EMPTY, 1n)).toThrow()
+  })
+
+  test('sell throws when receiving USDC without selling tokens', () => {
+    expect(() => sell(EMPTY, 0n, 1n)).toThrow()
+  })
 })
