@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-
-import { PageNarrow } from "@/components/layout/page";
-import { VaultView } from "@/components/vault/vault-view";
+import { PageHeading, PageNarrow } from "@/components/layout/page";
+import { EmptyState } from "@/components/layout/panel";
 
 export const metadata: Metadata = { title: "Vault" };
-
-export default function VaultPage() {
-    return (
-        <PageNarrow size="sm">
-            <VaultView />
-        </PageNarrow>
-    );
+export default function Page() {
+    return <PageNarrow><PageHeading>Vault</PageHeading><EmptyState title="Vault deposits and withdrawals are not connected yet." /></PageNarrow>;
 }

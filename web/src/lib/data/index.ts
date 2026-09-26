@@ -1,5 +1,7 @@
 export { useHydrated, useNow } from "./clock";
 export {
+    retryMarkets,
+    TRADING_ENABLED,
     useActivity,
     useEthPrice,
     useLeaderboard,

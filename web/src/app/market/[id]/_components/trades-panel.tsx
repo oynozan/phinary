@@ -45,7 +45,7 @@ export function TradesPanel({ market }: { market: Market }) {
                     </h2>
                 </div>
                 {list.length === 0 ? (
-                    <p className="py-12 text-center text-muted-foreground">No trades yet</p>
+                    <p className="py-12 text-center text-muted-foreground">Trade history unavailable</p>
                 ) : (
                     <table className="w-full font-secondary text-sm">
                         <thead>

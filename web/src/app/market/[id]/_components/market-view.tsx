@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { QueryError } from "@/components/market/query-error";
+
 import { PageNarrow, PageWide } from "@/components/layout/page";
 import { EmptyState } from "@/components/layout/panel";
 import { amountString, emptyForm, TRADE_INPUT_ID, TradeCard, type TradeForm } from "@/components/trade";
@@ -64,6 +66,8 @@ export function MarketView({ id, initialSide }: { id: number; initialSide: Side 
         }
         document.getElementById(TRADE_INPUT_ID)?.focus({ preventScroll: true });
     }
+
+    if (market.error) return <PageNarrow><QueryError id={id} /></PageNarrow>;
 
     if (market.isLoading) return <MarketSkeleton />;
 

@@ -19,7 +19,7 @@ const STROKE: Partial<Record<Phase, string>> = {
 function phaseSpan(m: Market): { from: number; to: number } | null {
     switch (m.phase) {
         case "upcoming":
-            return { from: m.createdAt, to: m.openTime };
+            return m.createdAt === null ? null : { from: m.createdAt, to: m.openTime };
         case "live":
             return { from: m.openTime, to: m.cutoff };
         case "closed":

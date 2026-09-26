@@ -66,7 +66,9 @@ export function ChartPanel({ market }: { market: Market }) {
             </div>
 
             <div className="relative mt-5 -mr-1 -ml-2">
-                {history.isLoading ? (
+                {history.error ? (
+                    <div className="grid place-items-center text-sm text-muted-foreground" style={{ height: CHART_HEIGHT }}>Price history unavailable</div>
+                ) : history.isLoading ? (
                     <Skeleton className="w-full rounded-2xl" style={{ height: CHART_HEIGHT }} />
                 ) : (
                     <ProbabilityChart points={points} domain={[market.openTime, market.expiry]} height={CHART_HEIGHT} />
@@ -84,7 +86,7 @@ export function ChartPanel({ market }: { market: Market }) {
             <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {upPrice !== null && <PriceTag side="up" price={upPrice} />}
                 {downPrice !== null && <PriceTag side="down" price={downPrice} />}
-                <StatPill label="Vol">{formatUsd(market.volume, { compact: true })}</StatPill>
+                {market.volume !== null && <StatPill label="Vol">{formatUsd(market.volume, { compact: true })}</StatPill>}
                 {ethValue !== null && (
                     <StatPill
                         label={settled ? "Avg" : UNDERLYING_SYMBOL}

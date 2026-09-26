@@ -11,7 +11,7 @@ export default function MarketsPage() {
                     Predict ETH on <Accent>Uniswap</Accent>
                 </HeroHeading>
                 <p className="mb-6 text-center font-secondary text-base font-semibold text-muted-foreground sm:text-lg lg:mb-8">
-                    No oracles. No servers. Only Uniswap v4.
+                    ETH prediction markets on Uniswap v4.
                 </p>
                 <MarketsHome />
             </PageWide>

@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
-
-import { ActivityView } from "@/components/activity/activity-view";
-import { PageHeading, PageWide } from "@/components/layout/page";
+import { PageHeading, PageNarrow } from "@/components/layout/page";
+import { EmptyState } from "@/components/layout/panel";
 
 export const metadata: Metadata = { title: "Activity" };
-
-export default function ActivityPage() {
-    return (
-        <PageWide>
-            <PageHeading>Activity</PageHeading>
-            <ActivityView />
-        </PageWide>
-    );
+export default function Page() {
+    return <PageNarrow><PageHeading>Activity</PageHeading><EmptyState title="Trade history is not connected yet." /></PageNarrow>;
 }

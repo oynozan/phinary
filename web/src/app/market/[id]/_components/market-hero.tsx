@@ -4,7 +4,7 @@ import { Clock } from "lucide-react";
 
 import { Countdown } from "@/components/market/countdown";
 import { MarketQuestion } from "@/components/market/market-question";
-import { DEADLINE_LABEL, nextDeadline } from "@/lib/phase";
+import { DEADLINE_LABEL, nextDeadline, PHASE_LABEL } from "@/lib/phase";
 import type { Market } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ export function MarketHero({ market, className }: { market: Market; className?: 
                     <Countdown to={deadline} />
                 </p>
             )}
+            {deadline === null && <p className="mt-3 text-muted-foreground">{PHASE_LABEL[market.phase]}</p>}
             <MarketTimeline market={market} className="mt-4 max-w-xl" />
         </div>
     );

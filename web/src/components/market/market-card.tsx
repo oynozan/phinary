@@ -128,7 +128,7 @@ export function MarketCard({ market, onBuy, className }: { market: Market; onBuy
             )}
 
             <div className="flex items-center justify-between font-secondary text-xs text-muted-foreground">
-                <span className="num">{formatUsd(market.volume, { compact: true })} vol</span>
+                <span className="num">{market.volume === null ? "Volume unavailable" : `${formatUsd(market.volume, { compact: true })} vol`}</span>
                 {tradable && deadline !== null && (
                     <span className="flex items-center gap-1.5 text-foreground">
                         <Clock aria-hidden className="size-3.5 text-muted-foreground" />

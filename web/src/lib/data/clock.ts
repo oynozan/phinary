@@ -3,13 +3,27 @@
 import { useSyncExternalStore } from "react";
 
 let now: number | null = null;
+let chainTime: number | null = null;
+let syncedAt = 0;
+
+/** Chain time plus monotonic elapsed time avoids dependence on a misconfigured device clock. */
+function currentTime() {
+    return chainTime === null ? Math.floor(Date.now() / 1000) : chainTime + Math.floor((performance.now() - syncedAt) / 1000);
+}
+
+export function syncChainClock(timestamp: number) {
+    chainTime = timestamp;
+    syncedAt = performance.now();
+    now = currentTime();
+    for (const listener of listeners) listener();
+}
 let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 function schedule() {
     const ms = 1000 - (Date.now() % 1000) + 5;
     timer = setTimeout(() => {
-        now = Math.floor(Date.now() / 1000);
+        now = currentTime();
         for (const l of listeners) l();
         schedule();
     }, ms);
@@ -28,7 +42,7 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot() {
-    if (now === null) now = Math.floor(Date.now() / 1000);
+    if (now === null) now = currentTime();
     return now;
 }
 

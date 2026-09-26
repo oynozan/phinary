@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEthPrice, usePriceHistory } from "@/lib/data";
 import { formatCents, formatPrice } from "@/lib/format";
-import { isResolved, isTradable } from "@/lib/phase";
+import { isResolved, isTradable, PHASE_LABEL } from "@/lib/phase";
 import type { Market, Side } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,7 @@ function FeaturedCard({ market: m }: { market: Market }) {
                         <MarketQuestion as="h2" strike={m.strike} expiry={m.expiry} className="text-2xl sm:text-3xl" />
                     </Link>
                     <EthSpot strike={m.strike} />
+                    {isResolved(m.phase) && <p className="mt-2 text-muted-foreground">{PHASE_LABEL[m.phase]}</p>}
 
                     <div className="mt-6 flex items-end gap-5 sm:gap-8">
                         <Chance value={m.upChance} className="text-6xl sm:text-7xl" />
@@ -114,6 +115,7 @@ function BuyButton({ market, side, tradable }: { market: Market; side: Side; tra
 
 function EthSpot({ strike }: { strike: number }) {
     const eth = useEthPrice();
+    if (eth.error) return <p className="mt-2 text-sm text-muted-foreground">ETH price unavailable</p>;
     if (!eth.data) return <Skeleton className="mx-auto mt-2 h-5 w-32 rounded-full" />;
     const above = eth.data.price > strike;
     return (
