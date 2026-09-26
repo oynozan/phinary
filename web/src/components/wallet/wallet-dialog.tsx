@@ -23,8 +23,15 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         }
     }}>
         <div className="wallet-dialog-heading">
-            <DialogTitle>Connect wallet</DialogTitle>
-            <DialogDescription>Choose a wallet to connect to Phinary.</DialogDescription>
+            <div className="wallet-dialog-brand" aria-hidden="true">
+                <svg width="60" height="64" viewBox="0 0 30 32" fill="none">
+                    <defs><linearGradient id="phinary-wallet-mark" x1="4" y1="3" x2="25" y2="29" gradientUnits="userSpaceOnUse"><stop stopColor="#72ddfa" /><stop offset=".48" stopColor="#9c83fa" /><stop offset="1" stopColor="#bd35f0" /></linearGradient></defs>
+                    <path d="M15 7C8.1 7 3 10.5 3 16s5.1 9 12 9 12-3.5 12-9-5.1-9-12-9Z" stroke="url(#phinary-wallet-mark)" strokeWidth="5" />
+                    <path d="M15 1v30" stroke="url(#phinary-wallet-mark)" strokeWidth="5" />
+                </svg>
+            </div>
+            <DialogTitle>Connect to Phinary</DialogTitle>
+            <DialogDescription>Choose a wallet to continue.</DialogDescription>
         </div>
         {wallet.options.length === 0 ? <div className="wallet-dialog-empty">
             <Wallet size={28} aria-hidden="true" />
