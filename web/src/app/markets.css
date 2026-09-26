@@ -857,3 +857,7 @@ a.market-price:hover {
   background: #291c26;
   color: #ffcbc7;
 }
+
+@media (max-width: 1023px) {
+  .market-controls button, .market-search, .market-search input, .market-select select { min-height: 44px; }
+}

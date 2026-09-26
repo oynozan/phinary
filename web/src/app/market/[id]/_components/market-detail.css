@@ -219,3 +219,9 @@ body:has(.market-detail-page)::before { display: none; }
   .detail-companion h2 { font-size: 16px; }
   .detail-companion a { font-size: 12px; padding: 7px 14px; }
 }
+
+@media (max-width: 1023px) {
+  .detail-segments button, .detail-quick button { min-height: 44px; min-width: 44px; }
+  .detail-amount input { min-height: 44px; }
+  .detail-advanced summary { min-height: 44px; padding-block: 12px; }
+}

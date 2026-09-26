@@ -285,3 +285,8 @@
 .app-dock-link:hover { color: #f5f5fa; background: #151925; }
 .app-dock-link:focus-visible { outline: 2px solid #db9bff; outline-offset: 1px; }
 @media (max-width: 1023px) { .app-dock { display: grid; } }
+
+@media (max-width: 1023px) {
+    .app-header .header-wallet, .app-header .header-menu, .header-brand { min-height: 44px; }
+    .app-header .header-menu { min-width: 44px; }
+}

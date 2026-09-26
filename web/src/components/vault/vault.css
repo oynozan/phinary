@@ -11,3 +11,7 @@
 
 .vault-market-mark svg{width:14px;height:18px}.vault-primary{scroll-margin-block:100px}.vault-page button,.vault-page input{font-family:inherit}
 @media(max-width:1023px){html:has(.vault-page){scroll-padding-bottom:110px}.vault-page :is(button,input,[tabindex]){scroll-margin-block:110px}}
+
+@media (max-width:1023px) {
+  .vault-quick button, .vault-tabs button, .vault-filters button, .vault-learn, .vault-primary, .vault-error button, .vault-exposure footer button { min-height:44px; }
+}
