@@ -222,7 +222,7 @@ make bots-status                   # running or not, last two log lines each
 make bots-logs                     # tail -f
 make bots-stop
 DRY_RUN=1 make bots                # compute and log, send nothing
-MARKET_BUDGET_USDC=10 make bots    # any bot setting passes through, see bot/.env.example
+KEEPER_POLL_MS=1000 make bots      # any bot setting passes through, see bot/.env.example
 ```
 
 `script/bots.sh` runs `bot/src/mirror.ts` and `bot/src/keeper.ts` with `nohup`, using `DEPLOYMENTS_FILE=deployments/<NETWORK>.json`. Logs and pids go to `deployments/.run/<NETWORK>/`.
@@ -309,7 +309,7 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 | Public RPC slow or failing | Bots: `RPC_URL=https://unichain-sepolia.drpc.org make bots` (after `make bots-stop`). Backup page: `?rpc=https://unichain-sepolia.drpc.org` |
 | No new markets | `make bots-status` and `make bots-logs`. The usual causes are vault idle below budget, the keeper out of ETH, or nonce errors. Restart with `make bots-stop bots`. For one market by hand, run `make market-sepolia` |
 | A market is past expiry but not settled | `cast send $HOOK "settle(uint256)" <id> --rpc-url $R --private-key …`. Settlement is permissionless after expiry |
-| Vault idle stuck low | Sweep settled markets with `cast send $HOOK "sweep(uint256)" <id> …` (permissionless), fund more, or lower `MARKET_BUDGET_USDC` |
+| Vault idle stuck low | Sweep settled markets with `cast send $HOOK "sweep(uint256)" <id> …` (permissionless) or fund more. Each market's budget already shrinks to `vaultIdle / 2`, and the scheduler's maximum is fixed at deploy |
 | Mirror feed errors | It falls back from Coinbase to Kraken to Binance.US. If all are down, the pool holds its last price, and markets still trade and settle |
 | Swap reverts with `V4TooLittleReceived` | Keep slippage on Auto, trade earlier in the minute, trade less |
 | "No routes found" on a normal size | The trade hits the band, the per-block cap or solvency. Trade 1-2 USDC |

@@ -2,10 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
-import { getAddress, isAddress, parseUnits, zeroAddress, type Address, type Hex } from "viem";
+import { getAddress, isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { isSourceName, type SourceName } from "./feeds.ts";
 import { isLevel, type Level } from "./log.ts";
-import { varE36FromAnnualVol, validateTemplate, type MarketTemplate } from "./market.ts";
 import { parseDecimal, type Rational } from "./math.ts";
 import { sortTokens, type PoolKey } from "./pricing.ts";
 
@@ -14,7 +13,6 @@ export const REPO_DIR = resolve(BOT_DIR, "..");
 export const DEFAULT_DEPLOYMENTS_FILE = resolve(REPO_DIR, "deployments", "unichain-sepolia.json");
 export const DEFAULT_RPC_URL = "https://sepolia.unichain.org";
 export const USDC_DECIMALS = 6;
-export const OUTCOME_DECIMALS = 6;
 
 export type Env = Record<string, string | undefined>;
 
@@ -187,15 +185,6 @@ export function envString(env: Env, name: string, def: string): string {
   return raw(env, name) ?? def;
 }
 
-/** Decimal string in human units scaled to `decimals` (e.g. "0.01" with 18 -> 1e16). */
-export function envUnits(env: Env, name: string, def: string, decimals: number): bigint {
-  const v = raw(env, name) ?? def;
-  if (!/^\d+(\.\d+)?$/.test(v)) throw new Error(`${name} must be a non-negative decimal`);
-  const frac = v.split(".")[1] ?? "";
-  if (frac.length > decimals) throw new Error(`${name} has more than ${decimals} decimals`);
-  return parseUnits(v, decimals);
-}
-
 export function envRational(env: Env, name: string, def: string): Rational {
   try {
     return parseDecimal(raw(env, name) ?? def);
@@ -290,39 +279,6 @@ export interface KeeperConfig extends CommonConfig {
   settle: boolean;
   scanBack: number;
   invalidAfterSec: number;
-}
-
-export function loadMarketTemplate(env: Env): MarketTemplate {
-  const sigmaMode = envInt(env, "SIGMA_MODE", 0, 0, 1);
-  const fixedVarRaw = raw(env, "FIXED_VAR_E36");
-  const template: MarketTemplate = {
-    tenorSec: envInt(env, "MARKET_TENOR_SEC", 60, 1),
-    windowSec: envInt(env, "MARKET_WINDOW_SEC", 10, 1, 2 ** 32 - 1),
-    cutoffBufferSec: envInt(env, "MARKET_CUTOFF_BUFFER_SEC", 2, 0, 2 ** 32 - 1),
-    nSamples: envInt(env, "MARKET_N_SAMPLES", 10, 0, 2 ** 32 - 1),
-    openDelaySec: envInt(env, "MARKET_OPEN_DELAY_SEC", 0, 0),
-    expiryAlignSec: envInt(env, "MARKET_EXPIRY_ALIGN_SEC", 0, 0),
-    budget: envUnits(env, "MARKET_BUDGET_USDC", "10", USDC_DECIMALS),
-    quote: {
-      h0Wad: envUnits(env, "QUOTE_H0", "0.02", 18),
-      gammaSWad: envUnits(env, "QUOTE_GAMMA_S", "0.00005", 18),
-      lambdaWad: envUnits(env, "QUOTE_LAMBDA", "0.001", 18),
-      qEpochMax: envUnits(env, "QUOTE_Q_EPOCH_MAX", "100", OUTCOME_DECIMALS),
-      pMinWad: envUnits(env, "QUOTE_P_MIN", "0.02", 18),
-    },
-    sigmaMode,
-    fixedVarE36:
-      fixedVarRaw !== undefined
-        ? envUnits(env, "FIXED_VAR_E36", "0", 0)
-        : varE36FromAnnualVol(envString(env, "FIXED_SIGMA_ANNUAL", "0.6")),
-    kernel: envInt(env, "KERNEL", 0, 0, 255),
-    timeZone: envString(env, "MARKET_TIMEZONE", "UTC"),
-    ticker: envString(env, "MARKET_TICKER", "ETH"),
-    nameTemplate: envString(env, "MARKET_NAME_TEMPLATE", "{ticker} {cmp} ${strike} {date} {hhmm}"),
-    symbolTemplate: envString(env, "MARKET_SYMBOL_TEMPLATE", "{ticker}{side}"),
-  };
-  validateTemplate(template);
-  return template;
 }
 
 export function loadKeeperConfig(env: Env = process.env): KeeperConfig {

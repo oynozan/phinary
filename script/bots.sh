@@ -9,7 +9,7 @@
 # <network> selects deployments/<network>.json (local, unichain-sepolia). `all` is the demo pair, mirror and keeper; the
 # sealed-oracle poker and prover starts only on its own, since it needs SEALED_ORACLE (or `sealedOracle` in the file).
 # Keys come from the environment or from bot/.env and the repo .env (DEPLOYER_PRIVATE_KEY, MIRROR_PRIVATE_KEY,
-# KEEPER_PRIVATE_KEY, SEALED_KEY); they are never printed. Every other bot setting (RPC_URL, MARKET_BUDGET_USDC,
+# KEEPER_PRIVATE_KEY, SEALED_KEY); they are never printed. Every other bot setting (RPC_URL, KEEPER_POLL_MS,
 # SEALED_BATCH, ...) passes through from the environment, see bot/.env.example.
 set -euo pipefail
 
