@@ -1,9 +1,9 @@
 diff --git a/PREDICTION_README.md b/PREDICTION_README.md
 new file mode 100644
-index 0000000..17ea3fd
+index 0000000..6c1b52a
 --- /dev/null
 +++ b/PREDICTION_README.md
-@@ -0,0 +1,217 @@
+@@ -0,0 +1,415 @@
 +# PredictionHook markets in the Uniswap web app (local fork)
 +
 +This is a shallow clone of `Uniswap/interface` at commit `9023421` (2026-09-23) with the changes below. It lets the stock swap
@@ -125,8 +125,8 @@ index 0000000..17ea3fd
 +   (`V4TooLittleReceived`) after the user signs. Settled markets use 1%, because redemption pays a fixed price.
 +   - The review modal only asks you to accept a new price when it is worse than the accepted trade's own slippage bound
 +     (stock Uniswap re-prompts at 1%, which would fire almost every second here).
-+6. "You receive" typing (exact output) is supported. After the trading cutoff the hook reverts, and the form shows
-+   "No routes found".
++6. "You receive" typing (exact output) is supported. After the trading cutoff the swap button reads **Trading closed**
++   and the market panel under the form says when the market settles (section 8).
 +7. After settlement, a winner sells the winning token -> USDC in the same form. The hook pays exactly 1.0 through the same
 +   swap path.
 +
@@ -213,7 +213,8 @@ index 0000000..17ea3fd
 +  `../packages/swap-sdk`. First buy on a fresh market with a signed permit used 300k gas; sells 285k; redemption 247k.
 +  Execution differed from a `latest`-block quote by up to 0.4% on a 1-day market, from repricing between blocks.
 +- Market ids are read as `[max(0, count - 40 + 1), count]`, so both 0-based and 1-based numbering work. Hook revert names
-+  are decoded from the Foundry artifacts, with a name-pattern fallback. Unknown hook errors show "No routes found".
++  are decoded from the Foundry artifacts and `PREDICTION_HOOK_ERRORS_ABI` (section 8), with a name-pattern fallback.
++  Unknown hook errors show **Trade rejected**.
 +- `eth_call` quotes run at `latest`. The hook prices from the start-of-block state, so a quote can be one block stale.
 +  Auto slippage (section 3) covers this and the move during wallet confirmation; custom slippage does not.
 +- First-trade gas was measured on the hook snapshot above (300k with the permit). The unsimulated first buy uses a
@@ -221,6 +222,203 @@ index 0000000..17ea3fd
 +- drpc free-tier rate limits under 1 s quote polling plus 5 s registry polling are unknown.
 +- The fork still needs Uniswap's session and bot check to load, and uses the hosted API for non-prediction tokens.
 +- There are no USD values or logos for YES/NO (letter avatars).
++
++### Dev-mode crash fix
++
++- `packages/mycelium/src/compat/diagnostics.ts`: `reportUnknownCompatKey` now reports instead of throwing in development builds (matches production). Upstream `SwapErrorScreen` passes `exitStyle`, which crashed the dev server whenever a swap failed.
++
++## 7. Price chart for YES/NO tokens
++
++The swap page's chart toggle (trending icon, desktop widths) opens the slideout price card. For a YES/NO token the card
++charts the hook's own quotes instead of Uniswap's backend history.
++
++- History is rebuilt exactly from chain state: `hook.quote(marketId)` with `eth_call` at each past block, from `openTime`
++  up to the last second the hook prices (`expiry - window - 1`; inside the averaging window `midYes` is 0). Each point's
++  time is `expiry - tau` from the quote itself. A 60 s market is at most 50 points; longer markets are sampled to 240
++  points on a grid anchored at `openTime`, so the grid does not move between refreshes.
++- YES plots `midYes`, NO plots `1 - midYes`, in USD. Once the market is settled the line ends at `expiry` with 1.00 for
++  the winner and 0.00 for the loser (0.50 for an invalid market). Between `expiry - window` and settlement the line
++  holds its last quote.
++- While the card is open it polls once per second: one multicall at `latest` (quote, `marketInfo`, block number and
++  timestamp), plus reads of any block it missed. Past reads are cached per market for the page's lifetime (32 markets)
++  and shared by YES and NO. Polling stops when the market is settled and its history is complete, or the card closes.
++- drpc's free tier rejects JSON-RPC batches above 3 calls, so history reads are single `eth_call`s, 6 at a time.
++  Measured in Chrome on `localhost:3000`: a finished 60 s market loads in about 1.3 s, a live one in about 0.9 s, and each
++  later poll takes about 130 ms.
++- The card defaults to the YES/NO side of a USDC <-> YES/NO pair, hides the 1H-1Y selector and the expand button (there
++  is no token details page for these tokens), shows seconds in the crosshair time and skips the low-variance y-axis
++  zoom. Every other token keeps the backend data and the stock card.
++
++| File | Change |
++|---|---|
++| `packages/uniswap/src/features/predictionMarkets/chart/priceHistory.ts` (new) | Pure helpers: block grid, quote -> point, YES/NO series with the payout end point |
++| `packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.ts` (new) | Per-market history store: historical `eth_call`s, 1 s live multicall, cache, subscriptions |
++| `packages/uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory.ts` (new) | `usePredictionPriceHistory(currency, { skip })` (undefined for non-outcome tokens) and `usePredictionOutcomeToken` |
++| `packages/uniswap/src/features/predictionMarkets/chart/*.test.ts` (new) | 20 tests: block selection, series building, settlement end point, incremental reads against a simulated 1 s chain, the React hook |
++| `apps/web/src/hooks/useTokenPriceChartPanel.ts` | Outcome tokens use the on-chain history and skip the backend spot price, history and 24 h change queries |
++| `apps/web/src/hooks/useTokenPriceChartPanel.test.tsx` | 2 tests for the outcome-token branch |
++| `apps/web/src/pages/Swap/Swap/SlideoutChartCard/SlideoutChartCard.tsx` | Default side, hidden time selector and expand button, seconds in the crosshair time |
++
++```sh
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets/chart)
++(cd apps/web && ../../node_modules/.bin/vitest run src/hooks/useTokenPriceChartPanel.test.tsx src/hooks/useTokenPriceChartData.test.ts)
++```
++
++Not verified: the rendered card in a browser. Headless Chrome cannot turn on testnet mode (it needs a connected wallet),
++so the chart itself was checked through the hook tests and the data layer inside the app origin. Executed trades are not
++marked on the chart.
++
++## 8. Market panel, swap-button messages and the Review button
++
++### What went wrong
++
++Reproduced on 1301 in headless Chrome against this dev server, with a read-only EIP-6963 wallet at the address that
++traded markets 45-50 (it answers reads through drpc and rejects every signature, so nothing was submitted) and testnet
++mode set in `redux/persist:interface`. The form and the review modal were sampled every 0.5 s through whole markets.
++
++1. **Expected: the market closes.** A 60 s market trades only until `cutoff = expiry - window - cutoffBuffer`, 48 s after
++   `openTime`; the keeper lists it 2-5 s late, so about 45 s are left. After the cutoff the hook reverts `NotTradable`
++   until settlement, then `MarketClosed` for every buy and for selling the losing side. The keeper opens the next market
++   only after settling the previous one, so for about 20 s of each minute no market is open.
++2. **Bug: failures were silent.** In testnet mode the stock form hides its warning row (`TradeInfoRow` returns null), and
++   the vendored SDK cannot decode PredictionHook's own errors (its ABI has only the oracle and pricer errors). Every
++   rejection became an invisible "No routes found": a disabled **Review** and a 0 output. That is the "0 after settlement"
++   in market 46 (`0x0f39…FAD0`): it settled NO, so YES cannot be sold.
++3. **Bug: the form flapped after the cutoff.** It kept showing the pre-cutoff amount for 16 s (the quote hook's immediate
++   garbage collection), then flipped every 1-2 s between "Finalizing quote..." with a 40 s old indicative amount and a
++   disabled **Review** with 0. react-query v5 resets a query without data to `pending` on each refetch. Every rejection
++   was also retried once, doubling reverted `eth_call`s.
++4. **Bug: the review modal's Swap button blinked disabled on each refresh.** `useSwapTxAndGasInfo` keeps the previous
++   `/swap` result as placeholder with `usePrevious`, which lasts one render. The 1 s refresh re-renders more than once
++   while the next `/swap` (`eth_estimateGas`) is in flight. Over 36 s with the modal open, Swap was disabled in 15 of 44
++   logged states before the fix and in none of 29 after.
++
++Not a cause: during the tradable window the form's **Review** stayed enabled across every refresh, before and after. The
++app made about 5 drpc requests per second with no transport error, and a 20 requests per second burst had none either.
++
++### What changed
++
++- **Market panel** under the swap form whenever either side is a YES/NO token: the question ("ETH above $2,691.96 at
++  23:02:04 UTC?", UTC like the market names), a status badge (Trading, Closed - awaiting settlement, Settled: YES won,
++  Settled: NO won, Invalid), countdowns to the cutoff and expiry, the oracle's ETH price against the strike, YES and NO
++  probability with ask and bid (the mid only after the cutoff, the payout once settled) and one line on what the holder
++  can do. It reads `hook.marketInfo`, `hook.quote` and `oracle.lnSpotSoBWad` in one multicall per second, only while it
++  is mounted and the tab is visible, and stops once the market is settled. It works for markets outside the registry's
++  newest-40 window too.
++- **Swap-button messages.** PredictionHook reverts are decoded by name and tagged with the market and side, and the swap
++  button carries the reason (the hidden warning row still gets the full message, as does the panel):
++
++  | Revert | Button | Panel message |
++  |---|---|---|
++  | `NotTradable` after the cutoff | Trading closed | Trading closed at 23:01:52 UTC. The market settles at 23:02:04 UTC. |
++  | `NotTradable` before `openTime` | Market not open yet | Trading opens at ... |
++  | `MarketClosed`, selling the losing side | NO won - YES can't be sold | NO won. YES is worth $0 and cannot be sold. |
++  | `MarketClosed`, buying | Market settled | YES won. A settled market can't be bought. ... |
++  | `OutOfBand` | Price outside trading band | ... Try a smaller amount or wait for the price to move. |
++  | `EpochCapExceeded` | Amount too large | The market takes a limited amount per block. ... |
++  | `Insolvent`, `InsufficientIdle` | Not enough liquidity | The market's reserve can't cover this trade. ... |
++  | `ZeroAmount` | Enter a larger amount | |
++  | RPC failure (not a revert) | Price unavailable, retrying | |
++  | Anything else | Trade rejected | The market rejected this trade (...). |
++
++- **Quote refresh for outcome-token pairs.** A hook rejection is final for that request: it is not retried, the stale
++  quote is hidden at once, the loading state no longer flickers on each refetch, and the immediate garbage collection
++  is skipped while rejected. Polling stays at 1 s, so the quote returns as soon as the hook accepts again (price back
++  in the band, or a winner's sell after settlement). RPC failures keep the stock behaviour (one retry, last quote kept).
++- **Review modal.** The last `/swap` result of the same outcome-token pair stays as placeholder until the next one
++  lands. Submitting still calls `ensureFreshSwapTxData`, so the executed transaction is always the current quote's.
++
++Every other token takes the stock code paths: each hook returns the upstream value when no YES/NO token is involved.
++
++| File | Change |
++|---|---|
++| `packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx` (new) | The panel |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts` (new) | 1 s multicall query for the panel |
++| `packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts` (new) | Phase, badge, hint and per-outcome prices |
++| `packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts` (new) | UTC times, countdowns, prices, the question |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts` (new) | Plain-language errors and the swap-form `Warning` with `buttonText` |
++| `packages/uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder.ts` (new) | Placeholder `/swap` result for the review modal |
++| `packages/uniswap/src/features/predictionMarkets/ui/*.test.ts(x)` (new) | 18 tests (below) |
++| `packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts` | `PREDICTION_HOOK_ERRORS_ABI`, re-decoding by name, market/side context on every error, `isPredictionQuoteRejection`, `shouldRetryPredictionQuote`, `predictionUsdcOnlyError` |
++| `packages/uniswap/src/features/predictionMarkets/predictionTradingApi.ts` | Errors carry the route; allowance-read failures become RPC errors |
++| `packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts` | Hook-revert decoding and RPC-failure tests; gas expectations updated to `gasWithHeadroom` (+30% + 30k) |
++| `packages/uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError.ts` | Prediction errors map to `getPredictionSwapWarning` first |
++| `packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts` | Outcome-token pairs: no retry of rejections, stale quote hidden, no loading flicker, no immediate GC while rejected |
++| `packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts` | `usePredictionSwapTxPlaceholder` behind `usePrevious` |
++| `apps/web/src/pages/Swap/Swap/SwapForm.tsx` | Mounts `PredictionMarketPanel` under the swap flow |
++
++```sh
++# 66 prediction tests; the one failure is the pre-existing registry test "does nothing until a hook address is
++# configured", whose premise no longer holds now that deployment.generated.ts has a hook
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets)
++# 687 tests around the edited files (same single failure), and 251 web swap-page tests
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets src/features/tokens/useCurrencyInfo.test.ts \
++  src/features/providers/resolveRpcConfig.test.ts src/features/chains src/data/apiClients/tradingApi/TradingApiClient.test.ts \
++  src/features/transactions/swap/hooks src/features/transactions/swap/review \
++  src/features/transactions/swap/components/SwapFormButton src/features/transactions/swap/form)
++(cd apps/web && ../../node_modules/.bin/vitest run src/pages/Swap src/connection/wagmiConfig.test.ts)
++```
++
++Typecheck (`tsconfig.prediction.json`) still reports only the 64 (uniswap) and 50 (web) pre-existing errors, and oxlint
++and oxfmt are clean on every file above.
++
++Not verified: a signed swap through the panel's markets (the headless wallet rejects signatures), and the panel on
++mobile widths.
++
++## 9. Review follow-ups: placeholder key, chart retries, closing guard, polling
++
++- **Review-modal placeholder is keyed to the trade.** `usePredictionSwapTxPlaceholder` now keys the last `/swap` result
++  on the pair, trade type, typed amount (input for exact-in, output for exact-out) and the approval step, and forgets it
++  when the form has no trade. Changing 1 USDC to 1000 USDC, or exact-in to exact-out, no longer shows the old amount's
++  gas, permit and transaction as valid while the new `/swap` loads.
++- **The quote hides a rejected quote until a newer one lands.** `useTradeQuery` remembers the hook rejection per query
++  (`hashKey` of the query key plus `errorUpdatedAt`) and keeps the stale quote hidden while `dataUpdatedAt` is older, even
++  if an RPC error replaces the rejection. Before, one RPC blip after a rejection briefly showed the old quote and then
++  restarted the loading state.
++- **A settled market stops polling.** A `MarketClosed` rejection (a buy of a settled or voided market, or a sell of the
++  losing token) is final (`isFinalPredictionRejection`), so the trade quote's `refetchInterval` becomes `false` instead
++  of sending a reverting `eth_call` every second. Changing the amount or the pair still fetches once.
++- **Closing guard.** In the last `PREDICTION_CONFIRM_SECONDS` (5 s) before the cutoff, a swap sent now would land after
++  it and revert `NotTradable`. `fetchPredictionQuote` now refuses to quote there
++  (`assertPredictionMarketNotClosing`: `MARKET_CLOSED` / `TradingClosing`), so the button reads "Trading closing". The
++  panel shows a 'Closing' badge and says why. Both use the browser clock, like the rest of the panel.
++- **Chart history retries back off.** A past-block read that fails for any reason other than a revert is retried after
++  3 s, 6 s and 12 s, and is left unpriced after 4 attempts, so a settled market's history still completes and polling
++  stops. A failed read of the latest block backs off in the same way, up to 30 s. The live 1 s poll carries on
++  meanwhile. Polling pauses while the tab is hidden and resumes on `visibilitychange`.
++- **Chart and panel share one live read.** `readPredictionMarketLive` also returns the block number and timestamp from
++  the same multicall. The chart reads the latest block via `SharedQueryClient.fetchQuery` of the panel's query, with
++  `staleTime` = 1 s, so with both open one multicall per second usually serves both.
++- **Chart change for a losing token.** A series that ends at $0.00 shows -100%. Upstream's
++  `getCalculatedPricePercentChange` treats a close of 0 as "no data".
++
++| File | Change |
++|---|---|
++| `packages/uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder.ts` | Key on pair + trade type + typed amount + approval action; cleared without a trade |
++| `packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts` | Passes the trade and approval action to the placeholder hook |
++| `packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts` | Sticky per-query rejection; `refetchInterval` stops on a final rejection |
++| `packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts` | `isFinalPredictionRejection`, `PREDICTION_CLOSING_REVERT`, `predictionClosingError`, `assertPredictionMarketNotClosing` |
++| `packages/uniswap/src/features/predictionMarkets/predictionTradingApi.ts` | Calls the closing guard before quoting |
++| `packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts` | `isPredictionMarketClosing`, 'closing' phase |
++| `packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx` | Badge colour, hint colour and countdowns for 'closing' |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts` | "Trading closing" text |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts` | Block number and timestamp in the multicall; `PREDICTION_MARKET_LIVE_KEY` |
++| `packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.ts` | Per-block backoff and give-up, whole-poll backoff, hidden-tab pause, shared live read |
++| `apps/web/src/hooks/useTokenPriceChartPanel.ts` | `predictionPricePercentChange` (a close of 0 gives -100%) |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionSwapFormHooks.test.tsx` | Placeholder key tests, sticky rejection after an RPC error, no polling once settled |
++| `packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts` | 'closing' phase and text, final vs non-final rejections |
++| `packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts` | Quote refused in the last 5 s before the cutoff |
++| `packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.test.ts` | Backoff, give-up, shared live read, hidden-tab pause |
++| `apps/web/src/hooks/useTokenPriceChartPanel.test.tsx` | -100% for a losing token |
++
++```sh
++# 76 prediction tests (same single pre-existing registry failure)
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets)
++# 286 tests with the swap hooks, review and services suites (same single failure); 263 web tests
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets src/features/transactions/swap/hooks \
++  src/features/transactions/swap/review src/features/transactions/swap/services)
++(cd apps/web && ../../node_modules/.bin/vitest run src/hooks/useTokenPriceChartPanel.test.tsx src/hooks/useTokenPriceChartData.test.ts src/pages/Swap)
++```
 diff --git a/apps/web/src/app/WebUniswapContext.tsx b/apps/web/src/app/WebUniswapContext.tsx
 index 6f8695c..018d80c 100644
 --- a/apps/web/src/app/WebUniswapContext.tsx
@@ -238,6 +436,329 @@ index 6f8695c..018d80c 100644
      )
    })
  
+diff --git a/apps/web/src/hooks/useTokenPriceChartPanel.test.tsx b/apps/web/src/hooks/useTokenPriceChartPanel.test.tsx
+index fb088c4..7c38260 100644
+--- a/apps/web/src/hooks/useTokenPriceChartPanel.test.tsx
++++ b/apps/web/src/hooks/useTokenPriceChartPanel.test.tsx
+@@ -3,6 +3,7 @@ import { UTCTimestamp } from 'lightweight-charts'
+ import { PollingInterval } from 'uniswap/src/constants/misc'
+ import { USDC_MAINNET } from 'uniswap/src/constants/tokens'
+ import { useTokenSpotPrice } from 'uniswap/src/features/dataApi/tokenDetails/useTokenDetailsData'
++import { usePredictionPriceHistory } from 'uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory'
+ import type { PriceChartData } from '~/components/Charts/PriceChart'
+ import { ChartType, DataQuality, PriceChartType, type ChartQueryResult } from '~/components/Charts/utils'
+ import { TimePeriod } from '~/data/util'
+@@ -28,7 +29,12 @@ vi.mock('uniswap/src/features/dataApi/tokenDetails/useTokenDetailsData', async (
+   }
+ })
+ 
++vi.mock('uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory', () => ({
++  usePredictionPriceHistory: vi.fn(() => undefined),
++}))
++
+ const mockUseTokenPriceChartData = vi.mocked(useTokenPriceChartData)
++const mockUsePredictionPriceHistory = vi.mocked(usePredictionPriceHistory)
+ const mockUseTokenSpotPrice = vi.mocked(useTokenSpotPrice)
+ 
+ type PriceChartQueryMock = ChartQueryResult<PriceChartData, ChartType.PRICE> & {
+@@ -66,6 +72,7 @@ describe('useTokenPriceChartPanel', () => {
+     vi.clearAllMocks()
+     mockUseTokenPriceChartData.mockReturnValue(basePriceQuery)
+     mockUseTokenSpotPrice.mockReturnValue(undefined)
++    mockUsePredictionPriceHistory.mockReturnValue(undefined)
+   })
+ 
+   it('syncs disableCandlestickUI to the store in layout effect', () => {
+@@ -201,4 +208,78 @@ describe('useTokenPriceChartPanel', () => {
+     expect(mockUseTokenSpotPrice).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ skip: true }))
+     expect(mockUseTokenPriceChartData).toHaveBeenCalledWith(expect.objectContaining({ skip: true }))
+   })
++
++  describe('prediction market tokens', () => {
++    const history = {
++      entries: [
++        { time: 10, value: 0.5 },
++        { time: 11, value: 0.6 },
++        { time: 12, value: 0.75 },
++      ],
++      loading: false,
++      isError: false,
++    }
++
++    it('charts the on-chain history and skips the backend queries', () => {
++      mockUsePredictionPriceHistory.mockReturnValue(history)
++      const setDisableCandlestickUI = vi.fn()
++
++      const { result } = renderHook(() =>
++        useTokenPriceChartPanel({
++          variables,
++          priceChartType: PriceChartType.CANDLESTICK,
++          setDisableCandlestickUI,
++          timePeriod: TimePeriod.DAY,
++          currency: USDC_MAINNET,
++        }),
++      )
++
++      expect(mockUseTokenSpotPrice).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ skip: true }))
++      expect(mockUseTokenPriceChartData).toHaveBeenCalledWith(expect.objectContaining({ skip: true }))
++      expect(result.current.priceQuery.entries).toEqual([
++        priceEntry(10, 0.5),
++        priceEntry(11, 0.6),
++        priceEntry(12, 0.75),
++      ])
++      expect(result.current.showInvalidSkeleton).toBe(false)
++      expect(result.current.stale).toBe(false)
++      expect(result.current.pricePercentChange).toBeCloseTo(50)
++      expect(setDisableCandlestickUI).toHaveBeenCalledWith(true)
++    })
++
++    it('shows -100% for a token that lost and ends at $0', () => {
++      mockUsePredictionPriceHistory.mockReturnValue({
++        ...history,
++        entries: [...history.entries, { time: 20, value: 0 }],
++        outcome: 0,
++      })
++
++      const { result } = renderHook(() =>
++        useTokenPriceChartPanel({
++          variables,
++          priceChartType: PriceChartType.LINE,
++          timePeriod: TimePeriod.DAY,
++          currency: USDC_MAINNET,
++        }),
++      )
++
++      expect(result.current.pricePercentChange).toBe(-100)
++    })
++
++    it('shows the invalid skeleton until two points exist', () => {
++      mockUsePredictionPriceHistory.mockReturnValue({ ...history, entries: history.entries.slice(0, 1), loading: true })
++
++      const { result } = renderHook(() =>
++        useTokenPriceChartPanel({
++          variables,
++          priceChartType: PriceChartType.LINE,
++          timePeriod: TimePeriod.DAY,
++          currency: USDC_MAINNET,
++        }),
++      )
++
++      expect(result.current.showInvalidSkeleton).toBe(true)
++      expect(result.current.priceQuery.loading).toBe(true)
++    })
++  })
+ })
+diff --git a/apps/web/src/hooks/useTokenPriceChartPanel.ts b/apps/web/src/hooks/useTokenPriceChartPanel.ts
+index b9e5dff..2a28adf 100644
+--- a/apps/web/src/hooks/useTokenPriceChartPanel.ts
++++ b/apps/web/src/hooks/useTokenPriceChartPanel.ts
+@@ -1,10 +1,15 @@
+ import type { Currency } from '@uniswap/sdk-core'
++import type { UTCTimestamp } from 'lightweight-charts'
+ import { useLayoutEffect, useMemo } from 'react'
+ import { PollingInterval } from 'uniswap/src/constants/misc'
+ import { fromGraphQLChain } from 'uniswap/src/features/chains/utils'
+ import { useTokenPriceChange, useTokenSpotPrice } from 'uniswap/src/features/dataApi/tokenDetails/useTokenDetailsData'
++import {
++  type PredictionPriceHistory,
++  usePredictionPriceHistory,
++} from 'uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory'
+ import { buildCurrencyId, currencyId } from 'uniswap/src/utils/currencyId'
+-import { DataQuality, PriceChartType } from '~/components/Charts/utils'
++import { ChartType, DataQuality, PriceChartType } from '~/components/Charts/utils'
+ import { TimePeriod } from '~/data/util'
+ import { useTokenPriceChartData } from '~/hooks/useTokenPriceChartData'
+ import { getDisplayedPricePercentChange, type TokenPriceChartQueryVariables } from '~/hooks/useTokenPriceChartData'
+@@ -20,6 +25,33 @@ export interface UseTokenPriceChartPanelParams {
+   disablePricePolling?: boolean
+ }
+ 
++// YES/NO prediction tokens chart the hook's on-chain quotes over the market's lifetime instead of backend history
++function toPredictionPriceQuery(history: PredictionPriceHistory): ReturnType<typeof useTokenPriceChartData> {
++  const entries = history.entries.map(({ time, value }) => ({
++    time: time as UTCTimestamp,
++    value,
++    open: value,
++    high: value,
++    low: value,
++    close: value,
++  }))
++  return {
++    chartType: ChartType.PRICE,
++    entries,
++    loading: history.loading,
++    isError: history.isError,
++    dataQuality: entries.length >= 2 ? DataQuality.VALID : DataQuality.INVALID,
++    disableCandlestickUI: true,
++  }
++}
++
++// A losing outcome token ends at $0, which upstream's helper reads as "no change" instead of -100%
++function predictionPricePercentChange(entries: { close: number }[]): number | undefined {
++  const first = entries.at(0)?.close
++  const last = entries.at(-1)?.close
++  return first && last !== undefined ? ((last - first) / first) * 100 : undefined
++}
++
+ export function useTokenPriceChartPanel({
+   variables,
+   priceChartType,
+@@ -35,6 +67,8 @@ export function useTokenPriceChartPanel({
+   isError: boolean
+   stale: boolean
+ } {
++  const predictionHistory = usePredictionPriceHistory(currency, { skip })
++  const skipBackend = skip || predictionHistory !== undefined
+   const chainId = useMemo(() => fromGraphQLChain(variables.chain), [variables.chain])
+   const spotCurrencyId = useMemo(() => {
+     if (!variables.address) {
+@@ -48,32 +82,38 @@ export function useTokenPriceChartPanel({
+     isMultichainAggregateView: variables.multichain,
+     // The V2 spot price must poll or the displayed price would freeze — REST token queries have no built-in polling
+     refetchInterval: disablePricePolling ? undefined : PollingInterval.KindaFast,
+-    skip,
++    skip: skipBackend,
+   })
+ 
+-  const priceQuery = useTokenPriceChartData({
++  const backendPriceQuery = useTokenPriceChartData({
+     variables,
+-    skip,
++    skip: skipBackend,
+     priceChartType,
+     currentPriceOverride,
+     disablePricePolling,
+   })
++  const priceQuery = useMemo(
++    () => (predictionHistory ? toPredictionPriceQuery(predictionHistory) : backendPriceQuery),
++    [predictionHistory, backendPriceQuery],
++  )
+ 
+   useLayoutEffect(() => {
+     setDisableCandlestickUI?.(priceQuery.disableCandlestickUI)
+   }, [priceQuery.disableCandlestickUI, setDisableCandlestickUI])
+ 
+   const currencyIdValue = useMemo(() => currencyId(currency), [currency])
+-  const priceChange24h = useTokenPriceChange(currencyIdValue, { skip })
++  const priceChange24h = useTokenPriceChange(currencyIdValue, { skip: skipBackend })
+ 
+   const pricePercentChange = useMemo(
+     () =>
+-      getDisplayedPricePercentChange({
+-        timePeriod,
+-        priceChange24h,
+-        entries: priceQuery.entries,
+-      }),
+-    [timePeriod, priceChange24h, priceQuery.entries],
++      predictionHistory
++        ? predictionPricePercentChange(priceQuery.entries)
++        : getDisplayedPricePercentChange({
++            timePeriod,
++            priceChange24h,
++            entries: priceQuery.entries,
++          }),
++    [predictionHistory, timePeriod, priceChange24h, priceQuery.entries],
+   )
+ 
+   return {
+diff --git a/apps/web/src/pages/Swap/Swap/SlideoutChartCard/SlideoutChartCard.tsx b/apps/web/src/pages/Swap/Swap/SlideoutChartCard/SlideoutChartCard.tsx
+index c415207..fe50c53 100644
+--- a/apps/web/src/pages/Swap/Swap/SlideoutChartCard/SlideoutChartCard.tsx
++++ b/apps/web/src/pages/Swap/Swap/SlideoutChartCard/SlideoutChartCard.tsx
+@@ -11,8 +11,13 @@ import { CopyHelper } from 'uniswap/src/components/CopyHelper/CopyHelper'
+ import { CurrencyLogo } from 'uniswap/src/components/CurrencyLogo/CurrencyLogo'
+ import { getChainLabel, toGraphQLChain } from 'uniswap/src/features/chains/utils'
+ import { useLocalizationContext } from 'uniswap/src/features/language/LocalizationContext'
+-import { FORMAT_DATE_MONTH_DAY_TIME, useLocalizedDayjs } from 'uniswap/src/features/language/localizedDayjs'
++import {
++  FORMAT_DATE_MONTH_DAY_TIME,
++  FORMAT_TIME_MEDIUM,
++  useLocalizedDayjs,
++} from 'uniswap/src/features/language/localizedDayjs'
+ import { CopyNotificationType } from 'uniswap/src/features/notifications/slice/types'
++import { usePredictionOutcomeToken } from 'uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory'
+ import { ElementName, InterfaceEventName } from 'uniswap/src/features/telemetry/constants'
+ import { sendAnalyticsEvent } from 'uniswap/src/features/telemetry/send'
+ import { useCurrencyInfo } from 'uniswap/src/features/tokens/useCurrencyInfo'
+@@ -149,6 +154,8 @@ function SlideoutChartCardBody({
+   const navigateToTokenDetails = useNavigateToTokenDetails()
+   const sporeColors = useSporeColors()
+   const tokenColor = useColor(selectedCurrency)
++  // A prediction market charts its whole lifetime and has no token details page
++  const isPredictionToken = !!usePredictionOutcomeToken(selectedCurrency)
+ 
+   const variables = useMemo((): TokenPriceChartQueryVariables => {
+     const chain = toGraphQLChain(selectedCurrency.chainId as UniverseChainId)
+@@ -207,6 +214,7 @@ function SlideoutChartCardBody({
+             </Flex>
+           )}
+           <TouchableArea
++            display={isPredictionToken ? 'none' : undefined}
+             onPress={() => {
+               sendAnalyticsEvent(SharedEventName.ELEMENT_CLICKED, {
+                 element: ElementName.SlideoutChartCardExpand,
+@@ -251,7 +259,9 @@ function SlideoutChartCardBody({
+                 />
+                 {crosshairData && (
+                   <Text variant="body2" color="$neutral3">
+-                    {localizedDayjs.unix(crosshairData.time as number).format(FORMAT_DATE_MONTH_DAY_TIME)}
++                    {localizedDayjs
++                      .unix(crosshairData.time as number)
++                      .format(isPredictionToken ? FORMAT_TIME_MEDIUM : FORMAT_DATE_MONTH_DAY_TIME)}
+                   </Text>
+                 )}
+               </Flex>
+@@ -283,7 +293,7 @@ function SlideoutChartCardBody({
+             height="100%"
+             type={PriceChartType.LINE}
+             stale={stale}
+-            timePeriod={toHistoryDuration(timePeriod)}
++            timePeriod={isPredictionToken ? undefined : toHistoryDuration(timePeriod)}
+             onCrosshairChange={onCrosshairChange}
+             overrideColor={chartColor}
+             hideYAxis
+@@ -297,6 +307,7 @@ function SlideoutChartCardBody({
+       <Flex row justifyContent="space-between" alignItems="center">
+         {/* Time period selector */}
+         <Flex
++          display={isPredictionToken ? 'none' : undefined}
+           row
+           borderColor="$surface3"
+           borderWidth="$spacing1"
+@@ -391,7 +402,12 @@ export function SlideoutChartCard({ isChartOpen }: { isChartOpen: boolean }): JS
+   const { inputCurrency, outputCurrency } = useSlideoutChartCardCurrencies()
+   const { currentTab } = useSwapAndLimitContext()
+ 
+-  const [selectedField, setSelectedField] = useState<CurrencyField>(CurrencyField.INPUT)
++  const [pickedField, setSelectedField] = useState<CurrencyField>()
++  // Until a side is picked, a USDC -> YES/NO swap charts the YES/NO token rather than USDC
++  const isInputPredictionToken = !!usePredictionOutcomeToken(inputCurrency)
++  const isOutputPredictionToken = !!usePredictionOutcomeToken(outputCurrency)
++  const selectedField =
++    pickedField ?? (isOutputPredictionToken && !isInputPredictionToken ? CurrencyField.OUTPUT : CurrencyField.INPUT)
+   const selectedCurrency =
+     (selectedField === CurrencyField.INPUT ? inputCurrency : outputCurrency) ?? inputCurrency ?? outputCurrency
+ 
+diff --git a/apps/web/src/pages/Swap/Swap/SwapForm.tsx b/apps/web/src/pages/Swap/Swap/SwapForm.tsx
+index c67cff9..4a0db69 100644
+--- a/apps/web/src/pages/Swap/Swap/SwapForm.tsx
++++ b/apps/web/src/pages/Swap/Swap/SwapForm.tsx
+@@ -1,6 +1,7 @@
+ import type { Currency } from '@uniswap/sdk-core'
+ import { useGetPasskeyAuthStatus } from '@universe/embedded-wallet'
+ import { Flex } from '@universe/mycelium'
++import { PredictionMarketPanel } from 'uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel'
+ import type { SwapRedirectFn } from 'uniswap/src/features/transactions/components/TransactionModal/TransactionModalContext'
+ import { SwapFormSettings } from 'uniswap/src/features/transactions/swap/components/SwapFormSettings/SwapFormSettings'
+ import { SwapOffHoursBanner } from 'uniswap/src/features/transactions/swap/components/SwapOffHoursBanner/SwapOffHoursBanner'
+@@ -78,6 +79,7 @@ export function SwapForm({
+           onCurrencyPanelsLayout={onCurrencyPanelsLayout}
+         />
+       </SwapDependenciesStoreContextProvider>
++      <PredictionMarketPanel />
+       {isSwapPage && <SwapOffHoursBanner />}
+       <SwapBottomCard />
+     </Flex>
 diff --git a/apps/web/tsconfig.prediction.json b/apps/web/tsconfig.prediction.json
 new file mode 100644
 index 0000000..4b0e096
@@ -8528,6 +9049,22 @@ index d050325..2843316 100644
      "labs/*"
    ],
    "patchedDependencies": {
+diff --git a/packages/mycelium/src/compat/diagnostics.ts b/packages/mycelium/src/compat/diagnostics.ts
+index 138037a..d6236a1 100644
+--- a/packages/mycelium/src/compat/diagnostics.ts
++++ b/packages/mycelium/src/compat/diagnostics.ts
+@@ -125,9 +125,8 @@ export function reportUnknownCompatKey({ what, key, known }: { what: string; key
+   const message =
+     `compat: unknown ${what} "${key}" — it maps to no CSS and would be silently dropped. ` +
+     `Known: ${known.join(', ')}.`
+-  if (isDevelopmentBuild()) {
+-    throw new Error(message)
+-  }
++  // Prediction-market fork: report instead of throwing in development too, so upstream screens that still pass
++  // legacy keys (e.g. SwapErrorScreen's `exitStyle`) render like the production build instead of crashing the dev server.
+   logBoundedOnce(`${what}:${key}`, message)
+ }
+ 
 diff --git a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
 index 9fdfacb..701e3f1 100644
 --- a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
@@ -8724,6 +9261,1109 @@ index 434e88a..00004c6 100644
      },
    },
    tokens: testnetTokens,
+diff --git a/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.test.ts b/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.test.ts
+new file mode 100644
+index 0000000..9f1d9d5
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.test.ts
+@@ -0,0 +1,385 @@
++import { renderHook, waitFor } from '@testing-library/react'
++import { SharedQueryClient } from '@universe/api'
++import {
++  historyRetryDelayMs,
++  loadMarketHistory,
++  resetMarketHistories,
++  subscribeMarketHistory,
++} from 'uniswap/src/features/predictionMarkets/chart/predictionPriceHistory'
++import { buildPredictionSeries } from 'uniswap/src/features/predictionMarkets/chart/priceHistory'
++import { usePredictionPriceHistory } from 'uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory'
++import { getPredictionDeployment, PREDICTION_HOOK_STORAGE_KEY } from 'uniswap/src/features/predictionMarkets/config'
++import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import { setPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
++import {
++  type Market,
++  type MarketInfo,
++  MarketStatus,
++  predictionHookAbi,
++  predictionPoolKey,
++  UNICHAIN_SEPOLIA,
++  WAD,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import { predictionMarketLiveQueryOptions } from 'uniswap/src/features/predictionMarkets/ui/predictionMarketLive'
++import {
++  type Abi,
++  type Address,
++  createClient,
++  custom,
++  decodeFunctionData,
++  encodeErrorResult,
++  encodeFunctionResult,
++  getAddress,
++  type Hex,
++  hexToBigInt,
++  parseAbi,
++  RpcRequestError,
++  zeroAddress,
++} from 'viem'
++import { unichainSepolia } from 'viem/chains'
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const GENESIS = 1_726_852_428
++const OPEN = 1_790_377_680
++const CREATED = OPEN + 3
++const EXPIRY = OPEN + 60
++const SETTLED_AT = EXPIRY + 4
++
++class Revert {
++  constructor(readonly data: Hex) {}
++}
++
++const UNKNOWN_MARKET = encodeErrorResult({ abi: parseAbi(['error UnknownMarket()']), errorName: 'UnknownMarket' })
++
++/* Simulated chain, one block per second */
++
++let head = OPEN
++const failBlocks = new Set<number>()
++/** Blocks whose reads fail every time */
++const brokenBlocks = new Set<number>()
++const midAt = (t: number): bigint => WAD / 2n + BigInt(t - OPEN) * 10n ** 16n
++
++function contract(abi: Abi, impl: Record<string, (t: number, ...args: never[]) => unknown>) {
++  return (t: number, data: Hex): Hex => {
++    const decoded = decodeFunctionData({ abi, data })
++    const fn = impl[decoded.functionName] as (t: number, ...a: unknown[]) => unknown
++    return encodeFunctionResult({
++      abi,
++      functionName: decoded.functionName,
++      result: fn(t, ...(decoded.args ?? [])),
++    } as never)
++  }
++}
++
++const hook = contract(predictionHookAbi, {
++  marketCount: () => 0n,
++  quote: (t: number) => {
++    if (t < CREATED) {
++      throw new Revert(UNKNOWN_MARKET)
++    }
++    const tau = t < EXPIRY ? BigInt(EXPIRY - t) : 0n
++    const mid = tau > 10n ? midAt(t) : 0n
++    return {
++      tradable: t < EXPIRY - 12,
++      tau,
++      varE36: 0n,
++      xWad: 0n,
++      midYes: mid,
++      askYes: mid,
++      bidYes: mid,
++      askNo: mid ? WAD - mid : 0n,
++      bidNo: mid ? WAD - mid : 0n,
++    }
++  },
++  marketInfo: (t: number) => ({
++    yes: zeroAddress,
++    no: zeroAddress,
++    oracle: zeroAddress,
++    lnStrikeWad: 0n,
++    openTime: BigInt(OPEN),
++    expiry: BigInt(EXPIRY),
++    window: 10,
++    cutoffBuffer: 2,
++    status: t >= SETTLED_AT ? MarketStatus.Settled : MarketStatus.Trading,
++    yesWon: false,
++    bucket: 0n,
++    outYes: 0n,
++    outNo: 0n,
++    invYes: 0n,
++    invNo: 0n,
++  }),
++})
++
++const multicallAbi = parseAbi([
++  'struct Call3 { address target; bool allowFailure; bytes callData; }',
++  'struct Result { bool success; bytes returnData; }',
++  'function aggregate3(Call3[] calls) payable returns (Result[] returnData)',
++  'function getBlockNumber() view returns (uint256)',
++  'function getCurrentBlockTimestamp() view returns (uint256)',
++])
++
++function execute(t: number, to: string, data: Hex): Hex {
++  if (to.toLowerCase() === HOOK.toLowerCase()) {
++    return hook(t, data)
++  }
++  if (to.toLowerCase() === getPredictionDeployment().multicall3.toLowerCase()) {
++    return multicall(t, data)
++  }
++  throw new Revert('0x')
++}
++
++const multicall = contract(multicallAbi, {
++  getBlockNumber: (t: number) => BigInt(t - GENESIS),
++  getCurrentBlockTimestamp: (t: number) => BigInt(t),
++  aggregate3: (t: number, calls: readonly { target: Address; callData: Hex }[]) =>
++    calls.map((c) => {
++      try {
++        return { success: true, returnData: execute(t, c.target, c.callData) }
++      } catch (e) {
++        return { success: false, returnData: e instanceof Revert ? e.data : '0x' }
++      }
++    }),
++})
++
++const requests: { block: number | 'latest' }[] = []
++const client = createClient({
++  chain: unichainSepolia,
++  transport: custom(
++    {
++      async request({ method, params }: { method: string; params: unknown[] }) {
++        if (method === 'eth_chainId') {
++          return '0x515'
++        }
++        if (method !== 'eth_call') {
++          throw new Error(`unsupported ${method}`)
++        }
++        const [tx, tag] = params as [{ to: string; data?: Hex; input?: Hex }, string]
++        const t = tag === 'latest' ? head : Number(hexToBigInt(tag as Hex)) + GENESIS
++        requests.push({ block: tag === 'latest' ? 'latest' : t - OPEN })
++        if (t > head) {
++          throw new Error('header not found')
++        }
++        if (failBlocks.has(t)) {
++          failBlocks.delete(t)
++          throw new Error('upstream timeout')
++        }
++        if (brokenBlocks.has(t)) {
++          throw new Error('missing trie node')
++        }
++        try {
++          return execute(t, tx.to, (tx.data ?? tx.input) as Hex)
++        } catch (e) {
++          if (e instanceof Revert) {
++            throw new RpcRequestError({
++              body: {},
++              url: 'mock://',
++              error: { code: 3, message: 'execution reverted', data: e.data },
++            })
++          }
++          throw e
++        }
++      },
++    },
++    { retryCount: 0 },
++  ),
++})
++
++describe('prediction market price history', () => {
++  beforeEach(() => {
++    localStorage.setItem(PREDICTION_HOOK_STORAGE_KEY, HOOK)
++    setPredictionPublicClient(client)
++    resetMarketHistories()
++    failBlocks.clear()
++    brokenBlocks.clear()
++    requests.length = 0
++  })
++
++  afterEach(() => {
++    vi.useRealTimers()
++  })
++
++  afterAll(() => {
++    localStorage.removeItem(PREDICTION_HOOK_STORAGE_KEY)
++    setPredictionPublicClient(undefined)
++  })
++
++  it('rebuilds the history from quotes at past blocks, skipping blocks before the market existed', async () => {
++    head = OPEN + 20
++    const snap = await loadMarketHistory(1n)
++    expect(snap.loading).toBe(false)
++    expect(snap.points.map((p) => p.time)).toEqual(Array.from({ length: 18 }, (_, i) => CREATED + i))
++    expect(snap.points.every((p) => p.midYes === midAt(p.time))).toBe(true)
++    // One multicall at the head, then one eth_call per earlier block
++    expect(requests.filter((r) => r.block === 'latest')).toHaveLength(1)
++    expect(requests.filter((r) => r.block !== 'latest')).toHaveLength(20)
++
++    const yes = buildPredictionSeries({ points: snap.points, isYes: true, market: snap.market })
++    const no = buildPredictionSeries({ points: snap.points, isYes: false, market: snap.market })
++    expect(yes.at(-1)).toEqual({ time: OPEN + 20, value: 0.7 })
++    expect(no.at(-1)?.value).toBeCloseTo(0.3, 12)
++  })
++
++  it('reads only the new blocks on the next poll', async () => {
++    head = OPEN + 20
++    await loadMarketHistory(1n)
++    requests.length = 0
++    head = OPEN + 22
++    const snap = await loadMarketHistory(1n)
++    expect(requests).toEqual([{ block: 'latest' }, { block: 21 }])
++    expect(snap.points.at(-1)?.time).toBe(OPEN + 22)
++  })
++
++  it('retries blocks whose read failed for a non-revert reason, after a backoff', async () => {
++    vi.useFakeTimers({ toFake: ['Date'] })
++    head = OPEN + 10
++    failBlocks.add(OPEN + 6)
++    const first = await loadMarketHistory(1n)
++    expect(first.points.map((p) => p.time)).not.toContain(OPEN + 6)
++
++    requests.length = 0
++    await loadMarketHistory(1n)
++    expect(requests).toEqual([{ block: 'latest' }])
++
++    vi.setSystemTime(Date.now() + historyRetryDelayMs(1))
++    const third = await loadMarketHistory(1n)
++    expect(third.points.map((p) => p.time)).toContain(OPEN + 6)
++  })
++
++  it('backs off exponentially up to 30 s', () => {
++    expect([1, 2, 3, 4, 5, 6].map(historyRetryDelayMs)).toEqual([3_000, 6_000, 12_000, 24_000, 30_000, 30_000])
++  })
++
++  it('gives up on a block that keeps failing, so a settled market still completes', async () => {
++    vi.useFakeTimers({ toFake: ['Date'] })
++    head = SETTLED_AT + 60
++    brokenBlocks.add(OPEN + 20)
++    let reads = 0
++    for (let attempt = 1; attempt <= 4; attempt++) {
++      requests.length = 0
++      await loadMarketHistory(1n)
++      reads += requests.filter((r) => r.block === 20).length
++      vi.setSystemTime(Date.now() + historyRetryDelayMs(attempt))
++    }
++    expect(reads).toBe(4)
++    requests.length = 0
++    const snap = await loadMarketHistory(1n)
++    expect(requests.filter((r) => r.block !== 'latest')).toEqual([])
++    expect(snap.points.map((p) => p.time)).not.toContain(OPEN + 20)
++    expect(snap.points).toHaveLength(EXPIRY - 11 - CREATED)
++  })
++
++  it('stops the series at expiry - window and ends it at the payout after settlement', async () => {
++    head = OPEN + 30
++    await loadMarketHistory(1n)
++
++    head = EXPIRY + 1
++    const pending = await loadMarketHistory(1n)
++    expect(pending.market?.status).toBe(MarketStatus.Trading)
++    expect(pending.points.at(-1)?.time).toBe(EXPIRY - 11)
++    expect(buildPredictionSeries({ points: pending.points, isYes: true, market: pending.market }).at(-1)?.time).toBe(
++      EXPIRY - 11,
++    )
++
++    head = SETTLED_AT
++    requests.length = 0
++    const settled = await loadMarketHistory(1n)
++    expect(requests).toEqual([{ block: 'latest' }])
++    const yes = buildPredictionSeries({ points: settled.points, isYes: true, market: settled.market })
++    const no = buildPredictionSeries({ points: settled.points, isYes: false, market: settled.market })
++    expect(yes.at(-1)).toEqual({ time: EXPIRY, value: 0 })
++    expect(no.at(-1)).toEqual({ time: EXPIRY, value: 1 })
++    expect(yes).toHaveLength(EXPIRY - 11 - CREATED + 2)
++  })
++
++  it("reuses the market panel's live read of the latest block", async () => {
++    head = OPEN + 20
++    await SharedQueryClient.fetchQuery(predictionMarketLiveQueryOptions({ hook: HOOK, marketId: 1n }))
++    requests.length = 0
++    const unsubscribe = subscribeMarketHistory(1n, () => undefined)
++    await waitFor(() => expect(requests.filter((r) => r.block !== 'latest')).toHaveLength(20))
++    unsubscribe()
++    expect(requests.filter((r) => r.block === 'latest')).toEqual([])
++  })
++
++  it('pauses polling while the page is hidden and resumes when it is shown', async () => {
++    head = OPEN + 20
++    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
++    const unsubscribe = subscribeMarketHistory(1n, () => undefined)
++    await waitFor(() => expect(requests.filter((r) => r.block === 'latest')).toHaveLength(1))
++    await new Promise((resolve) => setTimeout(resolve, 2_500))
++    expect(requests.filter((r) => r.block === 'latest')).toHaveLength(1)
++
++    visibility.mockReturnValue('visible')
++    head = OPEN + 22
++    document.dispatchEvent(new Event('visibilitychange'))
++    await waitFor(() => expect(requests.filter((r) => r.block === 'latest')).toHaveLength(2))
++    unsubscribe()
++    visibility.mockRestore()
++  }, 10_000)
++
++  it('loads a settled market in one pass', async () => {
++    head = SETTLED_AT + 3600
++    const snap = await loadMarketHistory(1n)
++    expect(snap.points).toHaveLength(EXPIRY - 11 - CREATED + 1)
++    expect(snap.market?.status).toBe(MarketStatus.Settled)
++    expect(requests.filter((r) => r.block !== 'latest')).toHaveLength(50)
++  })
++})
++
++describe('usePredictionPriceHistory', () => {
++  const YES = getAddress('0xfe00000000000000000000000000000000000001')
++  const NO = getAddress('0x0100000000000000000000000000000000000001')
++  const outcome = (address: Address, isYes: boolean) => ({
++    address,
++    symbol: isYes ? 'YES' : 'NO',
++    name: isYes ? 'Yes' : 'No',
++    decimals: 6,
++    isYes,
++    marketId: 1n,
++    poolKey: predictionPoolKey({ token: address, usdc: UNICHAIN_SEPOLIA.usdc, hook: HOOK }),
++  })
++  const market: Market = {
++    id: 1n,
++    hook: HOOK,
++    info: { openTime: BigInt(OPEN), expiry: BigInt(EXPIRY) } as MarketInfo,
++    status: 'Trading',
++    yes: outcome(YES, true),
++    no: outcome(NO, false),
++    strikeUsd: 2500,
++    cutoff: BigInt(EXPIRY - 12),
++  }
++
++  beforeEach(() => {
++    localStorage.setItem(PREDICTION_HOOK_STORAGE_KEY, HOOK)
++    setPredictionPublicClient(client)
++    resetMarketHistories()
++    resetPredictionRegistry()
++    registerPredictionMarkets([market])
++    requests.length = 0
++  })
++
++  it('returns undefined for tokens that are not YES/NO outcome tokens', () => {
++    const { result } = renderHook(() => usePredictionPriceHistory({ chainId: 1, isToken: true, address: NO }))
++    expect(result.current).toBeUndefined()
++    expect(requests).toEqual([])
++  })
++
++  it('charts NO as 1 - midYes and polls only while not skipped', async () => {
++    head = OPEN + 20
++    const skipped = renderHook(() =>
++      usePredictionPriceHistory({ chainId: 1301, isToken: true, address: NO }, { skip: true }),
++    )
++    expect(skipped.result.current?.entries).toEqual([])
++    expect(requests.filter((r) => r.block !== 'latest')).toEqual([])
++    skipped.unmount()
++
++    const { result, unmount } = renderHook(() =>
++      usePredictionPriceHistory({ chainId: 1301, isToken: true, address: NO }),
++    )
++    await waitFor(() => expect(result.current?.loading).toBe(false))
++    expect(result.current?.entries).toHaveLength(18)
++    expect(result.current?.entries.at(-1)?.value).toBeCloseTo(0.3, 12)
++    expect(result.current?.outcome).toBeUndefined()
++    unmount()
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.ts b/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.ts
+new file mode 100644
+index 0000000..10c2541
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/chart/predictionPriceHistory.ts
+@@ -0,0 +1,358 @@
++/**
++ * Price history of one prediction market, rebuilt from chain state.
++ *
++ * Each history point is `hook.quote(marketId)` read with `eth_call` at a past block, so the chart shows exactly what the
++ * hook quoted at that second. One market entry serves both its YES and NO token. While at least one chart subscribes
++ * and the page is visible, the entry polls once per second. The latest block's quote, marketInfo, block number and
++ * timestamp come from the market panel's query (one multicall, shared when both are open). Then the entry reads any
++ * grid blocks it has not seen yet with a few parallel calls (drpc's free tier rejects JSON-RPC batches above 3 calls).
++ * Past blocks never change, so every read is cached for the lifetime of the page. A past read that fails is retried
++ * with exponential backoff and given up on (left unpriced) after a few attempts. Polling stops once the market is
++ * settled and its history is complete.
++ */
++
++import { SharedQueryClient } from '@universe/api'
++import {
++  type BlockAnchor,
++  type HistoryMarket,
++  isFinalMarket,
++  type MidPoint,
++  quoteToMidPoint,
++  selectHistoryBlocks,
++} from 'uniswap/src/features/predictionMarkets/chart/priceHistory'
++import { getPredictionDeployment } from 'uniswap/src/features/predictionMarkets/config'
++import { getPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
++import { type HookQuote, type MarketInfo, predictionHookAbi } from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  PREDICTION_MARKET_LIVE_KEY,
++  predictionMarketLiveQueryOptions,
++} from 'uniswap/src/features/predictionMarkets/ui/predictionMarketLive'
++import { logger } from 'utilities/src/logger/logger'
++import { type Address, BaseError, ContractFunctionRevertedError } from 'viem'
++import { readContract } from 'viem/actions'
++
++/** One new block per second on Unichain Sepolia */
++export const PREDICTION_HISTORY_POLL_MS = 1_000
++export const PREDICTION_HISTORY_CONCURRENCY = 6
++const RETRY_MS = 3_000
++const MAX_RETRY_MS = 30_000
++/** A past block whose read keeps failing is left unpriced after this many attempts */
++const MAX_BLOCK_ATTEMPTS = 4
++const MAX_CACHED_MARKETS = 32
++
++/** 3 s, 6 s, 12 s... up to 30 s */
++export function historyRetryDelayMs(attempts: number): number {
++  return Math.min(RETRY_MS * 2 ** Math.max(attempts - 1, 0), MAX_RETRY_MS)
++}
++
++export interface MarketHistorySnapshot {
++  market?: HistoryMarket
++  points: readonly MidPoint[]
++  loading: boolean
++  isError: boolean
++}
++
++interface Entry {
++  hook: Address
++  marketId: bigint
++  market?: HistoryMarket
++  mids: Map<number, bigint>
++  /** Blocks already read, priced or not */
++  read: Set<bigint>
++  /** Past blocks whose read failed, with the attempt count and when to try again */
++  retries: Map<bigint, { attempts: number; at: number }>
++  tip?: MidPoint
++  loaded: boolean
++  complete: boolean
++  failures: number
++  snapshot: MarketHistorySnapshot
++  listeners: Set<() => void>
++  timer?: ReturnType<typeof setTimeout>
++  running: boolean
++}
++
++const EMPTY_SNAPSHOT: MarketHistorySnapshot = { points: [], loading: false, isError: false }
++const LOADING_SNAPSHOT: MarketHistorySnapshot = { points: [], loading: true, isError: false }
++const entries = new Map<string, Entry>()
++
++export function marketHistoryKey(hook: Address, marketId: bigint): string {
++  return `${hook.toLowerCase()}:${marketId}`
++}
++
++function toHistoryMarket(info: MarketInfo): HistoryMarket {
++  return {
++    openTime: Number(info.openTime),
++    expiry: Number(info.expiry),
++    window: Number(info.window),
++    status: info.status,
++    yesWon: info.yesWon,
++  }
++}
++
++function publish(entry: Entry): void {
++  const points = [...entry.mids.entries()].map(([time, midYes]) => ({ time, midYes })).sort((a, b) => a.time - b.time)
++  const last = points.at(-1)
++  if (entry.tip && (!last || entry.tip.time > last.time)) {
++    points.push(entry.tip)
++  }
++  entry.snapshot = {
++    market: entry.market,
++    points,
++    loading: !entry.loaded && entry.failures === 0,
++    isError: !entry.loaded && entry.failures > 0,
++  }
++  for (const l of entry.listeners) {
++    l()
++  }
++}
++
++async function readLatest(
++  entry: Entry,
++  maxAgeMs: number,
++): Promise<{ market: HistoryMarket; latest: BlockAnchor; quote?: HookQuote }> {
++  const live = await SharedQueryClient.fetchQuery({
++    ...predictionMarketLiveQueryOptions({ hook: entry.hook, marketId: entry.marketId }),
++    staleTime: maxAgeMs,
++  })
++  if (!live.block) {
++    throw new Error('latest block unavailable')
++  }
++  return { market: toHistoryMarket(live.info), latest: live.block, quote: live.quote }
++}
++
++function isRevert(error: unknown): boolean {
++  return error instanceof BaseError && !!error.walk((e) => e instanceof ContractFunctionRevertedError)
++}
++
++async function readBlocks({
++  entry,
++  market,
++  blocks,
++}: {
++  entry: Entry
++  market: HistoryMarket
++  blocks: readonly bigint[]
++}): Promise<number> {
++  const client = getPredictionPublicClient()
++  let failed = 0
++  let next = 0
++  const worker = async (): Promise<void> => {
++    while (next < blocks.length) {
++      const blockNumber = blocks[next++] as bigint
++      try {
++        const quote = await readContract(client, {
++          address: entry.hook,
++          abi: predictionHookAbi,
++          functionName: 'quote',
++          args: [entry.marketId],
++          blockNumber,
++        })
++        const point = quoteToMidPoint(quote as HookQuote, market)
++        if (point) {
++          entry.mids.set(point.time, point.midYes)
++        }
++        entry.read.add(blockNumber)
++        entry.retries.delete(blockNumber)
++      } catch (error) {
++        // Before the market's creation block the hook reverts with UnknownMarket
++        if (isRevert(error)) {
++          entry.read.add(blockNumber)
++          entry.retries.delete(blockNumber)
++          continue
++        }
++        failed++
++        const attempts = (entry.retries.get(blockNumber)?.attempts ?? 0) + 1
++        if (attempts >= MAX_BLOCK_ATTEMPTS) {
++          entry.read.add(blockNumber)
++          entry.retries.delete(blockNumber)
++        } else {
++          entry.retries.set(blockNumber, { attempts, at: Date.now() + historyRetryDelayMs(attempts) })
++        }
++      }
++    }
++  }
++  await Promise.all(Array.from({ length: Math.min(PREDICTION_HISTORY_CONCURRENCY, blocks.length) }, worker))
++  return failed
++}
++
++function isDue(entry: Entry, now: number): (blockNumber: bigint) => boolean {
++  return (blockNumber) => !entry.read.has(blockNumber) && (entry.retries.get(blockNumber)?.at ?? 0) <= now
++}
++
++/** One poll; resolves to how many past reads failed */
++async function refreshMarketHistory(entry: Entry, maxAgeMs: number): Promise<number> {
++  const { market, latest, quote } = await readLatest(entry, maxAgeMs)
++  entry.market = market
++  const grid = selectHistoryBlocks({ market, latest })
++  const tip = quote && quoteToMidPoint(quote, market)
++  if (tip && grid.at(-1) === latest.number) {
++    entry.mids.set(tip.time, tip.midYes)
++    entry.read.add(latest.number)
++  } else if (tip) {
++    entry.tip = tip
++  }
++  const now = Date.now()
++  const failed = await readBlocks({ entry, market, blocks: grid.filter(isDue(entry, now)) })
++  entry.loaded = true
++  entry.complete = isFinalMarket(market) && grid.every((b) => entry.read.has(b))
++  publish(entry)
++  return failed
++}
++
++/** A final market has nothing new at the tip, so it waits for its next due retry */
++function nextPollDelay(entry: Entry): number {
++  if (!entry.market || !isFinalMarket(entry.market)) {
++    return PREDICTION_HISTORY_POLL_MS
++  }
++  const retryTimes = [...entry.retries.values()].map((r) => r.at)
++  if (!retryTimes.length) {
++    return PREDICTION_HISTORY_POLL_MS
++  }
++  return Math.max(PREDICTION_HISTORY_POLL_MS, Math.min(...retryTimes) - Date.now())
++}
++
++function isPageHidden(): boolean {
++  return typeof document !== 'undefined' && document.visibilityState === 'hidden'
++}
++
++let resumesOnVisible = false
++
++/** Restarts the polls that paused while the page was hidden */
++function resumeOnVisible(): void {
++  if (resumesOnVisible || typeof document === 'undefined') {
++    return
++  }
++  resumesOnVisible = true
++  document.addEventListener('visibilitychange', () => {
++    if (isPageHidden()) {
++      return
++    }
++    for (const entry of entries.values()) {
++      if (entry.listeners.size && !entry.timer && !entry.running) {
++        run(entry)
++      }
++    }
++  })
++}
++
++function schedule(entry: Entry, delay: number): void {
++  clearTimeout(entry.timer)
++  entry.timer = undefined
++  if (!entry.listeners.size || entry.complete) {
++    return
++  }
++  entry.timer = setTimeout(() => {
++    entry.timer = undefined
++    if (isPageHidden()) {
++      resumeOnVisible()
++      return
++    }
++    run(entry)
++  }, delay)
++}
++
++function run(entry: Entry): void {
++  if (entry.running || entry.complete) {
++    return
++  }
++  entry.running = true
++  refreshMarketHistory(entry, PREDICTION_HISTORY_POLL_MS)
++    .then((failed) => {
++      entry.failures = 0
++      if (failed) {
++        logger.warn('predictionMarkets/chart', 'refreshMarketHistory', 'some past price reads failed', { failed })
++      }
++      schedule(entry, nextPollDelay(entry))
++    })
++    .catch((error: unknown) => {
++      entry.failures++
++      publish(entry)
++      logger.warn('predictionMarkets/chart', 'refreshMarketHistory', 'price history read failed', { error })
++      schedule(entry, historyRetryDelayMs(entry.failures))
++    })
++    .finally(() => {
++      entry.running = false
++    })
++}
++
++function evictIdle(): void {
++  for (const [key, entry] of entries) {
++    if (entries.size <= MAX_CACHED_MARKETS) {
++      return
++    }
++    if (!entry.listeners.size && !entry.running) {
++      entries.delete(key)
++    }
++  }
++}
++
++function getEntry(hook: Address, marketId: bigint): Entry {
++  const key = marketHistoryKey(hook, marketId)
++  let entry = entries.get(key)
++  if (!entry) {
++    entry = {
++      hook,
++      marketId,
++      mids: new Map(),
++      read: new Set(),
++      retries: new Map(),
++      loaded: false,
++      complete: false,
++      failures: 0,
++      snapshot: LOADING_SNAPSHOT,
++      listeners: new Set(),
++      running: false,
++    }
++    entries.set(key, entry)
++    evictIdle()
++  }
++  return entry
++}
++
++/** Subscribes to a market's history and polls it while subscribed */
++export function subscribeMarketHistory(marketId: bigint, listener: () => void): () => void {
++  const hook = getPredictionDeployment().predictionHook
++  if (!hook) {
++    return () => undefined
++  }
++  const entry = getEntry(hook, marketId)
++  entry.listeners.add(listener)
++  if (!entry.running && !entry.timer) {
++    run(entry)
++  }
++  return () => {
++    entry.listeners.delete(listener)
++    if (!entry.listeners.size) {
++      clearTimeout(entry.timer)
++      entry.timer = undefined
++    }
++  }
++}
++
++export function getMarketHistorySnapshot(marketId: bigint | undefined): MarketHistorySnapshot {
++  const hook = getPredictionDeployment().predictionHook
++  if (!hook || marketId === undefined) {
++    return EMPTY_SNAPSHOT
++  }
++  return entries.get(marketHistoryKey(hook, marketId))?.snapshot ?? LOADING_SNAPSHOT
++}
++
++/** Runs one poll outside the subscription loop and returns the resulting snapshot */
++export async function loadMarketHistory(marketId: bigint): Promise<MarketHistorySnapshot> {
++  const hook = getPredictionDeployment().predictionHook
++  if (!hook) {
++    return EMPTY_SNAPSHOT
++  }
++  const entry = getEntry(hook, marketId)
++  await refreshMarketHistory(entry, 0)
++  return entry.snapshot
++}
++
++/** Test helper */
++export function resetMarketHistories(): void {
++  for (const entry of entries.values()) {
++    clearTimeout(entry.timer)
++  }
++  entries.clear()
++  SharedQueryClient.removeQueries({ queryKey: [PREDICTION_MARKET_LIVE_KEY] })
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.test.ts b/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.test.ts
+new file mode 100644
+index 0000000..5276b21
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.test.ts
+@@ -0,0 +1,128 @@
++import {
++  blockAtTime,
++  buildPredictionSeries,
++  type HistoryMarket,
++  historyStepSeconds,
++  lastPricedTime,
++  outcomeValue,
++  quoteToMidPoint,
++  selectHistoryBlocks,
++} from 'uniswap/src/features/predictionMarkets/chart/priceHistory'
++import { MarketStatus, WAD } from 'uniswap/src/features/predictionMarkets/sdk'
++
++const OPEN = 1_790_377_680
++const GENESIS = 1_726_852_428
++
++const market = (over: Partial<HistoryMarket> = {}): HistoryMarket => ({
++  openTime: OPEN,
++  expiry: OPEN + 60,
++  window: 10,
++  status: MarketStatus.Trading,
++  yesWon: false,
++  ...over,
++})
++
++const anchorAt = (timestamp: number) => ({ number: BigInt(timestamp - GENESIS), timestamp })
++const blockOf = (t: number) => BigInt(t - GENESIS)
++
++describe('selectHistoryBlocks', () => {
++  it('maps a timestamp to its block with 1 s blocks', () => {
++    expect(blockAtTime({ anchor: anchorAt(OPEN + 30), time: OPEN })).toBe(blockOf(OPEN))
++    expect(blockAtTime({ anchor: anchorAt(OPEN + 30), time: OPEN + 30 })).toBe(blockOf(OPEN + 30))
++  })
++
++  it('reads every block of a 60 s market from openTime up to the latest block', () => {
++    const blocks = selectHistoryBlocks({ market: market(), latest: anchorAt(OPEN + 20) })
++    expect(blocks).toHaveLength(21)
++    expect(blocks[0]).toBe(blockOf(OPEN))
++    expect(blocks.at(-1)).toBe(blockOf(OPEN + 20))
++  })
++
++  it('stops at the last second the hook prices (tau > window)', () => {
++    const m = market()
++    expect(lastPricedTime(m)).toBe(OPEN + 49)
++    const blocks = selectHistoryBlocks({ market: m, latest: anchorAt(OPEN + 500) })
++    expect(blocks).toHaveLength(50)
++    expect(blocks.at(-1)).toBe(blockOf(OPEN + 49))
++  })
++
++  it('returns nothing before the market opens', () => {
++    expect(selectHistoryBlocks({ market: market(), latest: anchorAt(OPEN - 5) })).toEqual([])
++  })
++
++  it('samples a week-long market evenly on a grid that does not move between refreshes', () => {
++    const week = market({ expiry: OPEN + 7 * 86_400 })
++    const step = historyStepSeconds(week, 240)
++    expect(step).toBe(Math.ceil((7 * 86_400 - 10) / 240))
++    const done = selectHistoryBlocks({ market: week, latest: anchorAt(OPEN + 7 * 86_400 + 60), maxPoints: 240 })
++    expect(done.length).toBeLessThanOrEqual(240)
++    expect(done[1]! - done[0]!).toBe(BigInt(step))
++
++    const early = selectHistoryBlocks({ market: week, latest: anchorAt(OPEN + 3 * step + 7), maxPoints: 240 })
++    expect(early).toEqual(done.slice(0, 4))
++  })
++})
++
++describe('quoteToMidPoint', () => {
++  it('timestamps a quote from its tau', () => {
++    expect(quoteToMidPoint({ tau: 45n, midYes: WAD / 3n }, market())).toEqual({ time: OPEN + 15, midYes: WAD / 3n })
++  })
++
++  it('drops quotes inside the averaging window, after expiry, or when pricing failed', () => {
++    expect(quoteToMidPoint({ tau: 10n, midYes: 0n }, market())).toBeUndefined()
++    expect(quoteToMidPoint({ tau: 10n, midYes: WAD / 2n }, market())).toBeUndefined()
++    expect(quoteToMidPoint({ tau: 0n, midYes: 0n }, market())).toBeUndefined()
++    expect(quoteToMidPoint({ tau: 30n, midYes: 0n }, market())).toBeUndefined()
++  })
++})
++
++describe('buildPredictionSeries', () => {
++  const points = [
++    { time: OPEN + 5, midYes: (WAD * 40n) / 100n },
++    { time: OPEN + 3, midYes: (WAD * 25n) / 100n },
++    { time: OPEN + 4, midYes: (WAD * 30n) / 100n },
++    { time: OPEN + 4, midYes: (WAD * 35n) / 100n },
++  ]
++
++  it('builds an ascending YES series from midYes, last write wins per second', () => {
++    expect(buildPredictionSeries({ points, isYes: true, market: market() })).toEqual([
++      { time: OPEN + 3, value: 0.25 },
++      { time: OPEN + 4, value: 0.35 },
++      { time: OPEN + 5, value: 0.4 },
++    ])
++  })
++
++  it('prices NO as 1 - midYes', () => {
++    expect(buildPredictionSeries({ points, isYes: false }).map((p) => p.value)).toEqual([0.75, 0.65, 0.6])
++  })
++
++  it('ends at 1.00 for the winning token and 0.00 for the losing one at expiry', () => {
++    const settled = market({ status: MarketStatus.Settled, yesWon: true })
++    expect(buildPredictionSeries({ points, isYes: true, market: settled }).at(-1)).toEqual({
++      time: OPEN + 60,
++      value: 1,
++    })
++    expect(buildPredictionSeries({ points, isYes: false, market: settled }).at(-1)).toEqual({
++      time: OPEN + 60,
++      value: 0,
++    })
++  })
++
++  it('ends an invalid market at the 0.50 refund', () => {
++    const invalid = market({ status: MarketStatus.Invalid })
++    expect(buildPredictionSeries({ points, isYes: true, market: invalid }).at(-1)?.value).toBe(0.5)
++    expect(outcomeValue(invalid, false)).toBe(0.5)
++  })
++
++  it('adds no end point while the market is trading or awaiting settlement', () => {
++    expect(buildPredictionSeries({ points, isYes: true, market: market() })).toHaveLength(3)
++    expect(outcomeValue(market(), true)).toBeUndefined()
++  })
++
++  it('still shows the outcome when no quote could be read', () => {
++    const settled = market({ status: MarketStatus.Settled, yesWon: false })
++    expect(buildPredictionSeries({ points: [], isYes: false, market: settled })).toEqual([
++      { time: OPEN + 60, value: 1 },
++    ])
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.ts b/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.ts
+new file mode 100644
+index 0000000..3b2ed0f
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/chart/priceHistory.ts
+@@ -0,0 +1,136 @@
++import { MarketStatus, WAD } from 'uniswap/src/features/predictionMarkets/sdk'
++
++/** Unichain Sepolia produces a block every second, so block numbers map to timestamps exactly */
++export const PREDICTION_BLOCK_TIME_SECONDS = 1
++
++/** Most history blocks read for one market, long markets are sampled evenly */
++export const PREDICTION_HISTORY_MAX_POINTS = 240
++
++/** A chart point in USD per outcome token (0 to 1) */
++export interface PredictionPricePoint {
++  time: number
++  value: number
++}
++
++/** The `marketInfo` fields the history needs, times in unix seconds */
++export interface HistoryMarket {
++  openTime: number
++  expiry: number
++  window: number
++  status: number
++  yesWon: boolean
++}
++
++/** The hook's mid price for YES at one block */
++export interface MidPoint {
++  time: number
++  midYes: bigint
++}
++
++export interface BlockAnchor {
++  number: bigint
++  timestamp: number
++}
++
++// The hook prices only while tau > window, so the last priced second is one before expiry - window
++export function lastPricedTime(market: HistoryMarket): number {
++  return market.expiry - market.window - 1
++}
++
++export function historyStepSeconds(market: HistoryMarket, maxPoints = PREDICTION_HISTORY_MAX_POINTS): number {
++  const span = Math.max(0, lastPricedTime(market) - market.openTime + 1)
++  return Math.max(1, Math.ceil(span / Math.max(1, maxPoints)))
++}
++
++export function blockAtTime({
++  anchor,
++  time,
++  blockTime = PREDICTION_BLOCK_TIME_SECONDS,
++}: {
++  anchor: BlockAnchor
++  time: number
++  blockTime?: number
++}): bigint {
++  return anchor.number - BigInt(Math.ceil((anchor.timestamp - time) / blockTime))
++}
++
++/** Blocks to read from openTime up to the latest priced second, on a grid anchored at openTime */
++export function selectHistoryBlocks({
++  market,
++  latest,
++  maxPoints = PREDICTION_HISTORY_MAX_POINTS,
++  blockTime = PREDICTION_BLOCK_TIME_SECONDS,
++}: {
++  market: HistoryMarket
++  latest: BlockAnchor
++  maxPoints?: number
++  blockTime?: number
++}): bigint[] {
++  const step = historyStepSeconds(market, maxPoints)
++  const end = Math.min(latest.timestamp, lastPricedTime(market))
++  const blocks: bigint[] = []
++  for (let t = market.openTime; t <= end; t += step) {
++    const block = blockAtTime({ anchor: latest, time: t, blockTime })
++    if (block >= 0n && blocks.at(-1) !== block) {
++      blocks.push(block)
++    }
++  }
++  return blocks
++}
++
++/** The mid at the block a quote was read from, or undefined when the hook no longer prices the market */
++export function quoteToMidPoint(
++  quote: { tau: bigint; midYes: bigint },
++  market: Pick<HistoryMarket, 'expiry' | 'window'>,
++): MidPoint | undefined {
++  if (quote.midYes === 0n || quote.tau <= BigInt(market.window)) {
++    return undefined
++  }
++  return { time: market.expiry - Number(quote.tau), midYes: quote.midYes }
++}
++
++/** What one token pays once the market is final, or undefined while it is not */
++export function outcomeValue(market: Pick<HistoryMarket, 'status' | 'yesWon'>, isYes: boolean): number | undefined {
++  if (market.status === MarketStatus.Settled) {
++    return market.yesWon === isYes ? 1 : 0
++  }
++  if (market.status === MarketStatus.Invalid) {
++    return 0.5
++  }
++  return undefined
++}
++
++export function isFinalMarket(market: Pick<HistoryMarket, 'status'>): boolean {
++  return market.status === MarketStatus.Settled || market.status === MarketStatus.Invalid
++}
++
++function midToValue(midYes: bigint, isYes: boolean): number {
++  const mid = midYes > WAD ? WAD : midYes
++  return Number(isYes ? mid : WAD - mid) / Number(WAD)
++}
++
++/** Ascending YES or NO price series, ending at the payout once the market is final */
++export function buildPredictionSeries({
++  points,
++  isYes,
++  market,
++}: {
++  points: readonly MidPoint[]
++  isYes: boolean
++  market?: HistoryMarket
++}): PredictionPricePoint[] {
++  const byTime = new Map<number, bigint>()
++  for (const p of points) {
++    byTime.set(p.time, p.midYes)
++  }
++  const series = [...byTime.entries()]
++    .sort(([a], [b]) => a - b)
++    .map(([time, midYes]) => ({ time, value: midToValue(midYes, isYes) }))
++
++  const payout = market ? outcomeValue(market, isYes) : undefined
++  if (market && payout !== undefined) {
++    const last = series.at(-1)
++    series.push({ time: last ? Math.max(market.expiry, last.time + 1) : market.expiry, value: payout })
++  }
++  return series
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory.ts b/packages/uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory.ts
+new file mode 100644
+index 0000000..a82d404
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/chart/usePredictionPriceHistory.ts
+@@ -0,0 +1,66 @@
++import { useCallback, useMemo, useSyncExternalStore } from 'react'
++import {
++  getMarketHistorySnapshot,
++  subscribeMarketHistory,
++} from 'uniswap/src/features/predictionMarkets/chart/predictionPriceHistory'
++import {
++  buildPredictionSeries,
++  outcomeValue,
++  type PredictionPricePoint,
++} from 'uniswap/src/features/predictionMarkets/chart/priceHistory'
++import { getPredictionToken, usePredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import type { OutcomeTokenInfo } from 'uniswap/src/features/predictionMarkets/sdk'
++
++type CurrencyLike = { chainId: number; isToken: boolean; address?: string }
++
++export interface PredictionPriceHistory {
++  entries: PredictionPricePoint[]
++  loading: boolean
++  isError: boolean
++  /** Payout per token once the market is settled */
++  outcome?: number
++}
++
++function tokenAddress(currency: CurrencyLike | undefined): string | undefined {
++  return currency?.isToken ? currency.address : undefined
++}
++
++/** The YES or NO token behind `currency`, re-rendering when the market registry loads it */
++export function usePredictionOutcomeToken(currency: CurrencyLike | undefined): OutcomeTokenInfo | undefined {
++  const address = tokenAddress(currency)
++  usePredictionRegistry(currency?.chainId, address)
++  return getPredictionToken(currency?.chainId, address)
++}
++
++function noopSubscribe(): () => void {
++  return () => undefined
++}
++
++/** On-chain price history for a YES/NO token, or undefined for every other currency */
++export function usePredictionPriceHistory(
++  currency: CurrencyLike | undefined,
++  { skip = false }: { skip?: boolean } = {},
++): PredictionPriceHistory | undefined {
++  const token = usePredictionOutcomeToken(currency)
++  const marketId = token?.marketId
++  const subscribe = useCallback(
++    (listener: () => void) => (marketId === undefined ? () => undefined : subscribeMarketHistory(marketId, listener)),
++    [marketId],
++  )
++  const getSnapshot = useCallback(() => getMarketHistorySnapshot(marketId), [marketId])
++  const snapshot = useSyncExternalStore(skip ? noopSubscribe : subscribe, getSnapshot, getSnapshot)
++  const isYes = token?.isYes
++
++  return useMemo(() => {
++    if (isYes === undefined) {
++      return undefined
++    }
++    const { market, points, loading, isError } = snapshot
++    return {
++      entries: buildPredictionSeries({ points, isYes, market }),
++      loading,
++      isError,
++      outcome: market ? outcomeValue(market, isYes) : undefined,
++    }
++  }, [snapshot, isYes])
++}
 diff --git a/packages/uniswap/src/features/predictionMarkets/config.ts b/packages/uniswap/src/features/predictionMarkets/config.ts
 new file mode 100644
 index 0000000..17d48e7
@@ -8847,10 +10487,10 @@ index 0000000..776b397
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts
 new file mode 100644
-index 0000000..2663f10
+index 0000000..95c0a42
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts
-@@ -0,0 +1,780 @@
+@@ -0,0 +1,848 @@
 +import { AllowanceTransfer, PERMIT2_ADDRESS } from '@uniswap/permit2-sdk'
 +import { Token, TradeType } from '@uniswap/sdk-core'
 +import {
@@ -8892,6 +10532,7 @@ index 0000000..2663f10
 +} from 'uniswap/src/features/predictionMarkets/sdk'
 +import {
 +  fromPermitData,
++  PREDICTION_HOOK_ERRORS_ABI,
 +  toPermitData,
 +  toPredictionFetchError,
 +} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
@@ -8925,6 +10566,7 @@ index 0000000..2663f10
 +const NO = getAddress('0x0100000000000000000000000000000000000001')
 +const ALICE = getAddress('0xa11ce00000000000000000000000000000000001')
 +const RICH = getAddress('0xb0b0000000000000000000000000000000000002')
++const FLAKY = getAddress('0xf1a4000000000000000000000000000000000003')
 +const SIG: Hex = `0x${'ab'.repeat(65)}`
 +const CHAIN = 1301 as TradingApi.ChainId
 +
@@ -8945,26 +10587,35 @@ index 0000000..2663f10
 +  }
 +}
 +
-+const bandRevert = encodeErrorResult({
-+  abi: v4QuoterAbi,
-+  errorName: 'UnexpectedRevertBytes',
-+  args: [
-+    encodeErrorResult({
-+      abi: poolManagerErrorsAbi,
-+      errorName: 'WrappedError',
-+      args: [
-+        HOOK,
-+        '0x575e24b4',
-+        encodeErrorResult({ abi: hookErrorsAbi, errorName: 'Band' }),
-+        encodeErrorResult({ abi: poolManagerErrorsAbi, errorName: 'HookCallFailed' }),
-+      ],
-+    }),
-+  ],
-+})
++function quoterRevert(hookError: Hex): Hex {
++  return encodeErrorResult({
++    abi: v4QuoterAbi,
++    errorName: 'UnexpectedRevertBytes',
++    args: [
++      encodeErrorResult({
++        abi: poolManagerErrorsAbi,
++        errorName: 'WrappedError',
++        args: [
++          HOOK,
++          '0x575e24b4',
++          hookError,
++          encodeErrorResult({ abi: poolManagerErrorsAbi, errorName: 'HookCallFailed' }),
++        ],
++      }),
++    ],
++  })
++}
++
++const bandRevert = quoterRevert(encodeErrorResult({ abi: hookErrorsAbi, errorName: 'Band' }))
++
++let hookRevert: Hex | undefined
 +
 +const handlers: Record<string, (data: Hex) => Hex> = {
 +  [UNICHAIN_SEPOLIA.v4Quoter.toLowerCase()]: contract(v4QuoterAbi, {
 +    quoteExactInputSingle: (p: { exactAmount: bigint }) => {
++      if (hookRevert) {
++        throw new Revert(hookRevert)
++      }
 +      if (p.exactAmount >= 10n ** 12n) {
 +        throw new Revert(bandRevert)
 +      }
@@ -8975,7 +10626,14 @@ index 0000000..2663f10
 +  [UNICHAIN_SEPOLIA.permit2.toLowerCase()]: contract(permit2Abi, {
 +    allowance: (owner: Address) => (owner === RICH ? [2n ** 160n - 1n, 4_000_000_000, 5] : [0n, 0, 2]),
 +  }),
-+  [USDC.toLowerCase()]: contract(erc20Abi, { allowance: (owner: Address) => (owner === RICH ? maxUint256 : 0n) }),
++  [USDC.toLowerCase()]: contract(erc20Abi, {
++    allowance: (owner: Address) => {
++      if (owner === FLAKY) {
++        throw new Error('fetch failed')
++      }
++      return owner === RICH ? maxUint256 : 0n
++    },
++  }),
 +}
 +
 +let estimateGasRevert: Hex | undefined
@@ -9142,6 +10800,7 @@ index 0000000..2663f10
 +    registerPredictionMarkets([market()])
 +    setPredictionPublicClient(client)
 +    estimateGasRevert = undefined
++    hookRevert = undefined
 +  })
 +
 +  afterAll(() => {
@@ -9223,6 +10882,55 @@ index 0000000..2663f10
 +    })
 +    const zero = await api.fetchQuote(quoteRequest({ amount: '0' })).catch((e: unknown) => e)
 +    expect((zero as FetchError).data.errorCode).toBe('QuoteAmountTooLowError')
++  })
++
++  it('decodes PredictionHook reverts by name and tags them with the market and side', async () => {
++    const api = withPredictionMarketOverrides(fakeBase())
++    const cases: [string, string][] = [
++      ['NotTradable', 'MARKET_CLOSED'],
++      ['MarketClosed', 'MARKET_CLOSED'],
++      ['OutOfBand', 'OUT_OF_BAND'],
++      ['EpochCapExceeded', 'CAPACITY'],
++      ['Insolvent', 'CAPACITY'],
++    ]
++    for (const [errorName, predictionCode] of cases) {
++      hookRevert = quoterRevert(encodeErrorResult({ abi: PREDICTION_HOOK_ERRORS_ABI, errorName }))
++      const err = await api.fetchQuote(quoteRequest({ tokenIn: YES, tokenOut: USDC })).catch((e: unknown) => e)
++      expect((err as FetchError).data).toMatchObject({
++        errorCode: 'ResourceNotFound',
++        predictionCode,
++        revert: errorName,
++        marketId: '1',
++        isYes: true,
++        isBuy: false,
++      })
++    }
++  })
++
++  it('reports a failed allowance read as a retryable RPC error, not a hook rejection', async () => {
++    const api = withPredictionMarketOverrides(fakeBase())
++    const err = await api.fetchQuote(quoteRequest({ swapper: FLAKY })).catch((e: unknown) => e)
++    expect(err).toBeInstanceOf(FetchError)
++    expect((err as FetchError).response.status).toBe(500)
++    expect((err as FetchError).data).toMatchObject({ errorCode: 'PredictionRpcError', isYes: true, isBuy: true })
++  })
++
++  it('refuses to quote in the last seconds before the cutoff, when a swap could not confirm in time', async () => {
++    const now = Math.floor(Date.now() / 1000)
++    resetPredictionRegistry()
++    registerPredictionMarkets([market({ expiry: BigInt(now + 13), window: 10 })])
++    const api = withPredictionMarketOverrides(fakeBase())
++    const err = await api.fetchQuote(quoteRequest()).catch((e: unknown) => e)
++    expect(err).toBeInstanceOf(FetchError)
++    expect((err as FetchError).data).toMatchObject({
++      predictionCode: 'MARKET_CLOSED',
++      revert: 'TradingClosing',
++      marketId: '1',
++      isBuy: true,
++    })
++    resetPredictionRegistry()
++    registerPredictionMarkets([market({ expiry: BigInt(now + 20), window: 10 })])
++    await expect(api.fetchQuote(quoteRequest())).resolves.toMatchObject({ routing: TradingApi.Routing.CLASSIC })
 +  })
 +
 +  it('sizes auto slippage from time to expiry and keeps custom slippage', async () => {
@@ -9344,7 +11052,7 @@ index 0000000..2663f10
 +      from: ALICE,
 +      value: '0x00',
 +      chainId: 1301,
-+      gasLimit: '240000',
++      gasLimit: '290000',
 +    })
 +    expect(res.swap.data).toBe(expected.data)
 +    expect(expected.commands).toBe('0x0a10')
@@ -9555,7 +11263,7 @@ index 0000000..2663f10
 +      transactionSettings: {} as never,
 +      approvalAction: ApprovalAction.None,
 +    })
-+    expect(out.response?.transactions?.[0]?.gasLimit).toBe('240000')
++    expect(out.response?.transactions?.[0]?.gasLimit).toBe('290000')
 +  })
 +
 +  it('smart-account buy: permit transaction, no signature, swap without PERMIT2_PERMIT', async () => {
@@ -9633,10 +11341,10 @@ index 0000000..2663f10
 +})
 diff --git a/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.ts b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.ts
 new file mode 100644
-index 0000000..8b84294
+index 0000000..91b85a4
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.ts
-@@ -0,0 +1,497 @@
+@@ -0,0 +1,499 @@
 +import {
 +  type CheckPermissionsRequest,
 +  type CheckPermissionsResponse,
@@ -9686,8 +11394,10 @@ index 0000000..8b84294
 +  USDC_DECIMALS,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
 +import {
++  assertPredictionMarketNotClosing,
 +  fromPermitData,
 +  predictionFetchError,
++  predictionUsdcOnlyError,
 +  toPermitData,
 +  toPredictionFetchError,
 +} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
@@ -9742,10 +11452,7 @@ index 0000000..8b84294
 +  permitGasFee?: string
 +}
 +
-+/**
-+ * The Permit2 -> router leg: a PermitSingle to sign, or (`asTransaction`, for wallets that cannot sign permits)
-+ * a `Permit2.approve` transaction. Nothing when Permit2 already allows the router.
-+ */
++/** Permit2 -> router leg, a PermitSingle or with `asTransaction` a `Permit2.approve` tx, none if already allowed */
 +async function permitFor({
 +  client,
 +  owner,
@@ -9840,6 +11547,7 @@ index 0000000..8b84294
 +}): Promise<ClassicQuoteResponse> {
 +  const client = getPredictionPublicClient()
 +  const d = getPredictionDeployment()
++  assertPredictionMarketNotClosing(route, nowSeconds())
 +  const exactIn = params.type === TradingApi.TradeType.EXACT_INPUT
 +  const swapper = isConnected(params.swapper) ? params.swapper : undefined
 +  let quoted
@@ -9853,7 +11561,7 @@ index 0000000..8b84294
 +    }
 +    quoted = exactIn ? await quoteExactIn(client, req) : await quoteExactOut(client, req)
 +  } catch (error) {
-+    throw toPredictionFetchError(error)
++    throw toPredictionFetchError(error, route)
 +  }
 +  const slippage = params.slippageTolerance ?? predictionAutoSlippagePercent({ route, quoted })
 +  const bps = Math.round(slippage * 100)
@@ -9872,7 +11580,9 @@ index 0000000..8b84294
 +          price: pricePromise,
 +        })
 +      : Promise.resolve<PermitFields>({ permitData: null }),
-+  ])
++  ]).catch((error: unknown) => {
++    throw toPredictionFetchError(error, route)
++  })
 +  const gasUse = quoted.gasEstimate + PREDICTION_ROUTER_GAS_OVERHEAD
 +  const id = requestId()
 +  const tokenIn = tokenInRoute(params.tokenIn)
@@ -10006,7 +11716,7 @@ index 0000000..8b84294
 +    try {
 +      gasLimit = gasWithHeadroom(await estimateSwapGas(client, { tx, account: swapper }))
 +    } catch (error) {
-+      throw toPredictionFetchError(error)
++      throw toPredictionFetchError(error, route)
 +    }
 +  }
 +  return {
@@ -10056,7 +11766,7 @@ index 0000000..8b84294
 +    return route
 +  }
 +  if (getPredictionToken(chainIn, params.tokenIn) || getPredictionToken(chainIn, params.tokenOut)) {
-+    throw predictionFetchError({ detail: 'Prediction tokens trade only against USDC' })
++    throw predictionUsdcOnlyError()
 +  }
 +  return undefined
 +}
@@ -12505,20 +14215,95 @@ index 0000000..0d11788
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts b/packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts
 new file mode 100644
-index 0000000..9c333ad
+index 0000000..7e4296b
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,213 @@
 +import { FetchError, TradingApi } from '@universe/api'
 +import { getPredictionDeployment } from 'uniswap/src/features/predictionMarkets/config'
++import { getPredictionMarket, type PredictionRoute } from 'uniswap/src/features/predictionMarkets/registry'
 +import {
++  decodeRevert,
 +  PERMIT2_DOMAIN_NAME,
 +  PERMIT_SINGLE_TYPES,
 +  type PermitSingle,
-+  type PredictionSwapError,
++  PredictionSwapError,
 +  toSwapError,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
-+import type { Address } from 'viem'
++import { isPredictionMarketClosing } from 'uniswap/src/features/predictionMarkets/ui/marketStatus'
++import { type Abi, type Address, parseAbi } from 'viem'
++
++/** PredictionHook's own errors, which the vendored SDK ABIs lack */
++export const PREDICTION_HOOK_ERRORS_ABI: Abi = parseAbi([
++  'error Unauthorized()',
++  'error InvalidParams()',
++  'error UnsupportedKernel()',
++  'error UnknownMarket()',
++  'error UnknownPool()',
++  'error NotTradable()',
++  'error MarketClosed()',
++  'error NotSettled()',
++  'error TooEarly()',
++  'error OracleAvailable()',
++  'error OutOfBand()',
++  'error EpochCapExceeded()',
++  'error Insolvent()',
++  'error ZeroAmount()',
++  'error InsufficientIdle()',
++  'error InsufficientShares()',
++  'error ForeignInitialize()',
++  'error LiquidityDisabled()',
++  'error DonateDisabled()',
++])
++
++export const PREDICTION_RPC_ERROR_CODE = 'PredictionRpcError'
++
++/** `predictionCode` for an outcome token paired with anything but USDC */
++export const PREDICTION_USDC_ONLY_CODE = 'USDC_ONLY'
++
++/** What a prediction-market `FetchError` carries in `data`, next to the Trading API's `errorCode` and `detail` */
++export interface PredictionErrorData {
++  errorCode?: string
++  detail?: string
++  /** A revert's `RevertCode` or `USDC_ONLY`, absent for RPC failures */
++  predictionCode?: string
++  /** Innermost decoded revert name such as `NotTradable` */
++  revert?: string
++  marketId?: string
++  isYes?: boolean
++  isBuy?: boolean
++}
++
++function routeContext(route: PredictionRoute | undefined): Pick<PredictionErrorData, 'marketId' | 'isYes' | 'isBuy'> {
++  return route ? { marketId: route.token.marketId.toString(), isYes: route.token.isYes, isBuy: route.isBuy } : {}
++}
++
++/** The prediction-market details of a quote or swap error, or undefined for any other error */
++export function getPredictionErrorData(error: unknown): PredictionErrorData | undefined {
++  if (!(error instanceof FetchError)) {
++    return undefined
++  }
++  const data = error.data as PredictionErrorData | undefined
++  return data?.predictionCode || data?.errorCode === PREDICTION_RPC_ERROR_CODE ? data : undefined
++}
++
++/** True when the hook rejected the quote (closed market, out of band, too large), so a retry fails too */
++export function isPredictionQuoteRejection(error: unknown): boolean {
++  return !!getPredictionErrorData(error)?.predictionCode
++}
++
++/** True when the market is settled or voided (`MarketClosed`), so the pair never quotes again */
++export function isFinalPredictionRejection(error: unknown): boolean {
++  return getPredictionErrorData(error)?.revert === 'MarketClosed'
++}
++
++/** React Query `retry` for outcome-token quotes, one retry like other quotes and none after a hook rejection */
++export function shouldRetryPredictionQuote(failureCount: number, error: unknown): boolean {
++  return failureCount < 1 && !isPredictionQuoteRejection(error)
++}
++
++/** `revert` of the app's own rejection of a quote in the last seconds before the cutoff */
++export const PREDICTION_CLOSING_REVERT = 'TradingClosing'
 +
 +/** A `FetchError` the swap form maps to a warning: 404 ResourceNotFound ("No routes found") or QuoteAmountTooLowError. */
 +export function predictionFetchError({
@@ -12535,14 +14320,50 @@ index 0000000..9c333ad
 +  return new FetchError({ response: new Response(null, { status: 404 }), data: { errorCode, detail, ...extra }, cause })
 +}
 +
-+/** Converts quote/simulation failures into `FetchError`s; never a 412-429 status, which the UI shows as rate limiting. */
-+export function toPredictionFetchError(error: unknown): FetchError {
++/** Thrown for an outcome token paired with anything but USDC */
++export function predictionUsdcOnlyError(): FetchError {
++  return predictionFetchError({
++    detail: 'Prediction tokens trade only against USDC',
++    extra: { predictionCode: PREDICTION_USDC_ONLY_CODE },
++  })
++}
++
++/** Thrown for a quote so close to the cutoff that the swap would land after it and revert `NotTradable` */
++export function predictionClosingError(route: PredictionRoute): FetchError {
++  return predictionFetchError({
++    detail: 'Trading closes too soon for a swap to confirm',
++    extra: { predictionCode: 'MARKET_CLOSED', revert: PREDICTION_CLOSING_REVERT, ...routeContext(route) },
++  })
++}
++
++/** Refuses a quote for a market in its last seconds of trading, see `isPredictionMarketClosing` */
++export function assertPredictionMarketNotClosing(route: PredictionRoute, now: number): void {
++  const market = getPredictionMarket(route.token.marketId)
++  if (market?.status === 'Trading' && isPredictionMarketClosing(market.cutoff, now)) {
++    throw predictionClosingError(route)
++  }
++}
++
++/** Names a hook revert that the vendored SDK decoded without our hook ABI, by selector only */
++function withHookErrorNames(swapError: PredictionSwapError): PredictionSwapError {
++  const revert = swapError.revert
++  if (!revert || revert.name) {
++    return swapError
++  }
++  const decoded = decodeRevert(revert.raw, PREDICTION_HOOK_ERRORS_ABI)
++  return decoded.name
++    ? new PredictionSwapError({ message: decoded.message, code: decoded.code, revert: decoded, cause: swapError })
++    : swapError
++}
++
++/** Quote/simulation failure as a `FetchError` tagged with `route`, never 412-429 which reads as rate limiting */
++export function toPredictionFetchError(error: unknown, route?: PredictionRoute): FetchError {
 +  if (error instanceof FetchError) {
 +    return error
 +  }
 +  let swapError: PredictionSwapError | undefined
 +  try {
-+    swapError = toSwapError(error)
++    swapError = withHookErrorNames(toSwapError(error, PREDICTION_HOOK_ERRORS_ABI))
 +  } catch {
 +    swapError = undefined
 +  }
@@ -12550,7 +14371,7 @@ index 0000000..9c333ad
 +    const detail = error instanceof Error ? error.message : String(error)
 +    return new FetchError({
 +      response: new Response(null, { status: 500 }),
-+      data: { errorCode: 'PredictionRpcError', detail },
++      data: { errorCode: PREDICTION_RPC_ERROR_CODE, detail, ...routeContext(route) },
 +      cause: error,
 +    })
 +  }
@@ -12561,7 +14382,7 @@ index 0000000..9c333ad
 +  return predictionFetchError({
 +    detail: swapError.message,
 +    errorCode,
-+    extra: { predictionCode: swapError.code, revert: swapError.revert?.name },
++    extra: { predictionCode: swapError.code, revert: swapError.revert?.name, ...routeContext(route) },
 +    cause: error,
 +  })
 +}
@@ -12610,6 +14431,1416 @@ index 0000000..9c333ad
 +    spender: values.spender,
 +    sigDeadline: BigInt(values.sigDeadline),
 +  }
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx
+new file mode 100644
+index 0000000..7212cf5
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx
+@@ -0,0 +1,160 @@
++import { waitFor } from '@testing-library/react-native'
++import { Token } from '@uniswap/sdk-core'
++import { SharedQueryClient } from '@universe/api'
++import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import {
++  type HookQuote,
++  type Market,
++  type MarketInfo,
++  predictionPoolKey,
++  UNICHAIN_SEPOLIA,
++  WAD,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import { predictionFetchError } from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
++import type { PredictionMarketLive } from 'uniswap/src/features/predictionMarkets/ui/predictionMarketLive'
++import { PredictionMarketPanel } from 'uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel'
++import { renderWithProviders } from 'uniswap/src/test/render'
++import { CurrencyField } from 'uniswap/src/types/currency'
++import { getAddress, zeroAddress } from 'viem'
++
++const state = vi.hoisted(() => ({
++  derived: {} as Record<string, unknown>,
++  live: undefined as PredictionMarketLive | undefined,
++}))
++
++vi.mock('uniswap/src/features/transactions/swap/stores/swapFormStore/useSwapFormStore', () => ({
++  useSwapFormStoreDerivedSwapInfo: (selector: (s: unknown) => unknown): unknown => selector(state.derived),
++}))
++
++vi.mock('uniswap/src/features/predictionMarkets/registry', async (importOriginal) => ({
++  ...(await importOriginal<object>()),
++  usePredictionRegistry: (): number => 0,
++}))
++
++vi.mock('uniswap/src/features/predictionMarkets/ui/predictionMarketLive', () => ({
++  predictionMarketLiveQueryOptions: (ref?: { marketId: bigint }): object => ({
++    queryKey: ['predictionMarketLive-test', ref?.marketId.toString()],
++    queryFn: (): PredictionMarketLive | undefined => state.live,
++    enabled: !!ref,
++  }),
++}))
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const USDC = UNICHAIN_SEPOLIA.usdc
++const YES = getAddress('0xfe00000000000000000000000000000000000001')
++const NO = getAddress('0x0100000000000000000000000000000000000001')
++const usdc = new Token(1301, USDC, 6, 'USDC', 'USDC')
++const yes = new Token(1301, YES, 6, 'YES', 'YES')
++
++// ln(2691.96) in WAD
++const LN_STRIKE = 7_898_024_831_813_214_351n
++
++function info(overrides: Partial<MarketInfo> = {}): MarketInfo {
++  const expiry = BigInt(Math.floor(Date.now() / 1000) + 35)
++  return {
++    yes: YES,
++    no: NO,
++    oracle: zeroAddress,
++    lnStrikeWad: LN_STRIKE,
++    openTime: expiry - 60n,
++    expiry,
++    window: 10,
++    cutoffBuffer: 2,
++    status: 1,
++    yesWon: false,
++    bucket: 0n,
++    outYes: 0n,
++    outNo: 0n,
++    invYes: 0n,
++    invNo: 0n,
++    ...overrides,
++  }
++}
++
++function market(i: MarketInfo): Market {
++  const token = (isYes: boolean): Market['yes'] => ({
++    address: isYes ? YES : NO,
++    symbol: isYes ? 'YES' : 'NO',
++    name: isYes ? 'YES' : 'NO',
++    decimals: 6,
++    isYes,
++    marketId: 7n,
++    poolKey: predictionPoolKey({ token: isYes ? YES : NO, usdc: USDC, hook: HOOK }),
++  })
++  return {
++    id: 7n,
++    hook: HOOK,
++    status: 'Trading',
++    info: i,
++    yes: token(true),
++    no: token(false),
++    strikeUsd: 2691.96,
++    cutoff: i.expiry - 12n,
++  }
++}
++
++const quote: HookQuote = {
++  tradable: true,
++  tau: 35n,
++  varE36: 0n,
++  xWad: 0n,
++  midYes: (WAD * 503n) / 1000n,
++  askYes: (WAD * 546n) / 1000n,
++  bidYes: (WAD * 460n) / 1000n,
++  askNo: (WAD * 540n) / 1000n,
++  bidNo: (WAD * 454n) / 1000n,
++}
++
++function selectPair(error: Error | null = null): void {
++  state.derived = {
++    chainId: 1301,
++    currencies: { [CurrencyField.INPUT]: { currency: usdc }, [CurrencyField.OUTPUT]: { currency: yes } },
++    trade: { error },
++  }
++}
++
++describe('PredictionMarketPanel', () => {
++  beforeEach(() => {
++    resetPredictionRegistry()
++    SharedQueryClient.clear()
++  })
++
++  it('renders nothing for tokens that are not YES/NO outcome tokens', () => {
++    state.derived = {
++      chainId: 1,
++      currencies: { [CurrencyField.INPUT]: { currency: usdc } },
++      trade: { error: null },
++    }
++    const { queryByTestId } = renderWithProviders(<PredictionMarketPanel />)
++    expect(queryByTestId('prediction-market-panel')).toBeNull()
++  })
++
++  it('shows the question, live prices, the countdown and why the typed amount cannot trade', async () => {
++    const live = info()
++    registerPredictionMarkets([market(live)])
++    state.live = { info: live, quote, spotUsd: 2695.12 }
++    selectPair(
++      predictionFetchError({ detail: 'x', extra: { predictionCode: 'OUT_OF_BAND', isYes: true, isBuy: true } }),
++    )
++    const { getByText } = renderWithProviders(<PredictionMarketPanel />)
++    expect(getByText(/ETH above \$2,691\.96 at \d\d:\d\d:\d\d UTC\?/)).toBeTruthy()
++    expect(getByText('Trading')).toBeTruthy()
++    expect(getByText(/Trading closes in 0:2[23]/)).toBeTruthy()
++    await waitFor(() => expect(getByText('Ask $0.546 · Bid $0.460')).toBeTruthy())
++    expect(getByText('Ask $0.540 · Bid $0.454')).toBeTruthy()
++    expect(getByText(/ETH \$2,695\.12, \$3\.16 above strike/)).toBeTruthy()
++    expect(getByText(/outside the band the market quotes/)).toBeTruthy()
++  })
++
++  it('tells a holder of the losing token that it cannot be sold', async () => {
++    const settled = info({ status: 2, yesWon: false, expiry: BigInt(Math.floor(Date.now() / 1000) - 20) })
++    registerPredictionMarkets([market(settled)])
++    state.live = { info: settled, quote: undefined, spotUsd: 2690 }
++    selectPair()
++    const { getByText, queryByText } = renderWithProviders(<PredictionMarketPanel />)
++    await waitFor(() => expect(getByText('Settled: NO won')).toBeTruthy())
++    expect(getByText('NO won - YES is worth $0 and cannot be sold')).toBeTruthy()
++    expect(getByText('Pays $1.00')).toBeTruthy()
++    expect(queryByText(/above strike|below strike/)).toBeNull()
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx
+new file mode 100644
+index 0000000..b9ec28a
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx
+@@ -0,0 +1,193 @@
++import { useQuery } from '@tanstack/react-query'
++import type { Currency } from '@uniswap/sdk-core'
++import { type ColorTokens, Flex, Text } from '@universe/mycelium'
++import { memo, useMemo, useState } from 'react'
++import {
++  getPredictionMarket,
++  getPredictionToken,
++  usePredictionRegistry,
++} from 'uniswap/src/features/predictionMarkets/registry'
++import { type OutcomeTokenInfo, strikeUsdFromLn } from 'uniswap/src/features/predictionMarkets/sdk'
++import { getPredictionErrorData } from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
++import {
++  formatCountdown,
++  formatMarketQuestion,
++  formatUsd,
++} from 'uniswap/src/features/predictionMarkets/ui/marketFormat'
++import {
++  describeOutcome,
++  type PredictionMarketPhase,
++  summarizePredictionMarket,
++} from 'uniswap/src/features/predictionMarkets/ui/marketStatus'
++import { describePredictionError } from 'uniswap/src/features/predictionMarkets/ui/predictionErrors'
++import { predictionMarketLiveQueryOptions } from 'uniswap/src/features/predictionMarkets/ui/predictionMarketLive'
++import { useSwapFormStoreDerivedSwapInfo } from 'uniswap/src/features/transactions/swap/stores/swapFormStore/useSwapFormStore'
++import { CurrencyField } from 'uniswap/src/types/currency'
++import { ONE_SECOND_MS } from 'utilities/src/time/time'
++import { useInterval } from 'utilities/src/time/timing'
++
++const BADGE_COLORS: Record<PredictionMarketPhase, { background: ColorTokens; text: ColorTokens }> = {
++  upcoming: { background: '$surface3', text: '$neutral2' },
++  trading: { background: '$statusSuccess2', text: '$statusSuccess' },
++  closing: { background: '$statusWarning2', text: '$statusWarning' },
++  closed: { background: '$statusWarning2', text: '$statusWarning' },
++  settled: { background: '$accent2', text: '$accent1' },
++  invalid: { background: '$statusCritical2', text: '$statusCritical' },
++}
++
++function nowSeconds(): number {
++  return Math.floor(Date.now() / 1000)
++}
++
++function outcomeToken(currency: Currency | undefined): OutcomeTokenInfo | undefined {
++  return currency?.isToken ? getPredictionToken(currency.chainId, currency.address) : undefined
++}
++
++function OutcomeRow({
++  label,
++  selected,
++  outcome,
++}: {
++  label: string
++  selected: boolean
++  outcome: { probability: string; prices: string }
++}): JSX.Element {
++  const color = selected ? '$neutral1' : '$neutral2'
++  return (
++    <Flex row alignItems="center" justifyContent="space-between" gap="$spacing8">
++      <Flex row alignItems="center" gap="$spacing8">
++        <Text variant={selected ? 'buttonLabel3' : 'body3'} color={color} minWidth={28}>
++          {label}
++        </Text>
++        <Text variant="body3" color={color}>
++          {outcome.probability}
++        </Text>
++      </Flex>
++      <Text variant="body3" color="$neutral2">
++        {outcome.prices}
++      </Text>
++    </Flex>
++  )
++}
++
++function formatSpot(spotUsd: number, strikeUsd: number): string {
++  const gap = spotUsd - strikeUsd
++  return `ETH ${formatUsd(spotUsd)}, ${formatUsd(Math.abs(gap))} ${gap >= 0 ? 'above' : 'below'} strike`
++}
++
++function hintColor(phase: PredictionMarketPhase, selectedWon: boolean): ColorTokens {
++  switch (phase) {
++    case 'closing':
++    case 'closed':
++      return '$statusWarning'
++    case 'settled':
++      return selectedWon ? '$statusSuccess' : '$statusCritical'
++    case 'trading':
++      return '$neutral1'
++    default:
++      return '$neutral2'
++  }
++}
++
++/** Status, countdowns and live prices of the prediction market whose YES or NO token is in the swap form */
++export const PredictionMarketPanel = memo(function PredictionMarketPanel(): JSX.Element | null {
++  const { input, output, chainId, tradeError } = useSwapFormStoreDerivedSwapInfo((s) => ({
++    input: s.currencies[CurrencyField.INPUT]?.currency,
++    output: s.currencies[CurrencyField.OUTPUT]?.currency,
++    chainId: s.chainId,
++    tradeError: s.trade.error,
++  }))
++  usePredictionRegistry(chainId)
++  const [now, setNow] = useState(nowSeconds)
++
++  const token = outcomeToken(output) ?? outcomeToken(input)
++  const registered = token ? getPredictionMarket(token.marketId) : undefined
++  const ref = useMemo(
++    () =>
++      token ? { hook: token.poolKey.hooks, marketId: token.marketId, oracle: registered?.info.oracle } : undefined,
++    [token, registered?.info.oracle],
++  )
++  const { data: live } = useQuery(predictionMarketLiveQueryOptions(ref))
++  useInterval(() => setNow(nowSeconds()), token ? ONE_SECOND_MS : null)
++
++  const info = live?.info ?? registered?.info
++  if (!token || !info) {
++    return null
++  }
++
++  const cutoff = info.expiry - BigInt(info.window) - BigInt(info.cutoffBuffer)
++  const summary = summarizePredictionMarket({ market: { cutoff, info }, isYes: token.isYes, now })
++  const strikeUsd = strikeUsdFromLn(info.lnStrikeWad)
++  const question = formatMarketQuestion({ strikeUsd, info }, now)
++  const isFinal = summary.phase === 'settled' || summary.phase === 'invalid'
++  const errorData = getPredictionErrorData(tradeError)
++  const errorText =
++    errorData && errorData.predictionCode !== 'MARKET_CLOSED'
++      ? describePredictionError(errorData, now).message
++      : undefined
++  const facts = [
++    live?.spotUsd === undefined || isFinal ? undefined : formatSpot(live.spotUsd, strikeUsd),
++    summary.phase === 'upcoming' ? `Opens in ${formatCountdown(Number(info.openTime) - now)}` : undefined,
++    summary.phase === 'trading' || summary.phase === 'closing'
++      ? `Closes in ${formatCountdown(Number(cutoff) - now)}`
++      : undefined,
++    (summary.phase === 'trading' || summary.phase === 'closing' || summary.phase === 'closed') &&
++    now < Number(info.expiry)
++      ? `Expires in ${formatCountdown(Number(info.expiry) - now)}`
++      : undefined,
++  ].filter(Boolean)
++
++  return (
++    <Flex
++      gap="$spacing8"
++      p="$spacing16"
++      borderRadius="$rounded20"
++      borderWidth="$spacing1"
++      borderColor="$surface3"
++      backgroundColor="$surface1"
++      testID="prediction-market-panel"
++    >
++      <Flex row alignItems="flex-start" justifyContent="space-between" gap="$spacing8">
++        <Text variant="subheading2" color="$neutral1" flexShrink={1}>
++          {question}
++        </Text>
++        <Flex
++          px="$spacing8"
++          py="$spacing2"
++          borderRadius="$roundedFull"
++          backgroundColor={BADGE_COLORS[summary.phase].background}
++          flexShrink={0}
++        >
++          <Text variant="buttonLabel4" color={BADGE_COLORS[summary.phase].text}>
++            {summary.badge}
++          </Text>
++        </Flex>
++      </Flex>
++      {facts.length > 0 && (
++        <Text variant="body3" color="$neutral2">
++          {facts.join(' · ')}
++        </Text>
++      )}
++      <Flex gap="$spacing4">
++        <OutcomeRow
++          label="YES"
++          selected={token.isYes}
++          outcome={describeOutcome({ info, quote: live?.quote, isYes: true })}
++        />
++        <OutcomeRow
++          label="NO"
++          selected={!token.isYes}
++          outcome={describeOutcome({ info, quote: live?.quote, isYes: false })}
++        />
++      </Flex>
++      <Text variant="body3" color={hintColor(summary.phase, info.yesWon === token.isYes)}>
++        {summary.hint}
++      </Text>
++      {errorText && (
++        <Text variant="body3" color="$statusWarning">
++          {errorText}
++        </Text>
++      )}
++    </Flex>
++  )
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts b/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts
+new file mode 100644
+index 0000000..88fbf09
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts
+@@ -0,0 +1,51 @@
++import type { Market } from 'uniswap/src/features/predictionMarkets/sdk'
++
++const DAY_SECONDS = 86_400
++const HOUR_SECONDS = 3_600
++
++function pad2(n: number): string {
++  return n.toString().padStart(2, '0')
++}
++
++/** A market time in UTC, the zone the market names use, with the date only when it is not within a day of `now` */
++export function formatMarketTime(seconds: bigint | number, now: number): string {
++  const t = Number(seconds)
++  const d = new Date(t * 1000)
++  const clock = `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`
++  if (Math.abs(t - now) < DAY_SECONDS) {
++    return `${clock} UTC`
++  }
++  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
++  return `${date}, ${clock} UTC`
++}
++
++/** Seconds left as `m:ss`, `h:mm:ss` or `2d 3h` */
++export function formatCountdown(seconds: number): string {
++  const s = Math.max(0, Math.floor(seconds))
++  if (s >= DAY_SECONDS) {
++    return `${Math.floor(s / DAY_SECONDS)}d ${Math.floor((s % DAY_SECONDS) / HOUR_SECONDS)}h`
++  }
++  const h = Math.floor(s / HOUR_SECONDS)
++  const m = Math.floor((s % HOUR_SECONDS) / 60)
++  const rest = pad2(s % 60)
++  return h > 0 ? `${h}:${pad2(m)}:${rest}` : `${m}:${rest}`
++}
++
++export function formatUsd(value: number): string {
++  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
++}
++
++/** A WAD price of an outcome token in USDC, e.g. `$0.546` */
++export function formatOutcomePrice(wad: bigint): string {
++  return `$${(Number(wad) / 1e18).toFixed(3)}`
++}
++
++/** A WAD price as the market's implied probability, e.g. `50.3%` */
++export function formatProbability(wad: bigint): string {
++  return `${((Number(wad) / 1e18) * 100).toFixed(1)}%`
++}
++
++/** "ETH above $2,691.96 at 23:02:04 UTC?" */
++export function formatMarketQuestion(market: Pick<Market, 'strikeUsd' | 'info'>, now: number): string {
++  return `ETH above ${formatUsd(market.strikeUsd)} at ${formatMarketTime(market.info.expiry, now)}?`
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts b/packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts
+new file mode 100644
+index 0000000..cc29b77
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts
+@@ -0,0 +1,134 @@
++import { PREDICTION_CONFIRM_SECONDS } from 'uniswap/src/features/predictionMarkets/config'
++import {
++  type HookQuote,
++  type Market,
++  type MarketInfo,
++  MarketStatus,
++  WAD,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  formatCountdown,
++  formatMarketTime,
++  formatOutcomePrice,
++  formatProbability,
++} from 'uniswap/src/features/predictionMarkets/ui/marketFormat'
++
++export type PredictionMarketPhase = 'upcoming' | 'trading' | 'closing' | 'closed' | 'settled' | 'invalid'
++
++export interface PredictionMarketSummary {
++  phase: PredictionMarketPhase
++  badge: string
++  /** What the holder of the selected token can do now */
++  hint: string
++}
++
++type PhaseInput = {
++  cutoff: Market['cutoff']
++  info: Pick<MarketInfo, 'openTime' | 'expiry' | 'status' | 'yesWon'>
++}
++
++/** Still before the cutoff, but too close to it for a swap sent now to confirm in time */
++export function isPredictionMarketClosing(cutoff: bigint, now: number): boolean {
++  const left = Number(cutoff) - now
++  return left > 0 && left < PREDICTION_CONFIRM_SECONDS
++}
++
++/**
++ * Mirrors the hook's `_inTradingWindow`, open from `openTime` until `expiry - window - cutoffBuffer`, with the last
++ * seconds before the cutoff as 'closing'
++ */
++export function getPredictionMarketPhase({ cutoff, info }: PhaseInput, now: number): PredictionMarketPhase {
++  if (info.status === MarketStatus.Settled) {
++    return 'settled'
++  }
++  if (info.status === MarketStatus.Invalid) {
++    return 'invalid'
++  }
++  if (now < Number(info.openTime)) {
++    return 'upcoming'
++  }
++  if (now >= Number(cutoff)) {
++    return 'closed'
++  }
++  return isPredictionMarketClosing(cutoff, now) ? 'closing' : 'trading'
++}
++
++export function summarizePredictionMarket({
++  market,
++  isYes,
++  now,
++}: {
++  market: PhaseInput
++  isYes: boolean
++  now: number
++}): PredictionMarketSummary {
++  const { info } = market
++  const phase = getPredictionMarketPhase(market, now)
++  const side = isYes ? 'YES' : 'NO'
++  const winner = info.yesWon ? 'YES' : 'NO'
++  switch (phase) {
++    case 'upcoming':
++      return { phase, badge: 'Opens soon', hint: `Trading opens at ${formatMarketTime(info.openTime, now)}` }
++    case 'trading':
++      return { phase, badge: 'Trading', hint: `Trading closes in ${formatCountdown(Number(market.cutoff) - now)}` }
++    case 'closing':
++      return {
++        phase,
++        badge: 'Closing',
++        hint: `Trading closes in ${formatCountdown(Number(market.cutoff) - now)}, too soon for a new swap to confirm`,
++      }
++    case 'closed':
++      return {
++        phase,
++        badge: 'Closed - awaiting settlement',
++        hint:
++          now < Number(info.expiry)
++            ? `Trading closed - settles at ${formatMarketTime(info.expiry, now)}`
++            : 'Trading closed - settling now',
++      }
++    case 'settled':
++      return {
++        phase,
++        badge: `Settled: ${winner} won`,
++        hint:
++          side === winner
++            ? `${side} won - sell ${side} for exactly $1.00`
++            : `${winner} won - ${side} is worth $0 and cannot be sold`,
++      }
++    case 'invalid':
++      break
++  }
++  return { phase, badge: 'Invalid', hint: 'Market voided - YES and NO each sell for $0.50' }
++}
++
++/** One outcome's probability and prices, fixed payouts once settled, and the mid alone after the cutoff */
++export function describeOutcome({
++  info,
++  quote,
++  isYes,
++}: {
++  info: Pick<MarketInfo, 'status' | 'yesWon'>
++  quote: HookQuote | undefined
++  isYes: boolean
++}): { probability: string; prices: string } {
++  if (info.status === MarketStatus.Settled) {
++    const won = info.yesWon === isYes
++    return { probability: won ? 'Won' : 'Lost', prices: won ? 'Pays $1.00' : 'Pays $0.00' }
++  }
++  if (info.status === MarketStatus.Invalid) {
++    return { probability: 'Voided', prices: 'Pays $0.50' }
++  }
++  // The hook quotes zeros inside the settlement averaging window
++  if (!quote?.midYes) {
++    return { probability: '-', prices: '' }
++  }
++  const mid = isYes ? quote.midYes : WAD - quote.midYes
++  if (!quote.tradable) {
++    return { probability: formatProbability(mid), prices: `Mid ${formatOutcomePrice(mid)}` }
++  }
++  const [ask, bid] = isYes ? [quote.askYes, quote.bidYes] : [quote.askNo, quote.bidNo]
++  return {
++    probability: formatProbability(mid),
++    prices: `Ask ${formatOutcomePrice(ask)} · Bid ${formatOutcomePrice(bid)}`,
++  }
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts
+new file mode 100644
+index 0000000..866b4ff
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts
+@@ -0,0 +1,145 @@
++import {
++  type Warning,
++  WarningAction,
++  WarningLabel,
++  WarningSeverity,
++} from 'uniswap/src/components/modals/WarningModal/types'
++import { getPredictionMarket } from 'uniswap/src/features/predictionMarkets/registry'
++import type { Market } from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  getPredictionErrorData,
++  PREDICTION_CLOSING_REVERT,
++  PREDICTION_RPC_ERROR_CODE,
++  PREDICTION_USDC_ONLY_CODE,
++  type PredictionErrorData,
++} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
++import { formatMarketTime } from 'uniswap/src/features/predictionMarkets/ui/marketFormat'
++
++export interface PredictionErrorText {
++  /** Short enough for the swap button */
++  title: string
++  message: string
++}
++
++function nowSeconds(): number {
++  return Math.floor(Date.now() / 1000)
++}
++
++function describeClosedMarket({
++  data,
++  market,
++  now,
++}: {
++  data: PredictionErrorData
++  market: Market | undefined
++  now: number
++}): PredictionErrorText {
++  const side = data.isYes === undefined ? undefined : data.isYes ? 'YES' : 'NO'
++  const other = data.isYes === undefined ? undefined : data.isYes ? 'NO' : 'YES'
++  // MarketClosed means Settled or Invalid, and for a sell also that the token lost
++  if (data.revert === 'MarketClosed') {
++    if (data.isBuy === false && side && other) {
++      return {
++        title: `${other} won - ${side} can't be sold`,
++        message: `${other} won. ${side} is worth $0 and cannot be sold.`,
++      }
++    }
++    if (market?.status === 'Invalid') {
++      return { title: 'Market voided', message: 'This market was voided. YES and NO each sell for $0.50.' }
++    }
++    const winner = market?.status === 'Settled' ? (market.info.yesWon ? 'YES' : 'NO') : undefined
++    return {
++      title: 'Market settled',
++      message: `${winner ? `${winner} won. ` : ''}A settled market can't be bought. The winning token sells for exactly $1.00.`,
++    }
++  }
++  if (data.revert === PREDICTION_CLOSING_REVERT) {
++    return {
++      title: 'Trading closing',
++      message: `Trading closes${market ? ` at ${formatMarketTime(market.cutoff, now)}` : ' in a few seconds'}, too soon for a swap to confirm before then.`,
++    }
++  }
++  if (market && now < Number(market.info.openTime)) {
++    return { title: 'Market not open yet', message: `Trading opens at ${formatMarketTime(market.info.openTime, now)}.` }
++  }
++  if (!market) {
++    return { title: 'Trading closed', message: 'Trading has closed for this market.' }
++  }
++  const after = data.isBuy === false ? ', then the winning token sells for exactly $1.00' : ''
++  return {
++    title: 'Trading closed',
++    message: `Trading closed at ${formatMarketTime(market.cutoff, now)}. The market settles at ${formatMarketTime(market.info.expiry, now)}${after}.`,
++  }
++}
++
++/** Plain-language text for a failed outcome-token quote or swap */
++export function describePredictionError(data: PredictionErrorData, now: number = nowSeconds()): PredictionErrorText {
++  if (data.errorCode === PREDICTION_RPC_ERROR_CODE) {
++    return {
++      title: 'Price unavailable, retrying',
++      message: 'The Unichain Sepolia RPC did not answer. The price refreshes every second.',
++    }
++  }
++  const market = data.marketId ? getPredictionMarket(BigInt(data.marketId)) : undefined
++  const side = data.isYes === undefined ? 'This token' : data.isYes ? 'YES' : 'NO'
++  switch (data.predictionCode) {
++    case 'MARKET_CLOSED':
++      return describeClosedMarket({ data, market, now })
++    case 'OUT_OF_BAND':
++      return {
++        title: 'Price outside trading band',
++        message: `${side} would trade too close to $0 or $1, outside the band the market quotes. Try a smaller amount or wait for the price to move.`,
++      }
++    case 'CAPACITY':
++      return data.revert === 'EpochCapExceeded'
++        ? {
++            title: 'Amount too large',
++            message: 'The market takes a limited amount per block. Try a smaller amount.',
++          }
++        : {
++            title: 'Not enough liquidity',
++            message: "The market's reserve can't cover this trade. Try a smaller amount.",
++          }
++    case 'AMOUNT_TOO_LOW':
++      return { title: 'Enter a larger amount', message: 'The amount is too small to trade.' }
++    case 'ORACLE':
++      return {
++        title: 'Price feed unavailable',
++        message: 'The ETH price oracle has no data right now. Try again in a few seconds.',
++      }
++    case 'SLIPPAGE':
++      return { title: 'Price moved', message: 'The price moved beyond your slippage tolerance. Review the new price.' }
++    case PREDICTION_USDC_ONLY_CODE:
++      return { title: 'Trade against USDC', message: 'YES and NO tokens trade only against USDC.' }
++    case 'NO_ROUTE':
++      return { title: 'Market unavailable', message: data.detail ?? 'This market pool does not exist.' }
++    default:
++      return {
++        title: 'Trade rejected',
++        message: `The market rejected this trade${data.detail ? ` (${data.detail})` : ''}. Try a smaller amount.`,
++      }
++  }
++}
++
++/** The swap-form warning for a failed outcome-token quote, or undefined for any other error */
++export function getPredictionSwapWarning(error: Error): Warning | undefined {
++  const data = getPredictionErrorData(error)
++  if (!data) {
++    return undefined
++  }
++  const { title, message } = describePredictionError(data)
++  return {
++    type:
++      data.predictionCode === 'AMOUNT_TOO_LOW'
++        ? WarningLabel.EnterLargerAmount
++        : data.predictionCode
++          ? WarningLabel.NoRoutesError
++          : WarningLabel.SwapRouterError,
++    severity: WarningSeverity.Low,
++    action: WarningAction.DisableReview,
++    title,
++    message,
++    // Testnet mode hides the form's warning row, so the button carries the reason
++    buttonText: title,
++  }
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts
+new file mode 100644
+index 0000000..3caaa11
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts
+@@ -0,0 +1,88 @@
++import { queryOptions } from '@tanstack/react-query'
++import { getPredictionDeployment, PREDICTION_QUOTE_POLL_MS } from 'uniswap/src/features/predictionMarkets/config'
++import { getPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
++import {
++  type HookQuote,
++  type MarketInfo,
++  MarketStatus,
++  predictionHookAbi,
++  wadToNumber,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import type { QueryOptionsResult } from 'utilities/src/reactQuery/queryOptions'
++import { type Address, parseAbi, zeroAddress } from 'viem'
++import { multicall } from 'viem/actions'
++
++const ORACLE_ABI = parseAbi(['function lnSpotSoBWad() view returns (int256)'])
++const MULTICALL_BLOCK_ABI = parseAbi([
++  'function getBlockNumber() view returns (uint256)',
++  'function getCurrentBlockTimestamp() view returns (uint256)',
++])
++
++export interface PredictionMarketRef {
++  hook: Address
++  marketId: bigint
++  /** The market's oracle when known, else the deployment's */
++  oracle?: Address
++}
++
++export interface PredictionMarketLive {
++  info: MarketInfo
++  quote?: HookQuote
++  /** ETH price in USD from the oracle, at the start of the latest block */
++  spotUsd?: number
++  /** The block these reads ran against */
++  block?: { number: bigint; timestamp: number }
++}
++
++/** `hook.marketInfo`, `hook.quote`, the oracle's spot price and the block in one multicall */
++export async function readPredictionMarketLive(ref: PredictionMarketRef): Promise<PredictionMarketLive> {
++  // A call to the zero address fails decoding, which leaves `spotUsd` empty
++  const oracle = ref.oracle ?? getPredictionDeployment().underlyingOracle ?? zeroAddress
++  const { multicall3 } = getPredictionDeployment()
++  const [info, quote, lnSpot, blockNumber, timestamp] = await multicall(getPredictionPublicClient(), {
++    contracts: [
++      { address: ref.hook, abi: predictionHookAbi, functionName: 'marketInfo', args: [ref.marketId] },
++      { address: ref.hook, abi: predictionHookAbi, functionName: 'quote', args: [ref.marketId] },
++      { address: oracle, abi: ORACLE_ABI, functionName: 'lnSpotSoBWad' },
++      { address: multicall3, abi: MULTICALL_BLOCK_ABI, functionName: 'getBlockNumber' },
++      { address: multicall3, abi: MULTICALL_BLOCK_ABI, functionName: 'getCurrentBlockTimestamp' },
++    ],
++    allowFailure: true,
++    multicallAddress: multicall3,
++  })
++  if (info.status !== 'success') {
++    throw info.error
++  }
++  return {
++    info: info.result as MarketInfo,
++    quote: quote.status === 'success' ? (quote.result as HookQuote) : undefined,
++    spotUsd: lnSpot.status === 'success' ? Math.exp(wadToNumber(lnSpot.result)) : undefined,
++    block:
++      blockNumber.status === 'success' && timestamp.status === 'success'
++        ? { number: blockNumber.result, timestamp: Number(timestamp.result) }
++        : undefined,
++  }
++}
++
++export const PREDICTION_MARKET_LIVE_KEY = 'predictionMarketLive'
++
++type PredictionMarketLiveKey = [typeof PREDICTION_MARKET_LIVE_KEY, string | undefined, string | undefined]
++
++function isFinal(live: PredictionMarketLive | undefined): boolean {
++  return live?.info.status === MarketStatus.Settled || live?.info.status === MarketStatus.Invalid
++}
++
++/** Polls every second while mounted and the page is visible, and stops once the market is settled */
++export function predictionMarketLiveQueryOptions(
++  ref: PredictionMarketRef | undefined,
++): QueryOptionsResult<PredictionMarketLive, Error, PredictionMarketLive, PredictionMarketLiveKey> {
++  return queryOptions({
++    queryKey: [PREDICTION_MARKET_LIVE_KEY, ref?.hook, ref?.marketId.toString()] as PredictionMarketLiveKey,
++    queryFn: (): Promise<PredictionMarketLive> =>
++      ref ? readPredictionMarketLive(ref) : Promise.reject(new Error('no prediction market selected')),
++    enabled: !!ref,
++    refetchInterval: (query) => (isFinal(query.state.data) ? false : PREDICTION_QUOTE_POLL_MS),
++    refetchIntervalInBackground: false,
++    retry: 1,
++  })
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts
+new file mode 100644
+index 0000000..8497fa9
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts
+@@ -0,0 +1,270 @@
++import { FetchError, TradingApi } from '@universe/api'
++import { WarningAction, WarningLabel } from 'uniswap/src/components/modals/WarningModal/types'
++import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import {
++  type HookQuote,
++  type Market,
++  MarketStatus,
++  PredictionSwapError,
++  predictionPoolKey,
++  UNICHAIN_SEPOLIA,
++  WAD,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  isFinalPredictionRejection,
++  isPredictionQuoteRejection,
++  predictionClosingError,
++  predictionUsdcOnlyError,
++  shouldRetryPredictionQuote,
++  toPredictionFetchError,
++} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
++import {
++  formatCountdown,
++  formatMarketQuestion,
++  formatMarketTime,
++} from 'uniswap/src/features/predictionMarkets/ui/marketFormat'
++import {
++  describeOutcome,
++  getPredictionMarketPhase,
++  summarizePredictionMarket,
++} from 'uniswap/src/features/predictionMarkets/ui/marketStatus'
++import { getPredictionSwapWarning } from 'uniswap/src/features/predictionMarkets/ui/predictionErrors'
++import { getSwapWarningFromError } from 'uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError'
++import type { DerivedSwapInfo } from 'uniswap/src/features/transactions/swap/types/derivedSwapInfo'
++import { getAddress, zeroAddress } from 'viem'
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const USDC = UNICHAIN_SEPOLIA.usdc
++const YES = getAddress('0xfe00000000000000000000000000000000000001')
++const NO = getAddress('0x0100000000000000000000000000000000000001')
++
++// 23:02:04 UTC, a 60 s market opened at 23:01:04 with a 10 s window and a 2 s buffer
++const EXPIRY = 1_790_377_324
++const OPEN = EXPIRY - 60
++const CUTOFF = EXPIRY - 12
++
++function market(status: Market['status'] = 'Trading', yesWon = false): Market {
++  const token = (isYes: boolean): Market['yes'] => ({
++    address: isYes ? YES : NO,
++    symbol: isYes ? 'YES-2691.96-230204' : 'NO-2691.96-230204',
++    name: isYes ? 'YES ETH>2691.96 23:02:04' : 'NO ETH>2691.96 23:02:04',
++    decimals: 6,
++    isYes,
++    marketId: 46n,
++    poolKey: predictionPoolKey({ token: isYes ? YES : NO, usdc: USDC, hook: HOOK }),
++  })
++  return {
++    id: 46n,
++    hook: HOOK,
++    status,
++    info: {
++      yes: YES,
++      no: NO,
++      oracle: zeroAddress,
++      lnStrikeWad: 0n,
++      openTime: BigInt(OPEN),
++      expiry: BigInt(EXPIRY),
++      window: 10,
++      cutoffBuffer: 2,
++      status: MarketStatus[status],
++      yesWon,
++      bucket: 0n,
++      outYes: 0n,
++      outNo: 0n,
++      invYes: 0n,
++      invNo: 0n,
++    },
++    yes: token(true),
++    no: token(false),
++    strikeUsd: 2691.96,
++    cutoff: BigInt(CUTOFF),
++  }
++}
++
++function hookRevert(name: string, isBuy: boolean, isYes = true): FetchError {
++  const code =
++    name === 'NotTradable' || name === 'MarketClosed'
++      ? 'MARKET_CLOSED'
++      : name === 'OutOfBand'
++        ? 'OUT_OF_BAND'
++        : 'CAPACITY'
++  const m = market()
++  return toPredictionFetchError(
++    new PredictionSwapError({ message: 'x', code, revert: { code, message: 'x', name, path: [name], raw: '0x' } }),
++    { token: isYes ? m.yes : m.no, poolKey: m.yes.poolKey, zeroForOne: true, isBuy },
++  )
++}
++
++describe('prediction market formatting', () => {
++  it('writes the market question and times in UTC, like the market names', () => {
++    expect(formatMarketQuestion(market(), EXPIRY - 30)).toBe('ETH above $2,691.96 at 23:02:04 UTC?')
++    expect(formatMarketTime(EXPIRY, EXPIRY - 3 * 86_400)).toBe('Sep 25, 23:02:04 UTC')
++  })
++
++  it('formats countdowns', () => {
++    expect(formatCountdown(23)).toBe('0:23')
++    expect(formatCountdown(725)).toBe('12:05')
++    expect(formatCountdown(3_723)).toBe('1:02:03')
++    expect(formatCountdown(2 * 86_400 + 3 * 3_600)).toBe('2d 3h')
++    expect(formatCountdown(-5)).toBe('0:00')
++  })
++})
++
++describe('prediction market status', () => {
++  it('follows the hook trading window: open until expiry - window - cutoffBuffer', () => {
++    const m = market()
++    expect(getPredictionMarketPhase(m, OPEN - 1)).toBe('upcoming')
++    expect(getPredictionMarketPhase(m, OPEN)).toBe('trading')
++    expect(getPredictionMarketPhase(m, CUTOFF - 5)).toBe('trading')
++    expect(getPredictionMarketPhase(m, CUTOFF - 4)).toBe('closing')
++    expect(getPredictionMarketPhase(m, CUTOFF - 1)).toBe('closing')
++    expect(getPredictionMarketPhase(m, CUTOFF)).toBe('closed')
++    expect(getPredictionMarketPhase(market('Settled'), CUTOFF)).toBe('settled')
++    expect(getPredictionMarketPhase(market('Invalid'), EXPIRY + 10)).toBe('invalid')
++  })
++
++  it('tells the holder what they can do in each phase', () => {
++    expect(summarizePredictionMarket({ market: market(), isYes: true, now: CUTOFF - 23 })).toEqual({
++      phase: 'trading',
++      badge: 'Trading',
++      hint: 'Trading closes in 0:23',
++    })
++    expect(summarizePredictionMarket({ market: market(), isYes: true, now: CUTOFF - 3 })).toEqual({
++      phase: 'closing',
++      badge: 'Closing',
++      hint: 'Trading closes in 0:03, too soon for a new swap to confirm',
++    })
++    expect(summarizePredictionMarket({ market: market(), isYes: true, now: CUTOFF + 1 })).toEqual({
++      phase: 'closed',
++      badge: 'Closed - awaiting settlement',
++      hint: 'Trading closed - settles at 23:02:04 UTC',
++    })
++    expect(summarizePredictionMarket({ market: market('Settled', true), isYes: true, now: EXPIRY + 5 }).hint).toBe(
++      'YES won - sell YES for exactly $1.00',
++    )
++    const lost = summarizePredictionMarket({ market: market('Settled', false), isYes: true, now: EXPIRY + 5 })
++    expect(lost.badge).toBe('Settled: NO won')
++    expect(lost.hint).toBe('NO won - YES is worth $0 and cannot be sold')
++    expect(summarizePredictionMarket({ market: market('Invalid'), isYes: false, now: EXPIRY + 5 }).badge).toBe(
++      'Invalid',
++    )
++  })
++
++  it('shows ask and bid while tradable, the mid after the cutoff and fixed payouts once settled', () => {
++    const quote: HookQuote = {
++      tradable: true,
++      tau: 30n,
++      varE36: 0n,
++      xWad: 0n,
++      midYes: (WAD * 503n) / 1000n,
++      askYes: (WAD * 546n) / 1000n,
++      bidYes: (WAD * 460n) / 1000n,
++      askNo: (WAD * 540n) / 1000n,
++      bidNo: (WAD * 454n) / 1000n,
++    }
++    const { info } = market()
++    expect(describeOutcome({ info, quote, isYes: true })).toEqual({
++      probability: '50.3%',
++      prices: 'Ask $0.546 · Bid $0.460',
++    })
++    expect(describeOutcome({ info, quote, isYes: false })).toEqual({
++      probability: '49.7%',
++      prices: 'Ask $0.540 · Bid $0.454',
++    })
++    expect(describeOutcome({ info, quote: { ...quote, tradable: false }, isYes: true }).prices).toBe('Mid $0.503')
++    expect(describeOutcome({ info, quote: { ...quote, midYes: 0n }, isYes: true })).toEqual({
++      probability: '-',
++      prices: '',
++    })
++    expect(describeOutcome({ info: market('Settled', false).info, quote, isYes: false })).toEqual({
++      probability: 'Won',
++      prices: 'Pays $1.00',
++    })
++  })
++})
++
++describe('prediction swap-form errors', () => {
++  beforeEach(() => {
++    resetPredictionRegistry()
++    registerPredictionMarkets([market()])
++    vi.useFakeTimers()
++    vi.setSystemTime((CUTOFF + 3) * 1000)
++  })
++
++  afterEach(() => {
++    vi.useRealTimers()
++  })
++
++  it('explains a closed market on the swap button instead of "No routes found"', () => {
++    const warning = getPredictionSwapWarning(hookRevert('NotTradable', true))
++    expect(warning).toMatchObject({
++      type: WarningLabel.NoRoutesError,
++      action: WarningAction.DisableReview,
++      title: 'Trading closed',
++      buttonText: 'Trading closed',
++      message: 'Trading closed at 23:01:52 UTC. The market settles at 23:02:04 UTC.',
++    })
++  })
++
++  it('explains the app refusing to quote in the last seconds before the cutoff', () => {
++    const m = market()
++    const closing = predictionClosingError({ token: m.yes, poolKey: m.yes.poolKey, zeroForOne: true, isBuy: true })
++    expect(getPredictionSwapWarning(closing)).toMatchObject({
++      action: WarningAction.DisableReview,
++      buttonText: 'Trading closing',
++      message: 'Trading closes at 23:01:52 UTC, too soon for a swap to confirm before then.',
++    })
++    expect(isPredictionQuoteRejection(closing)).toBe(true)
++    expect(isFinalPredictionRejection(closing)).toBe(false)
++  })
++
++  it('says a losing token cannot be sold after settlement', () => {
++    expect(getPredictionSwapWarning(hookRevert('MarketClosed', false, true))?.buttonText).toBe(
++      "NO won - YES can't be sold",
++    )
++    expect(getPredictionSwapWarning(hookRevert('MarketClosed', false, false))?.message).toBe(
++      'YES won. NO is worth $0 and cannot be sold.',
++    )
++  })
++
++  it('names band, capacity and liquidity rejections', () => {
++    expect(getPredictionSwapWarning(hookRevert('OutOfBand', true))?.title).toBe('Price outside trading band')
++    expect(getPredictionSwapWarning(hookRevert('EpochCapExceeded', true))?.title).toBe('Amount too large')
++    expect(getPredictionSwapWarning(hookRevert('Insolvent', false))?.title).toBe('Not enough liquidity')
++    expect(getPredictionSwapWarning(predictionUsdcOnlyError())?.title).toBe('Trade against USDC')
++  })
++
++  it('keeps RPC failures retryable and marks hook rejections final', () => {
++    const rpc = toPredictionFetchError(new Error('fetch failed'))
++    expect(getPredictionSwapWarning(rpc)).toMatchObject({
++      type: WarningLabel.SwapRouterError,
++      buttonText: 'Price unavailable, retrying',
++    })
++    expect(isPredictionQuoteRejection(rpc)).toBe(false)
++    expect(shouldRetryPredictionQuote(0, rpc)).toBe(true)
++    expect(shouldRetryPredictionQuote(1, rpc)).toBe(false)
++    const closed = hookRevert('NotTradable', true)
++    expect(isPredictionQuoteRejection(closed)).toBe(true)
++    expect(shouldRetryPredictionQuote(0, closed)).toBe(false)
++    expect(isFinalPredictionRejection(closed)).toBe(false)
++    expect(isFinalPredictionRejection(hookRevert('MarketClosed', false))).toBe(true)
++    expect(isFinalPredictionRejection(rpc)).toBe(false)
++  })
++
++  it('routes prediction errors through getSwapWarningFromError and leaves other errors alone', () => {
++    const derivedSwapInfo = { currencies: {} } as unknown as DerivedSwapInfo
++    const t = ((key: string) => key) as never
++    expect(getSwapWarningFromError({ error: hookRevert('NotTradable', true), t, derivedSwapInfo })).toMatchObject({
++      buttonText: 'Trading closed',
++    })
++    const hosted = new FetchError({
++      response: new Response(null, { status: 404 }),
++      data: { errorCode: TradingApi.Err404.errorCode.RESOURCE_NOT_FOUND, detail: 'No quotes available' },
++    })
++    const warning = getSwapWarningFromError({ error: hosted, t, derivedSwapInfo })
++    expect(warning.type).toBe(WarningLabel.NoRoutesError)
++    expect(warning.title).toBe('swap.warning.noRoutesFound.title')
++    expect(warning.buttonText).toBeUndefined()
++    expect(getPredictionSwapWarning(hosted)).toBeUndefined()
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionSwapFormHooks.test.tsx b/packages/uniswap/src/features/predictionMarkets/ui/predictionSwapFormHooks.test.tsx
+new file mode 100644
+index 0000000..1a19e3e
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionSwapFormHooks.test.tsx
+@@ -0,0 +1,270 @@
++import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { act, renderHook, waitFor } from '@testing-library/react'
++import { CurrencyAmount, Token, TradeType } from '@uniswap/sdk-core'
++import { FetchError, TradingApi } from '@universe/api'
++import type { PropsWithChildren } from 'react'
++import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import { type Market, predictionPoolKey, UNICHAIN_SEPOLIA } from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  getPredictionErrorData,
++  PREDICTION_RPC_ERROR_CODE,
++  predictionFetchError,
++  toPredictionFetchError,
++} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
++import { usePredictionSwapTxPlaceholder } from 'uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder'
++import { useTradeQuery } from 'uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery'
++import type { Trade, UseTradeArgs } from 'uniswap/src/features/transactions/swap/types/trade'
++import { getAddress, zeroAddress } from 'viem'
++
++const service = vi.hoisted(() => ({
++  getTrade: vi.fn(),
++  prepareTradeInput: (params?: { amountSpecified?: { toExact: () => string; currency: { symbol?: string } } }) =>
++    params?.amountSpecified
++      ? { amount: params.amountSpecified.toExact(), symbol: params.amountSpecified.currency.symbol }
++      : null,
++}))
++
++vi.mock('uniswap/src/features/services', () => ({ useTradeService: () => service }))
++vi.mock('uniswap/src/features/transactions/hooks/usePollingIntervalByChain', () => ({
++  usePollingIntervalByChain: () => 1_000,
++  useQuoteRefetchIntervalForChain: () => 1_000,
++}))
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const USDC_ADDRESS = UNICHAIN_SEPOLIA.usdc
++const YES = getAddress('0xfe00000000000000000000000000000000000001')
++const NO = getAddress('0x0100000000000000000000000000000000000001')
++const usdc = new Token(1301, USDC_ADDRESS, 6, 'USDC', 'USDC')
++const yes = new Token(1301, YES, 6, 'YES', 'YES')
++const no = new Token(1301, NO, 6, 'NO', 'NO')
++const dai = new Token(1, getAddress('0x6b175474e89094c44da98b954eedeac495271d0f'), 18, 'DAI', 'DAI')
++const weth = new Token(1, getAddress('0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'), 18, 'WETH', 'WETH')
++
++function market(): Market {
++  const token = (isYes: boolean): Market['yes'] => ({
++    address: isYes ? YES : NO,
++    symbol: isYes ? 'YES' : 'NO',
++    name: isYes ? 'YES' : 'NO',
++    decimals: 6,
++    isYes,
++    marketId: 1n,
++    poolKey: predictionPoolKey({ token: isYes ? YES : NO, usdc: USDC_ADDRESS, hook: HOOK }),
++  })
++  const expiry = BigInt(Math.floor(Date.now() / 1000) + 3_600)
++  return {
++    id: 1n,
++    hook: HOOK,
++    status: 'Trading',
++    info: {
++      yes: YES,
++      no: NO,
++      oracle: zeroAddress,
++      lnStrikeWad: 0n,
++      openTime: 0n,
++      expiry,
++      window: 10,
++      cutoffBuffer: 2,
++      status: 1,
++      yesWon: false,
++      bucket: 0n,
++      outYes: 0n,
++      outNo: 0n,
++      invYes: 0n,
++      invNo: 0n,
++    },
++    yes: token(true),
++    no: token(false),
++    strikeUsd: 2_700,
++    cutoff: expiry - 12n,
++  }
++}
++
++function args(input: Token, output: Token): UseTradeArgs {
++  return {
++    account: undefined,
++    amountSpecified: CurrencyAmount.fromRawAmount(input, 1_000_000),
++    otherCurrency: output,
++    tradeType: TradeType.EXACT_INPUT,
++  } as unknown as UseTradeArgs
++}
++
++function wrapper({ children }: PropsWithChildren): JSX.Element {
++  const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 10 } } })
++  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
++}
++
++const FIRST_TRADE = { quoteHash: 'first', trade: { id: 'first' } }
++
++const closedError = (): FetchError =>
++  predictionFetchError({ detail: 'closed', extra: { predictionCode: 'MARKET_CLOSED', revert: 'NotTradable' } })
++
++describe('useTradeQuery with outcome tokens', () => {
++  beforeEach(() => {
++    resetPredictionRegistry()
++    registerPredictionMarkets([market()])
++    service.getTrade.mockReset()
++  })
++
++  it('drops the last quote once the hook rejects the pair, without flickering back to loading', async () => {
++    service.getTrade.mockResolvedValueOnce(FIRST_TRADE).mockRejectedValue(closedError())
++    const seen: { loading: boolean; hasData: boolean; hasError: boolean }[] = []
++    const { result } = renderHook(
++      () => {
++        const r = useTradeQuery(args(usdc, yes))
++        seen.push({ loading: r.isLoading, hasData: !!r.data, hasError: !!r.error })
++        return r
++      },
++      { wrapper },
++    )
++    await waitFor(() => expect(result.current.data).toEqual(FIRST_TRADE))
++    await waitFor(() => expect(result.current.error).toBeInstanceOf(FetchError), { timeout: 3_000 })
++    expect(result.current.data).toBeUndefined()
++    expect(result.current.isLoading).toBe(false)
++
++    const firstRejection = seen.findIndex((s) => s.hasError)
++    const callsAtRejection = service.getTrade.mock.calls.length
++    await act(() => new Promise((resolve) => setTimeout(resolve, 2_500)))
++    const after = seen.slice(firstRejection)
++    expect(after.every((s) => !s.loading && !s.hasData && s.hasError)).toBe(true)
++    // Polling continues once a second, with no immediate retry of a rejection
++    const extraCalls = service.getTrade.mock.calls.length - callsAtRejection
++    expect(extraCalls).toBeGreaterThanOrEqual(1)
++    expect(extraCalls).toBeLessThanOrEqual(3)
++  }, 10_000)
++
++  it('shows the next quote as soon as the hook accepts the pair again', async () => {
++    service.getTrade
++      .mockResolvedValueOnce(FIRST_TRADE)
++      .mockRejectedValueOnce(closedError())
++      .mockResolvedValue({ quoteHash: 'back', trade: { id: 'back' } })
++    const { result } = renderHook(() => useTradeQuery(args(usdc, no)), { wrapper })
++    await waitFor(() => expect(result.current.error).toBeInstanceOf(FetchError), { timeout: 3_000 })
++    await waitFor(() => expect(result.current.data?.quoteHash).toBe('back'), { timeout: 3_000 })
++    expect(result.current.error).toBeNull()
++  }, 10_000)
++
++  it('keeps the stale quote hidden when an RPC error follows the rejection', async () => {
++    service.getTrade
++      .mockResolvedValueOnce(FIRST_TRADE)
++      .mockRejectedValueOnce(closedError())
++      .mockRejectedValue(toPredictionFetchError(new Error('upstream timeout')))
++    const seen: { loading: boolean; hasData: boolean }[] = []
++    const { result } = renderHook(
++      () => {
++        const r = useTradeQuery(args(usdc, yes))
++        seen.push({ loading: r.isLoading, hasData: !!r.data })
++        return r
++      },
++      { wrapper },
++    )
++    await waitFor(() => expect(result.current.data).toEqual(FIRST_TRADE))
++    const firstQuote = seen.length
++    await waitFor(
++      () => expect(getPredictionErrorData(result.current.error)?.errorCode).toBe(PREDICTION_RPC_ERROR_CODE),
++      {
++        timeout: 4_000,
++      },
++    )
++    const rejected = seen.slice(firstQuote).findIndex((s) => !s.hasData)
++    expect(rejected).toBeGreaterThanOrEqual(0)
++    expect(seen.slice(firstQuote + rejected).every((s) => !s.hasData && !s.loading)).toBe(true)
++  }, 10_000)
++
++  it('stops polling once the market is settled', async () => {
++    const settled = predictionFetchError({
++      detail: 'closed',
++      extra: { predictionCode: 'MARKET_CLOSED', revert: 'MarketClosed', isBuy: false },
++    })
++    service.getTrade.mockRejectedValue(settled)
++    const { result } = renderHook(() => useTradeQuery(args(yes, usdc)), { wrapper })
++    await waitFor(() => expect(result.current.error).toBe(settled), { timeout: 3_000 })
++    const calls = service.getTrade.mock.calls.length
++    await act(() => new Promise((resolve) => setTimeout(resolve, 2_500)))
++    expect(service.getTrade.mock.calls.length).toBe(calls)
++    expect(result.current.isLoading).toBe(false)
++  }, 10_000)
++
++  it('keeps the stale quote with the error for other tokens, as upstream does', async () => {
++    const upstreamError = new FetchError({
++      response: new Response(null, { status: 404 }),
++      data: { errorCode: TradingApi.Err404.errorCode.RESOURCE_NOT_FOUND },
++    })
++    service.getTrade.mockResolvedValueOnce(FIRST_TRADE).mockRejectedValue(upstreamError)
++    const { result } = renderHook(() => useTradeQuery(args(dai, weth)), { wrapper })
++    await waitFor(() => expect(result.current.data).toEqual(FIRST_TRADE))
++    await waitFor(() => expect(result.current.error).toBe(upstreamError), { timeout: 3_000 })
++    expect(result.current.data).toEqual(FIRST_TRADE)
++  }, 10_000)
++})
++
++describe('usePredictionSwapTxPlaceholder', () => {
++  const tradeOf = (
++    input: Token,
++    output: Token,
++    { amount = 1_000_000, tradeType = TradeType.EXACT_INPUT }: { amount?: number; tradeType?: TradeType } = {},
++  ): Trade =>
++    ({
++      tradeType,
++      inputAmount: CurrencyAmount.fromRawAmount(input, tradeType === TradeType.EXACT_INPUT ? amount : 7),
++      outputAmount: CurrencyAmount.fromRawAmount(output, tradeType === TradeType.EXACT_OUTPUT ? amount : 7),
++    }) as unknown as Trade
++
++  type Props = { data: { txRequests: string[] } | undefined; trade: Trade | undefined; approvalAction?: string }
++  const render = (initialProps: Props) =>
++    renderHook((props: Props) => usePredictionSwapTxPlaceholder(props), { initialProps })
++
++  beforeEach(() => {
++    resetPredictionRegistry()
++    registerPredictionMarkets([market()])
++  })
++
++  it('keeps the last /swap result of the trade across renders while the next one loads', () => {
++    const first = { txRequests: ['first'] }
++    const { result, rerender } = render({ data: first, trade: tradeOf(usdc, yes) })
++    rerender({ data: undefined, trade: tradeOf(usdc, yes) })
++    expect(result.current).toBe(first)
++    rerender({ data: undefined, trade: tradeOf(usdc, yes) })
++    expect(result.current).toBe(first)
++    rerender({ data: undefined, trade: tradeOf(usdc, no) })
++    expect(result.current).toBeUndefined()
++  })
++
++  it('never hands one amount, trade type or approval step the result of another', () => {
++    const first = { txRequests: ['first'] }
++    const { result, rerender } = render({ data: first, trade: tradeOf(usdc, yes), approvalAction: 'none' })
++    rerender({ data: undefined, trade: tradeOf(usdc, yes, { amount: 1_000_000_000 }), approvalAction: 'none' })
++    expect(result.current).toBeUndefined()
++    rerender({
++      data: undefined,
++      trade: tradeOf(usdc, yes, { tradeType: TradeType.EXACT_OUTPUT }),
++      approvalAction: 'none',
++    })
++    expect(result.current).toBeUndefined()
++    rerender({ data: undefined, trade: tradeOf(usdc, yes), approvalAction: 'permit2-approve' })
++    expect(result.current).toBeUndefined()
++    rerender({ data: undefined, trade: tradeOf(usdc, yes), approvalAction: 'none' })
++    expect(result.current).toBe(first)
++    // The output amount of an exact-in quote moves with the price and does not change the key
++    rerender({
++      data: undefined,
++      trade: { ...tradeOf(usdc, yes), outputAmount: CurrencyAmount.fromRawAmount(yes, 9) } as unknown as Trade,
++      approvalAction: 'none',
++    })
++    expect(result.current).toBe(first)
++  })
++
++  it('forgets the result once the form has no trade', () => {
++    const first = { txRequests: ['first'] }
++    const { result, rerender } = render({ data: first, trade: tradeOf(usdc, yes) })
++    rerender({ data: undefined, trade: undefined })
++    expect(result.current).toBeUndefined()
++    rerender({ data: undefined, trade: tradeOf(usdc, yes) })
++    expect(result.current).toBeUndefined()
++  })
++
++  it('does nothing for other tokens', () => {
++    const { result, rerender } = render({ data: { txRequests: [] }, trade: tradeOf(dai, weth) })
++    rerender({ data: undefined, trade: tradeOf(dai, weth) })
++    expect(result.current).toBeUndefined()
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder.ts b/packages/uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder.ts
+new file mode 100644
+index 0000000..7dd084a
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder.ts
+@@ -0,0 +1,45 @@
++import { TradeType } from '@uniswap/sdk-core'
++import { useEffect, useRef } from 'react'
++import { touchesPredictionToken } from 'uniswap/src/features/predictionMarkets/registry'
++import type { Trade } from 'uniswap/src/features/transactions/swap/types/trade'
++import { currencyId } from 'uniswap/src/utils/currencyId'
++
++/** Pair, trade type, the amount the user typed and the approval step: what a `/swap` result depends on besides the price */
++function placeholderKey(trade: Trade | undefined, approvalAction: string | undefined): string | undefined {
++  if (!trade || !touchesPredictionToken(trade.inputAmount.currency, trade.outputAmount.currency)) {
++    return undefined
++  }
++  const specified = trade.tradeType === TradeType.EXACT_INPUT ? trade.inputAmount : trade.outputAmount
++  return [
++    currencyId(trade.inputAmount.currency),
++    currencyId(trade.outputAmount.currency),
++    trade.tradeType,
++    specified.quotient.toString(),
++    approvalAction,
++  ].join(':')
++}
++
++/**
++ * Last `/swap` result of an outcome-token trade, kept as placeholder until the next lands, for as long as the pair,
++ * trade type, typed amount and approval step stay the same; else undefined
++ */
++export function usePredictionSwapTxPlaceholder<T>({
++  data,
++  trade,
++  approvalAction,
++}: {
++  data: T | undefined
++  trade: Trade | undefined
++  approvalAction?: string
++}): T | undefined {
++  const last = useRef<{ key: string; data: T } | undefined>(undefined)
++  const key = placeholderKey(trade, approvalAction)
++  useEffect(() => {
++    if (!key) {
++      last.current = undefined
++    } else if (data !== undefined) {
++      last.current = { key, data }
++    }
++  }, [key, data])
++  return key && last.current?.key === key ? last.current.data : undefined
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts b/packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts
 new file mode 100644
@@ -12750,19 +15981,56 @@ index 48b6391..c975144 100644
  
    return {
      currencyInfo,
+diff --git a/packages/uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError.ts b/packages/uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError.ts
+index 1caba63..7208f04 100644
+--- a/packages/uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError.ts
++++ b/packages/uniswap/src/features/transactions/swap/hooks/useSwapWarnings/getSwapWarningFromError.ts
+@@ -1,6 +1,7 @@
+ import { FetchError, isRateLimitFetchError, TradingApi } from '@universe/api'
+ import { TFunction } from 'i18next'
+ import { Warning, WarningAction, WarningLabel, WarningSeverity } from 'uniswap/src/components/modals/WarningModal/types'
++import { getPredictionSwapWarning } from 'uniswap/src/features/predictionMarkets/ui/predictionErrors'
+ import { SponsoredApprovalRejectedError } from 'uniswap/src/features/transactions/errors'
+ import { GasSponsorshipNotAppliedError } from 'uniswap/src/features/transactions/swap/errors'
+ import { DerivedSwapInfo } from 'uniswap/src/features/transactions/swap/types/derivedSwapInfo'
+@@ -36,6 +37,11 @@ export function getSwapWarningFromError({
+   }
+ 
+   if (error instanceof FetchError) {
++    const predictionWarning = getPredictionSwapWarning(error)
++    if (predictionWarning) {
++      return predictionWarning
++    }
++
+     // Special case: rate limit errors are not parsed by errorCode
+     if (isRateLimitFetchError(error)) {
+       return {
 diff --git a/packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts b/packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts
-index f99dc99..ef05b15 100644
+index f99dc99..793a51f 100644
 --- a/packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts
 +++ b/packages/uniswap/src/features/transactions/swap/hooks/useTrade/useTradeQuery.ts
-@@ -1,6 +1,7 @@
+@@ -1,6 +1,12 @@
  import { UseQueryResult } from '@tanstack/react-query'
  import { useQueryWithImmediateGarbageCollection } from '@universe/api'
  import { useRef } from 'react'
 +import { getPredictionQuotePollMs } from 'uniswap/src/features/predictionMarkets/registry'
++import {
++  isFinalPredictionRejection,
++  isPredictionQuoteRejection,
++  shouldRetryPredictionQuote,
++} from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
  import { useTradeService } from 'uniswap/src/features/services'
  import {
    usePollingIntervalByChain,
-@@ -22,8 +23,9 @@ export function useTradeQuery(params: UseTradeArgs): UseQueryResult<TradeWithGas
+@@ -11,6 +17,7 @@ import { createTradeServiceQueryOptions } from 'uniswap/src/features/transaction
+ import { TradeWithGasEstimates } from 'uniswap/src/features/transactions/swap/services/tradeService/tradeService'
+ import { UseTradeArgs } from 'uniswap/src/features/transactions/swap/types/trade'
+ import { useEvent } from 'utilities/src/react/hooks'
++import { hashKey } from 'utilities/src/reactQuery/hashKey'
+ import { ONE_SECOND_MS } from 'utilities/src/time/time'
+ 
+ export function useTradeQuery(params: UseTradeArgs): UseQueryResult<TradeWithGasEstimates> {
+@@ -22,21 +29,31 @@ export function useTradeQuery(params: UseTradeArgs): UseQueryResult<TradeWithGas
    // randomization on both lines. `refetchIntervalForChain` may be a number or
    // a function (when randomized); `maxRefetchIntervalMs` mirrors it as a plain
    // number so we can size `immediateGcTime` from the upper-bound interval.
@@ -12773,7 +16041,90 @@ index f99dc99..ef05b15 100644
 +  const maxRefetchIntervalMs = params.pollInterval ?? predictionPollMs ?? chainDefaultPollIntervalMs
    const tradeService = useTradeService()
    const getTradeQueryOptions = useEvent(createTradeServiceQueryOptions({ tradeService }))
++  const queryOptions = getTradeQueryOptions(params)
++  const predictionQueryHash = predictionPollMs ? hashKey(queryOptions.queryKey) : undefined
++  const predictionRejectionRef = useRef<{ queryHash: string; at: number } | undefined>(undefined)
++  const predictionRejected = !!predictionQueryHash && predictionRejectionRef.current?.queryHash === predictionQueryHash
  
+   const response = useQueryWithImmediateGarbageCollection({
+-    ...getTradeQueryOptions(params),
+-    refetchInterval,
++    ...queryOptions,
++    // A settled market never quotes again for this pair
++    refetchInterval:
++      predictionPollMs && params.pollInterval === undefined
++        ? (query) => (isFinalPredictionRejection(query.state.error) ? false : predictionPollMs)
++        : refetchInterval,
+     // We set the `gcTime` to 15 seconds longer than the maximum refetch interval so that there's more than enough time for a refetch to complete before we clear the stale data.
+     // If the user loses internet connection (or leaves the app and comes back) for longer than this,
+     // then we clear stale data and show a big loading spinner in the swap review screen.
+-    immediateGcTime: maxRefetchIntervalMs + ONE_SECOND_MS * 15,
++    // A rejected outcome-token quote already hides its stale data, and removing it would restart the loading state
++    immediateGcTime: predictionRejected ? undefined : maxRefetchIntervalMs + ONE_SECOND_MS * 15,
+     // We want to retry once, rather than the default, in order to populate response.error / Error UI sooner.
+     // The query will still poll after failed retries, due to staleness.
+-    retry: 1,
++    retry: predictionPollMs ? shouldRetryPredictionQuote : 1,
+   })
+ 
+   const errorRef = useRef<Error | null>(response.error)
+@@ -49,8 +66,26 @@ export function useTradeQuery(params: UseTradeArgs): UseQueryResult<TradeWithGas
+     errorRef.current = response.error
+   }
+ 
++  // Refetches of a closed or out-of-band market all fail, so hide the stale quote and the per-refetch `pending` flicker
++  // until a newer quote lands, even if an RPC error replaces the rejection meanwhile
++  if (
++    predictionQueryHash &&
++    isPredictionQuoteRejection(response.error) &&
++    response.errorUpdatedAt > response.dataUpdatedAt
++  ) {
++    predictionRejectionRef.current = { queryHash: predictionQueryHash, at: response.errorUpdatedAt }
++  }
++  const hidePredictionQuote =
++    !!predictionQueryHash &&
++    predictionRejectionRef.current?.queryHash === predictionQueryHash &&
++    response.dataUpdatedAt <= predictionRejectionRef.current.at
++  if (predictionRejected && !hidePredictionQuote) {
++    predictionRejectionRef.current = undefined
++  }
++
+   return {
+     ...response,
++    ...(hidePredictionQuote && { data: undefined, isLoading: false }),
+     error: errorRef.current,
+   } as UseQueryResult<TradeWithGasEstimates>
+ }
+diff --git a/packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts b/packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts
+index d8ee9e6..fe14920 100644
+--- a/packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts
++++ b/packages/uniswap/src/features/transactions/swap/review/services/swapTxAndGasInfoService/hooks.ts
+@@ -9,6 +9,7 @@ import { useActiveAddress } from 'uniswap/src/features/accounts/store/hooks'
+ import { useActiveGasStrategy } from 'uniswap/src/features/gas/hooks'
+ import { useTradingApiGasOverrides } from 'uniswap/src/features/gas/hooks/useTradingApiGasOverrides'
+ import { useActiveSwapPermissionedState } from 'uniswap/src/features/permissionedTokens/useActiveSwapPermissionedState'
++import { usePredictionSwapTxPlaceholder } from 'uniswap/src/features/predictionMarkets/ui/usePredictionSwapTxPlaceholder'
+ import type {
+   SignDelegationAuthorizationFn,
+   SwapDelegationInfo,
+@@ -372,10 +373,16 @@ export function useSwapTxAndGasInfo(): SwapTxAndGasInfo {
+ 
+   const prevData = usePrevious(data)
+   const prevParams = usePrevious(params)
++  // `prevData` is gone after one render, and outcome-token quotes refresh every second
++  const predictionPlaceholder = usePredictionSwapTxPlaceholder({
++    data,
++    trade: params.trade,
++    approvalAction: params.approvalTxInfo.tokenApprovalInfo.action,
++  })
+ 
+   // Persist prev query result as placeholder data when applicable
+   const canUsePlaceholderData = useMemo(() => getCanUsePlaceholderData(params, prevParams), [params, prevParams])
+-  const placeholderData = canUsePlaceholderData ? prevData : undefined
++  const placeholderData = canUsePlaceholderData ? (prevData ?? predictionPlaceholder) : undefined
+ 
+   return data ?? placeholderData ?? EMPTY_SWAP_TX_AND_GAS_INFO
+ }
 diff --git a/packages/uniswap/src/features/transactions/swap/utils/trade.ts b/packages/uniswap/src/features/transactions/swap/utils/trade.ts
 index 05f9051..42b1e37 100644
 --- a/packages/uniswap/src/features/transactions/swap/utils/trade.ts
