@@ -12,7 +12,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --import tsx --test test/*.test.mts",
     "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts",
-    "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts"
+    "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts",
+    "preview:activity": "node --import tsx scripts/preview-activity.mts"
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.81",

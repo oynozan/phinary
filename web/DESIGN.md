@@ -1,5 +1,5 @@
 ---
-name: Phinary Markets, Market Detail, Portfolio and shared header
+name: Phinary Markets, Market Detail, Portfolio, Activity and shared header
 description: Compact near-black financial interface with violet atmosphere.
 colors:
   background: "#080b12"
@@ -16,6 +16,9 @@ colors:
   live: "#20dfa0"
   header: "transparent"
   featured: "rgb(12 16 25 / 88%)"
+  activity-metric: "rgb(13 17 26 / 90%)"
+  activity-panel: "rgb(11 15 25 / 93%)"
+  activity-hover: "#151925"
   detail-panel: "rgb(11 16 25 / 94%)"
   detail-recess: "#0a0f18"
   detail-input: "#080d15"
@@ -199,7 +202,7 @@ components:
 
 ## Overview
 
-This refresh applies to Markets, Market Detail (`/market/[id]`), Portfolio (`/portfolio`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; Portfolio scope is defined below and in `preview/portfolio/README.md`. Product and data constraints remain in `PRODUCT.md`.
+This refresh applies to Markets, Market Detail (`/market/[id]`), Portfolio (`/portfolio`), Activity (`/activity`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; Portfolio scope is defined below and in `preview/portfolio/README.md`. Product and data constraints remain in `PRODUCT.md`.
 
 ## Colors
 
@@ -260,9 +263,21 @@ Sell and Claim dialogs are exercisable only in the isolated sample preview. Sell
 
 Run `npm run preview:portfolio` from `web/` for the loopback-only preview at `http://localhost:3102`. It always labels itself “UI preview · Sample data”, uses isolated ETH fixtures and never connects wallets, calls RPC or submits transactions. See `preview/portfolio/README.md` for scenarios, operational limits and verification notes.
 
+## Activity scope
+
+Activity is a design-first, public read-only screen scoped to `.activity-page` in `src/components/activity/activity.css`. It does not require wallet connection. The production hooks have no indexed source yet: totals remain N/A and the feed and ranking explain that data is not connected. Do not turn unavailable data into a zero-valued successful result or import preview fixtures into the production route.
+
+Use the existing near-black ground, Manrope, tabular numbers, violet UP, coral DOWN and green positive/live text. Metric panels use `activity-metric`, feed/ranking panels use `activity-panel`, and row hover uses `activity-hover`; these are local extensions, not replacements for global tokens. The transparent shared header remains unchanged and reveals the page-owned static `/markets/orbit.webp` at 0.48 opacity behind the top 350px. Keep the 30px title, 23px panel headings, fine borders and 10px panel corners. No animated artwork or new illustrations are introduced.
+
+The container caps at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Summary metrics are Volume 1h, Trades 1h, Wins/Losses 1h and Win rate 1h. Below 1024px the four summary panels use two columns, the 3:2 feed/ranking layout stacks and tables become readable cards. At mobile widths the title is 27px and panel headers wrap. Preserve existing production dock clearance and reduced-motion handling.
+
+Every metric uses the same snapshot boundary: `asOf - 3600 < timestamp <= asOf`. Buy and Sell count toward traded volume and trade count; Claim does not. Wins and losses represent user-position outcomes, not market counts, and exclude Invalid refunds. Rank up to ten traders by known realised profit, and show the newest twelve feed events. Missing accounting remains unavailable; no realised profit is inferred from trade totals. Preserve the last successful snapshot and its original As of time when updates pause or fail, rather than silently replacing it with zeros or advancing its time window.
+
+`npm run preview:activity` launches the loopback-only sample preview at `http://localhost:3103`. It prominently labels sample data, generates local updates every five seconds and includes pause, failure, recovery and missing-data scenarios. No wallet, RPC, indexer or real transaction is connected. See `preview/activity/README.md` for startup and scenario details. Other route designs and the shared header remain governed by their existing rules.
+
 ## Legacy body reference
 
-The following rules apply only to route bodies outside Markets, Market Detail and Portfolio, and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.
+The following rules apply only to route bodies outside Markets, Market Detail, Portfolio and Activity, and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.
 
 ### Hard rules
 
