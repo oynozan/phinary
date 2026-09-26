@@ -16,8 +16,10 @@ Each market has two tokens, `ETHUP` and `ETHDOWN`. Each costs between $0.00 and 
 
 | Contract | Address |
 |---|---|
-| PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` |
-| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| MarketScheduler (the hook's only owner) | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` |
+| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` |
+| UnderlyingOracleHook (ownership renounced) | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| Legacy PredictionHook (old markets, redeem only) | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` |
 | PriceSteerer (demo price mirror) | `0x21C55279188072E6BfeF14c4920eA1cEFEd358a3` |
 | USDC (Circle, testnet) | `0x31d0220469e10c4E71834a79b1f276d740d3768F` |
 

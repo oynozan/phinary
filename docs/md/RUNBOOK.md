@@ -199,9 +199,9 @@ The keeper's signer needs no role: `scheduler.open()` is permissionless, so any 
 - For the first 5 minutes after deploy, the oracle quotes the 60 % fallback σ.
 - After that it quotes the realised σ of the demo pool, clamped to [20 %, 250 %].
 - The mirror only steers on moves of 2 bp or more, so on a quiet market the estimate often sits on the 20 % floor.
-- On that floor, a 60 s market's price swings hard on each 2-3 bp steer. One standard deviation of ETH over 50 s is only about 3 bp at 20 %.
+- On that floor, a 2-minute market's price swings hard on each 2-3 bp steer. One standard deviation of ETH over 50 s is only about 3 bp at 20 %.
 
-For calmer demo prices, the oracle owner can raise the floor at any time:
+The live Sepolia oracle's ownership was renounced on 2026-09-26, so its bounds are fixed at [20 %, 250 %] for good. `setVarianceBounds` works only on a fresh oracle (for example the local env) before its owner renounces:
 
 ```sh
 # setVarianceBounds(min, max, fallback), per-second variance at 1e36 = sigma^2 / 31557600 * 1e36
@@ -243,7 +243,7 @@ KEEPER_POLL_MS=1000 make bots      # any bot setting passes through, see bot/.en
 - A market's budget is the most its LPs can lose. It also caps trade size: a buy of `x` USDC at price `p` needs `budget + x ≥ x / p`, so near 0.5 a single buy is capped at about the budget.
 - Each opened market's budget is `min(MARKET_BUDGET_USDC, vaultIdle / 2)`, decided by the scheduler itself; `open()` reverts `InsufficientIdle` below `SCHEDULER_MIN_BUDGET_USDC`, and about two markets hold budget at once.
 
-With a 40 USDC vault, use `MARKET_BUDGET_USDC=10` and demo trades of 2-5 USDC. While the vault is too short to afford `SCHEDULER_MIN_BUDGET_USDC`, `open()` reverts `InsufficientIdle`. The keeper logs `open() refused … error=InsufficientIdle(…)` once per slot as a warning and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded. An oracle revert inside `open()`, such as the sealed oracle's `StaleSpot`, is logged the same way.
+`MARKET_BUDGET_USDC` and `SCHEDULER_MIN_BUDGET_USDC` are read only when the scheduler is deployed; the live scheduler is fixed at 10 USDC and 1 USDC. With the live vault (about 93 USDC), two overlapping markets hold 20 USDC, and demo trades of 2-5 USDC fit comfortably. While the vault is too short to afford `SCHEDULER_MIN_BUDGET_USDC`, `open()` reverts `InsufficientIdle`. The keeper logs `open() refused … error=InsufficientIdle(…)` once per slot as a warning and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded. An oracle revert inside `open()`, such as the sealed oracle's `StaleSpot`, is logged the same way.
 
 ## 5. Front ends
 
@@ -460,26 +460,28 @@ All three pass live against the real pool. Without `UNICHAIN_RPC_URL` they are s
 
 ## Live deployment notes (Unichain Sepolia, 2026-09-26)
 
-This deployment predates the `MarketScheduler` (it was deployed with `setKeeper`, before the scheduler existed); the hook keeper below still holds that role on it today. Migrate it with `script/sepolia.sh scheduler` (section 3) before relying on the scheduler-only behaviour described elsewhere in this runbook.
+Redeployed on 2026-09-26 with the scheduler. No key holds an admin role: the hook's only owner is the scheduler, its keeper slot is empty, and the oracle's owner is the zero address.
 
 | Item | Value |
 |---|---|
-| Deployment | `deployments/unichain-sepolia.json` (block 63,521,900) |
-| PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` (vault funded with 35 USDC) |
-| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| Deployment | `deployments/unichain-sepolia.json` (block 63,569,270) |
+| MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` (period 60 s, tenor 120 s, window 10 s, h0 0.02, gammaS 0.00002, budget 10 USDC, min 1 USDC) |
+| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` (owner: the scheduler; vault funded with 93.36 USDC moved from the old hook) |
+| Legacy PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` (all markets settled and swept, vault empty; old tokens stay redeemable there) |
+| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` (ownership renounced) |
 | PriceSteerer owner (mirror signer) | `0x642c95Ad042C32289687152EE838D14BC219eDAc` |
-| Hook keeper (keeper signer) | `0x7B7675a09801049C1D3296d76A29D69913Da3dF0` |
+| Keeper signer (no role; any key works) | `0x7B7675a09801049C1D3296d76A29D69913Da3dF0` |
 
 - **RPC for bots and scripts:** `https://unichain-sepolia.drpc.org`. The load-balanced `https://sepolia.unichain.org` sometimes serves stale state (pending nonce 0) and causes `nonce too low`.
 - **Demo bot command:**
 
   ```sh
-  RPC_URL=https://unichain-sepolia.drpc.org MARKET_BUDGET_USDC=10 QUOTE_H0=0.01 QUOTE_GAMMA_S=0.00002 MIRROR_THRESHOLD_BPS=1 MARKET_TENOR_SEC=120 KEEPER_PERIOD_SEC=60 script/bots.sh start unichain-sepolia
+  RPC_URL=https://unichain-sepolia.drpc.org MIRROR_THRESHOLD_BPS=1 script/bots.sh start unichain-sepolia
   ```
 
+  - Market settings live in the scheduler, so `MARKET_*` and `QUOTE_*` no longer affect the bots. The keeper reads the scheduler's period on chain and warns if `KEEPER_PERIOD_SEC` differs.
   - Demo markets last 2 minutes and a new one opens every minute. Markets overlap, so one is always open with at least ~45 s of trading left. Each market settles every minute.
-  - This gives an ATM spread of about ±4¢, widening toward the cutoff.
-  - The production values (h0 = 0.02, gammaS = 0.00005) quote ±10¢ at σ ≈ 20%, which is too wide for 60-second markets.
+  - The spread is h0 = 2¢ plus a gamma term that widens toward the cutoff.
 - **Real-chain smoke test:**
 
   ```sh
