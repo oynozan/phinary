@@ -1,0 +1,56 @@
+---
+title: Events and indexing
+description: The events PredictionHook emits and how to attribute trades to real accounts.
+---
+
+# Events and indexing
+
+<Source path="src/interfaces/IPredictionHook.sol" lines="73-90" />
+
+```solidity showLineNumbers{73}
+event MarketCreated(
+    uint256 indexed marketId, address yes, address no, bytes32 yesPoolId, bytes32 noPoolId, int256 lnStrikeWad, uint64 expiry
+);
+event Trade(
+    uint256 indexed marketId,
+    address indexed sender,
+    bool isYes,
+    bool isBuy,
+    uint256 qty,
+    uint256 usdcAmount,
+    uint256 avgPriceWad
+);
+event MarketSettled(uint256 indexed marketId, bool yesWon, int256 avgNormTickTimesWindow, bool invalid);
+event Redeemed(uint256 indexed marketId, address indexed account, uint256 amount, uint256 payout);
+event Swept(uint256 indexed marketId, uint256 amount);
+event Deposit(address indexed account, uint256 assets, uint256 shares);
+event Withdraw(address indexed account, uint256 assets, uint256 shares);
+event KeeperSet(address keeper);
+```
+
+| Event | Emitted when |
+|---|---|
+| `MarketCreated` | A market opens. It carries both pool ids, so an indexer can discover the pools |
+| `Trade` | Every swap: side, token quantity, USDC amount and average price |
+| `HookSwap` | Every swap, with the real amounts. OpenZeppelin's standard event for custom-accounting hooks |
+| `MarketSettled` | The result is recorded, including `Invalid` markets |
+| `Redeemed` | Someone redeems tokens with `redeem` |
+| `Swept` | A settled market returns its surplus to the vault |
+| `Deposit`, `Withdraw` | LP shares are minted or burned |
+
+## `HookSwap`
+
+The PoolManager's own `Swap` event reports zero amounts, because the hook takes over the whole swap and the pool's curve never runs. `HookSwap` is where indexers that follow OpenZeppelin's hook events find the real amounts.
+
+## Who traded
+
+The `sender` of `Trade` and `HookSwap` is the router that called the PoolManager, not the end user. The Ponder indexer (<Source path="indexer/src/trades.ts" />) finds the real account from the outcome-token transfers in the same transaction:
+
+| Transfer | Read as |
+|---|---|
+| From the zero address | A mint into the PoolManager; ignored |
+| To the zero address | A redemption |
+| From or to the PoolManager | The trade's leg to or from the user |
+| Anything else | A transfer between users |
+
+The rules are in <Source path="indexer/src/lib/attribution.ts" />.

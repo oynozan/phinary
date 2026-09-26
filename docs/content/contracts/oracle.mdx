@@ -35,19 +35,6 @@ interface IUnderlyingOracle {
 }
 ```
 
-## An oracle, but not an external one
-
-Anything that tells a contract a price is an oracle, and a market that settles on "ETH above the strike at expiry" needs one. Phinary's oracle is a Uniswap pool, so there is no third party in the price path.
-
-| | External oracle (Chainlink, Pyth) | Phinary |
-|---|---|---|
-| Price source | Operators watch exchanges off-chain and post prices on-chain | Trades in a Uniswap v4 ETH/USDC pool on the same chain |
-| Who you trust | The operators, and the admin who can change or pause a feed | No one; moving the price means paying to move the pool |
-| Updates | Separate transactions from the operators | None; the hook reads the pool in the same call |
-| How it fails | Operators stop, lag or misreport; the feed is paused | Someone pays to move the pool during the averaging window |
-
-On Unichain Sepolia the oracle's ownership is renounced, so its variance bounds are fixed and no key can change it. The accurate claim is "no external oracle", not "oracle-free".
-
 ## Start-of-block price
 
 <Source path="src/oracle/UnderlyingOracleHook.sol" lines="202-221" />
@@ -162,14 +149,4 @@ function threshold(int256 lnStrikeWad, int16 decimalsShift, uint32 window) inter
 
 ## Testnet price
 
-The Unichain Sepolia ETH/USDC pool has no arbitrageurs. The mirror bot (<Source path="bot/src/mirror.ts" />) keeps it near the real ETH price through `PriceSteerer` (<Source path="src/demo/PriceSteerer.sol" />). It reads Coinbase, then Kraken, then Binance.US, but the contracts never see those exchanges: they only read the pool. On mainnet, arbitrage does this job and the mirror is not needed.
-
-## Mainnet: SealedPoolOracle
-
-Unichain's deep ETH/USDC pool (about $8M of in-range liquidity) has no hook, and a hook cannot be added to an existing pool. For mainnet, [`SealedPoolOracle`](https://github.com/oynozan/phinary/blob/main/src/oracle/SealedPoolOracle.sol) implements the same `IUnderlyingOracle` over that pool without a hook:
-
-- **Seal.** Every price-moving swap with liquidity in range raises the pool's fee-growth counters. If the price and both counters are unchanged between a snapshot taken in an earlier block and a later read, no swap happened in between, so the pool held that price at the block boundaries. Snapshots sitting exactly on a tick price never seal.
-- **Proof.** For blocks a seal cannot cover, anyone submits a Merkle-Patricia proof of the pool's `slot0` against Unichain's own block hash (`BLOCKHASH`, the EIP-2935 history contract, or a stored header chain).
-- **Bot.** A permissionless bot pokes every block and proves every gap. It cannot choose a price; if it stops, quotes halt and settlement waits for proofs.
-
-It is tested against the real pool on a Unichain mainnet fork and end to end on Anvil, and it is not deployed yet. Running it needs an RPC that serves historical `eth_getProof`.
+The Unichain Sepolia ETH/USDC pool has no arbitrageurs. The mirror bot (<Source path="bot/src/mirror.ts" />) keeps it near the real ETH price through `PriceSteerer` (<Source path="src/demo/PriceSteerer.sol" />). On mainnet, arbitrage does this job.

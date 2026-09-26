@@ -1,0 +1,59 @@
+---
+title: Pricing, simply
+description: What moves a Phinary price, why buying costs more than selling, and how big trades are priced.
+---
+
+# Pricing, simply
+
+The hook quotes every trade itself. Its YES price is the chance that ETH's final 10-second average ends above the strike, worked out with the Black-Scholes model. Three things move it.
+
+## Distance from the strike
+
+The further ETH is above the strike, the more likely YES wins. How much a dollar matters depends on the time left. These are fair YES prices for a strike of 2,684.53 USD at 60% volatility:
+
+| ETH minus strike | −2 | −1 | −0.5 | 0 | +0.5 | +1 | +2 |
+|---|---|---|---|---|---|---|---|
+| 110 s left (just opened) | 0.25 | 0.37 | 0.43 | 0.50 | 0.57 | 0.63 | 0.75 |
+| 60 s left | 0.17 | 0.32 | 0.41 | 0.50 | 0.59 | 0.68 | 0.83 |
+| 20 s left | 0.03 | 0.17 | 0.31 | 0.50 | 0.69 | 0.83 | 0.97 |
+
+With 20 seconds left there is little time for ETH to come back, so being 2 USD above the strike already means 97%.
+
+## Volatility
+
+Volatility measures how much ETH usually moves. The hook measures it from the same Uniswap pool, over the last 30 minutes. Higher volatility means more can still happen, so prices stay closer to 50/50. ETH 1 USD above the strike with 60 seconds left:
+
+| Volatility (yearly) | 30% | 60% | 120% |
+|---|---|---|---|
+| YES price | 0.83 | 0.68 | 0.59 |
+
+## Ask and bid
+
+You pay the **ask** when you buy and get the **bid** when you sell. The gap between them is the **spread**, and it is what the vault earns for taking the other side. It has two parts:
+
+- **A flat 2 cents** on each side (`h0`).
+- **A sensitivity part** that grows where the price reacts most to ETH: near the strike and close to expiry (`gammaS`).
+
+Example: a fair price of 0.589 becomes an ask of 0.619 and a bid of 0.559.
+
+NO needs no separate price. Buying NO costs 1 minus the YES bid, and selling NO pays 1 minus the YES ask.
+
+## Price impact
+
+Within one block, each token bought moves the price for the next one by 0.001 USDC. Selling moves it back. The effect resets in the next block.
+
+| In the same block | Starting price | 5 USDC buys | Average price |
+|---|---|---|---|
+| Alice buys YES | 0.6191 | 8.0248 YES | 0.6231 |
+| Carol then buys NO | 0.4410 − 0.0080 = 0.4330 | 11.3984 NO | 0.4387 |
+
+Alice's YES purchase made NO cheaper for Carol, because it moved the market towards YES.
+
+## Why it is built this way
+
+- **One price per block.** The hook reads ETH's price at the start of the block, so no trade can move the price the next trade sees within that block.
+- **No gain from splitting.** Many small swaps in one block pay the same impact as one big swap.
+- **A band.** No trade may push the price below 0.02 or above 0.98, so nearly decided markets stop trading instead of quoting nonsense.
+- **A per-block limit** of 100 tokens of net flow caps how much a single block can move.
+
+The exact formulas are on [Contracts › Pricing math](/contracts/pricing).

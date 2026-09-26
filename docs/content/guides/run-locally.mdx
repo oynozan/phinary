@@ -1,0 +1,103 @@
+---
+title: Run the demo locally
+description: Build, test and run the contracts, bots and front ends on your machine.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Run the demo locally
+
+Every command runs from the repository root. `make` with no target lists them all.
+
+## What runs where
+
+| Piece | Command | Address |
+|---|---|---|
+| Uniswap app fork | `cd interface && SKIP_CONFIG_PULL=true bun web dev` | `http://localhost:3000` |
+| Phinary dashboard | `cd web && npm install && npm run dev` | `http://localhost:3100` |
+| These docs | `cd docs && npm install && npm run dev` | `http://localhost:3200` |
+| Backup swap page | `make backup-app` | `http://localhost:5173` |
+| Private chain fork | `make local-env` | `http://127.0.0.1:8545` |
+
+## Requirements
+
+- **Foundry 1.8.3** in `~/.foundry/bin`.
+- **Node 24** for the bots, the dashboard and the docs.
+- **bun 1.3.14 and node 22.22.2** for the Uniswap app fork.
+- A repo-root `.env` with `DEPLOYER_PRIVATE_KEY` and `DEPLOYER_ADDRESS`, only if you deploy.
+
+## Rehearse on a private fork
+
+<Steps>
+
+### Build and test the contracts
+
+```sh
+make build && make test
+```
+
+### Start the private fork
+
+```sh
+make local-env
+```
+
+It forks Unichain Sepolia, deploys every contract and starts both bots.
+
+### Run a full market
+
+```sh
+make rehearse
+```
+
+A scripted buy, sell, settlement and redemption against that fork.
+
+### Stop it
+
+```sh
+make local-stop
+```
+
+</Steps>
+
+## Trade in the Uniswap app
+
+<Steps>
+
+### Point the fork at the live deployment
+
+```sh
+make vendor-interface
+```
+
+It copies `@phinary/swap-sdk` into the fork and writes the hook address from `deployments/unichain-sepolia.json`.
+
+### Start the app
+
+```sh
+cd interface && SKIP_CONFIG_PULL=true bun web dev
+```
+
+Open `http://localhost:3000`. The first load takes 30 to 40 seconds.
+
+### Trade
+
+Follow [Trade in the Uniswap app](/guides/uniswap-app).
+
+</Steps>
+
+<Callout type="important">
+The app fork always reads the real Unichain Sepolia, never the private fork. To trade against the private fork, use the backup page: `make backup-app NETWORK=local`.
+</Callout>
+
+## Run the bots
+
+```sh
+make bots          # start the price mirror and the keeper
+make bots-status   # both running?
+make bots-logs     # follow their logs
+make bots-stop
+```
+
+- **Keeper:** opens a market every minute, then settles and sweeps each one when due. Every call is permissionless, so any account can do this.
+- **Price mirror:** keeps the testnet ETH/USDC pool at the real ETH price, the job arbitrageurs do on mainnet.

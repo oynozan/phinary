@@ -251,3 +251,12 @@ pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
     overflow-y: hidden;
     padding: 0.25rem 0;
 }
+
+/* Screenshots */
+article img {
+    display: block;
+    max-width: min(100%, 32rem);
+    margin: 1.5rem auto;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+}

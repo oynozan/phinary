@@ -1,0 +1,94 @@
+---
+title: Glossary
+description: Every term used in the Phinary docs and contracts, with a short example.
+---
+
+# Glossary
+
+## Markets
+
+| Term | Meaning |
+|---|---|
+| **Market** | One question, such as "ETH above 2,688.81 USD at 15:25 UTC?", with a YES and a NO token and two Uniswap v4 pools (YES/USDC and NO/USDC) |
+| **Strike** | The price in the question. Set to the current ETH price, rounded to cents, when the market opens |
+| **Expiry** | The time the question refers to, for example 15:25:00 UTC |
+| **Tenor** | How long a market lives: 120 s in the demo |
+| **Period, slot** | Markets open once per period (60 s). Each 60-second slot can open at most one market |
+| **Cutoff** | When trading stops: expiry minus the window minus a 2 s buffer, so 12 s before expiry in the demo |
+| **Window** | The last 10 s before expiry, over which the ETH price is averaged for the result |
+| **YES, `ETHUP`** | Pays 1 USDC if the window's average ETH price is above the strike |
+| **NO, `ETHDOWN`** | Pays 1 USDC if it is at or below the strike |
+| **Outcome token** | YES or NO. A 6-decimal ERC-20 that only the hook can mint or burn |
+| **Complete set** | One YES plus one NO. Always worth exactly 1 USDC, because exactly one of them pays |
+| **Scheduler** | `MarketScheduler`, the contract with no admin that opens one market per slot for anyone who calls it |
+| **Keeper** | Any account that opens, settles and sweeps markets. The demo runs a bot for it, but every call is open to everyone |
+
+## Prices
+
+| Term | Meaning |
+|---|---|
+| **Mid** | The fair YES price, which is the probability that YES wins. 0.62 means 62% |
+| **Ask** | What you pay per token when buying |
+| **Bid** | What you get per token when selling |
+| **Spread** | Ask minus bid. A flat part (`h0`, 2 cents a side) plus a part that grows near the strike and near expiry (`gammaS`) |
+| **Volatility, σ** | How much ETH typically moves, measured from the pool over 30 minutes. 60% a year means about 0.64% an hour |
+| **Moneyness, x** | How far ETH is from the strike, as `ln(price / strike)` |
+| **Epoch** | All trades that share one `block.timestamp`. The price is fixed per epoch except for impact |
+| **Flow** | The net number of YES-equivalent tokens bought in the current epoch. Buying NO counts as negative |
+| **Price impact, λ** | How much each token of flow moves the price: 0.001 USDC in the demo |
+| **Per-block limit** | `qEpochMax`: at most 100 tokens of net flow per epoch |
+| **Band** | Every traded price must stay between `pMin` and `1 − pMin`, so 0.02 to 0.98 |
+| **Slippage** | How far the price may move between your quote and your transaction. Use **Auto** for short markets |
+
+## Settlement
+
+| Term | Meaning |
+|---|---|
+| **Start-of-block price** | The pool's price before any swap in the current block. Nothing in the block can change it |
+| **Tick** | Uniswap's log-price unit: each tick is a 0.01% price step |
+| **Normalised tick** | A tick flipped if needed so that "ETH up" is always "tick up", whichever token the pool lists first |
+| **Tick cumulative** | The running sum of tick × seconds, as in Uniswap v3's oracle. Two readings give an average over any past interval |
+| **Settle** | Record the result after expiry. Anyone can call it |
+| **Settled** | The market has a result. Winning tokens sell for exactly 1.00 USDC |
+| **Invalid** | The result could not be measured. After one hour anyone can mark the market Invalid, and every token pays 0.50 |
+| **Grace** | The one-hour wait before a market can be made Invalid |
+| **Redeem** | Turn winning tokens into USDC, by selling them at 1.00 or by calling `redeem` |
+
+## Vault
+
+| Term | Meaning |
+|---|---|
+| **Vault** | The pool of LP USDC inside the hook that takes the other side of every trade |
+| **Idle** | Vault USDC not lent to any market. Withdrawals are paid from it |
+| **Budget** | What a new market borrows from the vault: `min(10 USDC, idle / 2)` in the demo |
+| **Bucket, reserve** | The USDC a market holds: its budget plus what buyers paid minus what sellers received |
+| **Outstanding** | YES or NO tokens held by traders (`outYes`, `outNo`) |
+| **Inventory** | Tokens traders sold back, held by the hook and reused before minting new ones |
+| **Solvency** | The rule `bucket ≥ max(outYes, outNo)`, checked after every trade |
+| **Sweep** | After settlement, return everything above what winners can claim to the vault |
+| **NAV⁺, NAV⁻** | The vault's value if every live market ends in its best or its worst case. Deposits use NAV⁺, withdrawals NAV⁻ |
+| **Shares** | Your part of the vault |
+
+## Uniswap v4
+
+| Term | Meaning |
+|---|---|
+| **Hook** | A contract that a v4 pool calls at set points, such as before a swap |
+| **PoolManager** | The single v4 contract that holds every pool and every balance |
+| **PoolKey, PoolId** | A pool's identity (two currencies, fee, tick spacing, hook) and its hash |
+| **NoOp swap** | A swap whose whole amount the hook takes over, so the pool's own curve never runs |
+| **BeforeSwapDelta** | What `beforeSwap` returns to tell the PoolManager how much the hook took and paid |
+| **ERC-6909 claims** | Balances held inside the PoolManager instead of as ERC-20s. The hook keeps all its USDC this way |
+| **Flash accounting** | Inside one `unlock`, balances only have to net to zero at the end, through `sync`, `settle`, `take`, `mint` and `burn` |
+| **UniversalRouter** | Uniswap's router. A swap is command `V4_SWAP` with `SWAP_EXACT_IN_SINGLE`, `SETTLE_ALL` and `TAKE_ALL` |
+| **V4Quoter** | Uniswap's quoter. It simulates the same swap, hook included, and returns the amounts |
+| **Permit2** | Uniswap's approval contract. One signature lets the router move a token |
+| **Exact in, exact out** | Fix what you pay, or fix what you receive |
+
+## Units
+
+| Term | Meaning |
+|---|---|
+| **6 decimals** | USDC and outcome tokens: `1000000` is 1.00 |
+| **WAD** | 18-decimal fixed point for prices: `1e18` is 1.00 USDC per token |
+| **varE36** | Variance per second at 1e36 scale. 60% a year is `1.14e28` |

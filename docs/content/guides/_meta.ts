@@ -8,11 +8,10 @@ const pageTheme = {
 
 const meta: MetaRecord = {
     "*": { theme: pageTheme },
-    index: "Introduction",
-    guides: "Guides",
-    concepts: "Concepts",
-    contracts: "Contracts",
-    integration: "Integration",
+    "uniswap-app": "Trade in the Uniswap app",
+    troubleshooting: "Troubleshooting",
+    liquidity: "Provide liquidity",
+    "run-locally": "Run the demo locally",
 };
 
 export default meta;

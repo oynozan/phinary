@@ -1,0 +1,27 @@
+---
+title: Troubleshooting
+description: What the common errors in the Uniswap app mean and how to fix them.
+---
+
+# Troubleshooting
+
+## Price outside trading band
+
+![A market at 99.5% YES: the swap is refused because the price would leave the band](/screenshots/uniswap/band-error.png)
+
+Every trade must keep the price between 0.02 and 0.98. Here ETH was 1.18 USD above the strike with 30 seconds to expiry, so YES was already at 0.974 to 1.017 and no trade fits. Use a newer market, or a smaller amount when the price is close to the edge.
+
+## Common problems
+
+| What you see | Why | What to do |
+|---|---|---|
+| **Price outside trading band** | The trade would push the price below 0.02 or above 0.98 | Trade less, or pick a newer market |
+| **Not enough liquidity**, "the market's reserve can't cover this trade" | After this trade the market's reserve could not back every winning token | Trade less |
+| **No routes found** on a normal amount | The trade hits the band, the per-block limit of 100 tokens, or the reserve | Trade 1 to 2 USDC |
+| Swap reverts with `V4TooLittleReceived` | The price moved past your slippage limit while you confirmed | Set slippage to **Auto**, trade earlier in the market, trade less |
+| A market vanished from the token picker | Trading closed and the result is not in yet | Wait about 15 seconds; it reappears under settled markets |
+| The signature is rejected, or the swap reverts with empty data | The account is a smart account or EIP-7702 delegated | Use a plain MetaMask account |
+| Unichain Sepolia is missing | Testnet mode is off; disconnecting turns it off | Turn **Testnet mode** back on in Settings |
+| The app does not load, or Uniswap's gateway refuses it | It is not on `localhost` | Open `http://localhost:3000`; the first load takes 30 to 40 s |
+| A market is past expiry but has no result | Nobody has called `settle` yet | Anyone can settle it ([keeper calls](/integration/keeper-calls#settle-and-sweep)) |
+| Selling a settled losing token fails | It is worth nothing | Only the winning token can be sold, at 1.00 |

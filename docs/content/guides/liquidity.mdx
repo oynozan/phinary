@@ -1,0 +1,83 @@
+---
+title: Provide liquidity
+description: Deposit USDC into the vault that backs every market, and withdraw it again.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# Provide liquidity
+
+Every market is backed by one USDC vault inside the hook. Each new market takes a budget from it, and after the result the market returns what is left. LPs earn when traders lose and the spread they pay adds up, and they lose when traders win. [The LP vault](/concepts/vault) explains the accounting.
+
+The dashboard's **Vault** page does this with buttons. This guide uses `cast` from Foundry so every step is visible.
+
+## Before you start
+
+```sh
+export R=https://unichain-sepolia.drpc.org
+export HOOK=0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8
+export USDC=0x31d0220469e10c4E71834a79b1f276d740d3768F
+export PK=0x...   # your wallet's private key; never commit it
+```
+
+USDC has 6 decimals, so `10000000` is 10 USDC.
+
+## Deposit and withdraw
+
+<Steps>
+
+### Check the vault
+
+```sh
+cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R
+cast call $HOOK "navPlus()(uint256)"   --rpc-url $R
+cast call $HOOK "navMinus()(uint256)"  --rpc-url $R
+```
+
+`vaultIdle` is USDC not lent to any market. `navPlus` and `navMinus` are the vault's value if every live market ends in its best or worst case. On 26 Sep 2026 they read 73.44, 93.44 and 93.44 USDC: the two NAVs were equal because nobody held tokens in the live markets.
+
+### Approve USDC
+
+```sh
+cast send $USDC "approve(address,uint256)" $HOOK 10000000 --rpc-url $R --private-key $PK
+```
+
+### Deposit
+
+```sh
+cast send $HOOK "deposit(uint256)" 10000000 --rpc-url $R --private-key $PK
+```
+
+Your shares are priced at `navPlus`, the best case, so a new deposit can never take value from existing LPs.
+
+### Check your shares
+
+```sh
+cast call $HOOK "sharesOf(address)(uint256)" <your address> --rpc-url $R
+```
+
+### Withdraw
+
+```sh
+cast send $HOOK "withdraw(uint256)" <shares> --rpc-url $R --private-key $PK
+```
+
+Shares are paid at `navMinus`, the worst case, and only from `vaultIdle`. USDC lent to a live market comes back when that market is swept, a minute or two later.
+
+</Steps>
+
+<Callout type="important">
+A withdrawal that needs more than `vaultIdle` reverts with `InsufficientIdle`. Withdraw fewer shares, or wait for the live markets to settle and be swept.
+</Callout>
+
+## Example
+
+The vault holds 80 USDC idle and one live market with a 20 USDC reserve, 8.02 YES and 11.40 NO outstanding.
+
+| | Best case: YES wins | Worst case: NO wins |
+|---|---|---|
+| Market pays winners | 8.02 | 11.40 |
+| Market returns to the vault | 11.98 | 8.60 |
+| Vault value | NAV⁺ = 91.98 | NAV⁻ = 88.60 |
+
+A deposit now is priced at 91.98 and a withdrawal at 88.60. The gap is the part of the vault still at stake. Once the market settles, both values become the same real number.

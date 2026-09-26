@@ -1,0 +1,75 @@
+---
+title: Keeper calls
+description: Open, read, settle and sweep markets with cast. Every call is permissionless.
+---
+
+# Keeper calls
+
+The keeper bot only calls public functions. Anyone can make the same calls with `cast` from Foundry, which is also the fastest way to inspect a live market.
+
+```sh
+export R=https://unichain-sepolia.drpc.org
+export HOOK=0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8
+export SCHED=0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd
+export PK=0x...   # any funded wallet; it needs no role
+```
+
+## Open a market
+
+```sh
+cast call $SCHED "canOpen()(bool)" --rpc-url $R
+cast call $SCHED "nextOpenTime()(uint256)" --rpc-url $R
+cast send $SCHED "open()" --rpc-url $R --private-key $PK
+```
+
+`open()` succeeds for the first caller in each 60-second slot and reverts `AlreadyOpened` for everyone after. `canOpen()` is false when the slot is taken, the vault is too low or the oracle cannot read a price.
+
+## Read a market
+
+```sh
+cast call $HOOK "marketCount()(uint256)" --rpc-url $R
+cast call $HOOK "quote(uint256)((bool,uint256,uint256,int256,uint256,uint256,uint256,uint256,uint256))" 245 --rpc-url $R
+```
+
+A real reading of market 245 on 26 Sep 2026:
+
+```
+(true, 95, 1267523512561158009481075873, 1858520153327, 502154097098530377, 546064386654506839, 458243807542553915, 541756192457446085, 453935613345493161)
+```
+
+| Field | Value | Meaning |
+|---|---|---|
+| `tradable` | `true` | Before the cutoff |
+| `tau` | `95` | 95 s to expiry |
+| `varE36` | `1.2675e27` | Volatility of 20% a year, the oracle's lower clamp |
+| `xWad` | `1.86e12` | ETH is 0.0002% above the strike |
+| `midYes` | `0.5022e18` | YES has a 50.2% chance |
+| `askYes`, `bidYes` | `0.5461e18`, `0.4582e18` | Buy YES at 0.546, sell at 0.458 |
+| `askNo`, `bidNo` | `0.5418e18`, `0.4539e18` | Buy NO at 0.542, sell at 0.454 |
+
+For the ledger (tokens, strike, expiry, status, reserve and outstanding tokens), use `marketInfo`:
+
+```sh
+cast call $HOOK "marketInfo(uint256)((address,address,address,int256,uint64,uint64,uint32,uint32,uint8,bool,uint256,uint256,uint256,uint256,uint256))" 245 --rpc-url $R
+```
+
+The ninth field is the status: 1 trading, 2 settled, 3 invalid. The tenth is `true` when YES won.
+
+## Settle and sweep
+
+```sh
+cast send $HOOK "settle(uint256)" 245 --rpc-url $R --private-key $PK
+cast send $HOOK "sweep(uint256)" 245 --rpc-url $R --private-key $PK
+```
+
+- `settle` works from expiry onwards and reverts `TooEarly` before.
+- `sweep` returns the surplus of a settled market to the vault. It is safe to call again later.
+- `settleInvalid(uint256)` only works one hour after expiry, and only when the oracle can no longer answer.
+
+## Read the vault
+
+```sh
+cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R
+cast call $HOOK "navPlus()(uint256)"   --rpc-url $R
+cast call $HOOK "navMinus()(uint256)"  --rpc-url $R
+```

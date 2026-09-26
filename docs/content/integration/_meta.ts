@@ -8,11 +8,10 @@ const pageTheme = {
 
 const meta: MetaRecord = {
     "*": { theme: pageTheme },
-    index: "Introduction",
-    guides: "Guides",
-    concepts: "Concepts",
-    contracts: "Contracts",
-    integration: "Integration",
+    index: "Overview",
+    "quote-and-swap": "Quote and swap",
+    events: "Events and indexing",
+    "keeper-calls": "Keeper calls",
 };
 
 export default meta;
