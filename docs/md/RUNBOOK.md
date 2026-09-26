@@ -449,11 +449,12 @@ sealed e2e passed: gaps proven, settle gated on the frontier, outcomes match the
 UNICHAIN_RPC_URL=https://mainnet.unichain.org forge test --match-path test/integration/SealedUnichainFork.t.sol
 ```
 
-`test/integration/SealedUnichainFork.t.sol` deploys `SealedPoolOracle` on the real deep ETH/USDC pool `0x3258f413c7a88cda2fa8709a589d221a80f6574f63df5a5b6774485d8acc39d9` (native ETH, fee 500, spacing 10). It checks two things:
+`test/integration/SealedUnichainFork.t.sol` deploys `SealedPoolOracle` on the real deep ETH/USDC pool `0x3258f413c7a88cda2fa8709a589d221a80f6574f63df5a5b6774485d8acc39d9` (native ETH, fee 500, spacing 10). It checks three things:
 - an idle run of three blocks seals, and `lnSpotSoBWad` matches the `slot0` that StateView reports;
-- a 25 ETH swap inside a run breaks the seal, and the frontier holds.
+- a 25 ETH swap inside a run breaks the seal, and the frontier holds;
+- with no poke after that swap, `lnSpotSoBWad` stays at the frontier's price for `maxStaleBlocks` blocks, then reverts `StaleSpot`, until a later idle run re-seals and the spot matches the pool's new `slot0`.
 
-Both tests pass live against the real pool. Without `UNICHAIN_RPC_URL` they are skipped.
+All three pass live against the real pool. Without `UNICHAIN_RPC_URL` they are skipped.
 
 ---
 
