@@ -25,8 +25,8 @@ export function MarketBrowser({
 }) {
   const [filters, setFilters] = useState<ExplorerFilters>({
     tab: "live",
-    underlying: "ETH",
-    track: "1m",
+    underlying: "all",
+    track: "all",
     search: "",
     sort: "deadline",
   });
@@ -42,12 +42,12 @@ export function MarketBrowser({
         registry,
       )
     : undefined;
-  const assets = [...new Set(tracks?.map((t) => t.asset) ?? [filters.underlying])];
+  const assets = [...new Set(tracks?.map((t) => t.asset) ?? [])];
   const durations = [
     ...new Set(
       tracks
         ? [...tracks].sort((a, b) => a.period - b.period).map((t) => t.label)
-        : [filters.track ?? "1m"],
+        : [],
     ),
   ];
   const change = (next: ExplorerFilters) => {

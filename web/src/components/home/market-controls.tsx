@@ -6,7 +6,7 @@ export const MARKET_TABS: { value: MarketTab; label: string }[] = [
   { value: "upcoming", label: "Upcoming" },
   { value: "resolved", label: "Resolved" },
 ];
-/** Asset and duration pills, one market track is shown at a time */
+/** Optional asset and duration filters: "All" by default, clicking the active pill clears it */
 export function TrackFilter({
   filters,
   onChange,
@@ -18,29 +18,37 @@ export function TrackFilter({
   assets: string[];
   durations: string[];
 }) {
+  const track = filters.track ?? "all";
   return (
     <div className="track-filter">
       <div role="group" aria-label="Asset">
-        {assets.map((a) => (
+        {["all", ...assets].map((a) => (
           <button
             type="button"
             key={a}
             aria-pressed={filters.underlying === a}
-            onClick={() => onChange({ ...filters, underlying: a })}
+            onClick={() =>
+              onChange({
+                ...filters,
+                underlying: filters.underlying === a ? "all" : a,
+              })
+            }
           >
-            {a}
+            {a === "all" ? "All" : a}
           </button>
         ))}
       </div>
       <div role="group" aria-label="Duration">
-        {durations.map((d) => (
+        {["all", ...durations].map((d) => (
           <button
             type="button"
             key={d}
-            aria-pressed={filters.track === d}
-            onClick={() => onChange({ ...filters, track: d })}
+            aria-pressed={track === d}
+            onClick={() =>
+              onChange({ ...filters, track: track === d ? "all" : d })
+            }
           >
-            {d}
+            {d === "all" ? "All" : d}
           </button>
         ))}
       </div>
