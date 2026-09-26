@@ -1,10 +1,11 @@
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
 import { unichainSepolia } from "viem/chains";
+import { createReadTransport } from "./read-transport.ts";
 import { getConnectionConfig } from "./config.ts";
 
 export function createChainClient(config = getConnectionConfig()) {
     return createPublicClient({
         chain: unichainSepolia,
-        transport: http(config.rpcUrl, { timeout: 15_000, retryCount: 1 }),
+        transport: createReadTransport(config.rpcUrl, config.chainId),
     });
 }

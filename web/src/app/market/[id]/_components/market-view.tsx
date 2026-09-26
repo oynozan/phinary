@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MarketRefreshNotice, QueryError } from "@/components/market/query-error";
+import { QueryError } from "@/components/market/query-error";
 import { emptyForm, TradeCard, type TradeForm } from "@/components/trade";
 import { BRAND_NAME } from "@/config/brand";
 import { useMarket } from "@/lib/data";
@@ -37,7 +37,7 @@ function MarketContent({ market, initialSide, stale }: { market: Market; initial
         window.history.replaceState(null, "", `?${params.toString()}`);
     }, [form.side]);
     return <>
-        <MarketHero market={market} />
+        <MarketHero market={market} stale={stale} />
         <div className="detail-grid">
             <div className="detail-overview-slot"><Overview market={market} /></div>
             <div className="detail-chart-slot"><ChartPanel market={market} /></div>
@@ -52,6 +52,6 @@ function MarketContent({ market, initialSide, stale }: { market: Market; initial
 export function MarketView({ id, initialSide }: { id: number; initialSide: Side }) {
     const market = useMarket(id);
     return <div className="market-detail-page"><div className="detail-container">
-        {market.error && market.data === undefined ? <section className="detail-panel detail-error"><Link href="/">Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href="/">Back to Markets</Link></section> : <><div>{market.error && <MarketRefreshNotice id={id} />}</div><MarketContent key={id} market={market.data} initialSide={initialSide} stale={!!market.error} /></>}
+        {market.error && market.data === undefined ? <section className="detail-panel detail-error"><Link href="/">Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href="/">Back to Markets</Link></section> : <MarketContent key={id} market={market.data} initialSide={initialSide} stale={!!market.error} />}
     </div></div>;
 }

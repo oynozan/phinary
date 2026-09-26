@@ -3,6 +3,7 @@ import { createChainClient } from "./client.ts";
 import { getConnectionConfig } from "./config.ts";
 import { toMarket } from "./market-adapter.ts";
 import type { Market } from "../types.ts";
+import { MarketReadError, readStage, reportMarketFailure, summarizeMarketFailure } from "./market-diagnostics.ts";
 import { underlyingOracleAbi } from "./read-abis.ts";
 
 export const MARKET_LIMIT = 30;
@@ -15,40 +16,41 @@ export interface MarketSnapshot {
 }
 
 /** All values in a snapshot are pinned to one block. Errors never become an empty market list. */
-export async function readMarkets(id?: number, client = createChainClient(), config = getConnectionConfig()): Promise<MarketSnapshot> {
-    const [chainId, block] = await Promise.all([client.getChainId(), client.getBlock()]);
+async function readMarketSnapshot(id?: number, client = createChainClient(), config = getConnectionConfig()): Promise<MarketSnapshot> {
+    const [chainId, block] = await Promise.all([readStage("chain", () => client.getChainId()), readStage("head", () => client.getBlock())]);
     if (chainId !== config.chainId) throw new Error("Wrong network returned by RPC");
-    const count = await client.readContract({
+    const count = await readStage("count", () => client.readContract({
         address: config.predictionHook, abi: predictionHookAbi, functionName: "marketCount", blockNumber: block.number,
-    });
+    }));
     if (count > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Market count exceeds display range");
     const total = Number(count);
     const ids = id === undefined
         ? Array.from({ length: Math.min(total, MARKET_LIMIT) }, (_, i) => total - i)
         : Number.isSafeInteger(id) && id > 0 && id <= total ? [id] : [];
     const [results, oracle] = await Promise.all([
-        ids.length ? client.multicall({
+        ids.length ? readStage("markets", () => client.multicall({
             contracts: ids.flatMap((marketId) => [
                 { address: config.predictionHook, abi: predictionHookAbi, functionName: "marketInfo", args: [BigInt(marketId)] } as const,
                 { address: config.predictionHook, abi: predictionHookAbi, functionName: "marketParams", args: [BigInt(marketId)] } as const,
                 { address: config.predictionHook, abi: predictionHookAbi, functionName: "quote", args: [BigInt(marketId)] } as const,
             ]),
             blockNumber: block.number, multicallAddress: config.multicall3, allowFailure: true,
-        }) : [],
-        client.multicall({
+        })) : [],
+        readStage("oracle", () => client.multicall({
             contracts: [
                 { address: config.underlyingOracle, abi: underlyingOracleAbi, functionName: "lnSpotSoBWad" },
                 { address: config.underlyingOracle, abi: underlyingOracleAbi, functionName: "varianceE36" },
             ],
             blockNumber: block.number, multicallAddress: config.multicall3, allowFailure: true,
-        }),
+        })),
     ]);
     const timestamp = Number(block.timestamp);
     const markets = ids.map((marketId, index) => {
         const info = results[index * 3];
         const params = results[index * 3 + 1];
         const quote = results[index * 3 + 2];
-        if (info?.status !== "success" || params?.status !== "success") throw new Error(`Market ${marketId} could not be read`);
+        if (info?.status !== "success") throw new MarketReadError("market-info", info?.error);
+        if (params?.status !== "success") throw new MarketReadError("market-params", params?.error);
         return toMarket(marketId, info.result as ChainMarketInfo,
             (params.result as { nSamples: number }).nSamples,
             quote?.status === "success" ? quote.result as HookQuote : undefined, timestamp);
@@ -61,4 +63,10 @@ export async function readMarkets(id?: number, client = createChainClient(), con
             warm: oracle[1].result[1],
         } : undefined,
     };
+}
+
+export async function readMarkets(id?: number, client = createChainClient(), config = getConnectionConfig()): Promise<MarketSnapshot> {
+    const started = performance.now();
+    try { return await readMarketSnapshot(id, client, config); }
+    catch (error) { reportMarketFailure(summarizeMarketFailure(error, id, performance.now() - started)); throw error; }
 }

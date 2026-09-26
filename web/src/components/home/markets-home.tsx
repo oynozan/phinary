@@ -64,12 +64,11 @@ export function MarketsHome() {
             <h2>Markets</h2>
             <p>Explore onchain markets.</p>
           </div>
-          <span className="network-note">
+          <div><span className="network-note">
             <i />
             Unichain Sepolia · Latest {MARKET_LIMIT} markets
-          </span>
+          </span><MarketRefreshNotice stale={!!error && !!markets} /></div>
         </div>
-        {error && markets && <MarketRefreshNotice />}
         <MarketBrowser
           markets={markets}
           registry={registry}
