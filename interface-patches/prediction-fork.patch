@@ -1,9 +1,9 @@
 diff --git a/PREDICTION_README.md b/PREDICTION_README.md
 new file mode 100644
-index 0000000..6c1b52a
+index 0000000..76b346b
 --- /dev/null
 +++ b/PREDICTION_README.md
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,483 @@
 +# PredictionHook markets in the Uniswap web app (local fork)
 +
 +This is a shallow clone of `Uniswap/interface` at commit `9023421` (2026-09-23) with the changes below. It lets the stock swap
@@ -92,6 +92,8 @@ index 0000000..6c1b52a
 +
 +  - It reads `deployments/unichain-sepolia.json`: flat or `{contracts: {...}}` layout, keys such as `predictionHook` or
 +    `PredictionHook`, and optionally `usdc` and `universalRouter`. Placeholders are tolerated.
++  - The fork also reads `marketGatekeeper`, `marketSchedulers` and `underlyings` from the same file (section 10). A file
++    from before the gatekeeper, with a single `marketScheduler`, still works.
 +  - It rewrites `deployment.generated.ts` and re-vendors the SDK.
 +  - Vite hot-reloads the change.
 +- **Without a rebuild**, run `localStorage.setItem('prediction.hook', '0x…')` in the browser console and reload.
@@ -109,9 +111,11 @@ index 0000000..6c1b52a
 +   testnet mode off.
 +3. Pick the market tokens in one of two ways:
 +   - Open `/swap?chain=unichain_sepolia&inputCurrency=0x31d0220469e10c4E71834a79b1f276d740d3768F&outputCurrency=<YES>`.
-+   - Or open the token selector. Its **Prediction markets** section lists YES/NO of the 8 newest markets that are open
-+     for trading (before their cutoff); a second section lists the 4 newest settled markets, which can only be sold to
-+     redeem. Markets past their cutoff but not yet settled are hidden, because they accept no trades.
++   - Or open the token selector. It lists USDC once, then one section per market track ("ETH 1-minute",
++     "ETH 15-minute", "SOL 1-minute", "SOL 15-minute") with YES/NO of that track's markets that are open for trading
++     (before their cutoff), then one section with the 2 newest settled markets of every track, which can only be sold
++     to redeem. Markets past their cutoff but not yet settled are hidden, because they accept no trades. Outcome
++     symbols are shown in full ("ETH15MDOWN"), not cut to 6 characters.
 +
 +   YES, NO and USDC resolve locally, so there are no spam warnings.
 +4. The first buy takes three steps: **Approve USDC** (Permit2), **Sign** (PermitSingle for UR 2.0, 30 days), then **Swap**.
@@ -139,7 +143,7 @@ index 0000000..6c1b52a
 +| `packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts` (new) | `FetchError` mapping (404 `ResourceNotFound` / `QuoteAmountTooLowError`, never 412-429), `permitData` <-> `PermitSingle` | 7 |
 +| `packages/uniswap/src/features/predictionMarkets/registry.ts` (new) | Token registry polled from the hook (`marketCount`/`marketInfo`/`poolKeys`, newest 40 markets, every 5 s, only while a 1301 view is mounted); older tokens resolved on demand via `OutcomeToken.hook()`; `usePredictionRegistry`; 1 s quote interval helper | 3, 4 |
 +| `packages/uniswap/src/features/predictionMarkets/rpc.ts` (new) | Cookieless viem client for 1301 | 6 |
-+| `packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts` (new) | Options for the "Prediction markets" (open) and "Settled prediction markets" selector sections | 9 |
++| `packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts` (new) | Options for the per-track open sections and the "Settled prediction markets" selector section (section 10) | 9 |
 +| `packages/uniswap/src/features/predictionMarkets/sdk/` (new, vendored) | Copy of `../packages/swap-sdk/src` (quote, encode, permit, errors, markets, ABIs); regenerate with `vendor-interface.mjs`, do not edit | 2 |
 +| `packages/uniswap/src/features/predictionMarkets/deployment.generated.ts` (new, generated) | Deployment JSON | 1 |
 +| `packages/uniswap/src/features/predictionMarkets/*.test.ts` (new) | Unit tests (section 6) | |
@@ -151,7 +155,7 @@ index 0000000..6c1b52a
 +| `apps/web/src/app/WebUniswapContext.tsx` | `getCanBatchTransactions` is false on 1301 (keeps `/check_approval` and `/swap`) | 5 |
 +| `packages/uniswap/src/features/providers/resolveRpcConfig.web.ts` | UniRPC off for 1301 | 6 |
 +| `packages/uniswap/src/features/chains/evm/info/unichain.ts` | 1301 Public and Interface RPC -> drpc (Default already was) | 6 |
-+| `packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx` | "Prediction markets" and "Settled prediction markets" sections first in testnet mode | 9 |
++| `packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx` | One prediction section per market track, then "Settled prediction markets", first in testnet mode | 9 |
 +| `packages/uniswap/tsconfig.prediction.json`, `apps/web/tsconfig.prediction.json` (new) | Non-composite typecheck configs (section 6) | |
 +| `package.json`, `nx.json`, `tsconfig.json`, `bun.lock`, `apps/web/.env.override` | Local-run patches (section 1) | |
 +
@@ -419,6 +423,70 @@ index 0000000..6c1b52a
 +  src/features/transactions/swap/review src/features/transactions/swap/services)
 +(cd apps/web && ../../node_modules/.bin/vitest run src/hooks/useTokenPriceChartPanel.test.tsx src/hooks/useTokenPriceChartData.test.ts src/pages/Swap)
 +```
++
++## 10. Market tracks (MarketGatekeeper)
++
++The hook's owner is a `MarketGatekeeper` that forwards `createMarket` from a fixed set of `MarketScheduler`s, one per
++track (asset, cadence and market length). The planned tracks are ETH1M, ETH15M, SOL1M and SOL15M, each with its own
++oracle. The fork reads them like this:
++
++- **Deployment.** `getPredictionDeployment()` adds `marketGatekeeper`, `marketSchedulers` and `underlyings`
++  (`{symbol, token, oracle}`) to the vendored SDK's fields (`parseTracksDeployment` in `config.ts`). Without
++  `underlyings` there is one ETH entry built from `underlyingOracle` and `demoWeth`. Without `marketSchedulers` the old
++  single `marketScheduler` is the only track. A `prediction.hook` override other than the file's hook has no tracks.
++- **Tracks.** Read once per page from `gatekeeper.schedulers()` (the file's list when there is no gatekeeper), then
++  `config()` and `oracle()` per scheduler. The asset is the `underlyings` symbol behind the track's oracle, else the
++  ticker without its period suffix. The label is "ETH 1-minute" (market length from `tenor`). Tracks are ordered by
++  asset in first-seen order, then by period.
++- **Classification.** A market's track is `gatekeeper.schedulerOf(id)`, read once per id in the registry poll's
++  extra multicall. Without a gatekeeper, or for an id it never created, the track whose ticker gives the outcome
++  symbol exactly (`ticker + "UP"` or `ticker + "DOWN"`); never a prefix, since "ETH" is a prefix of "ETH15M".
++- **Recent markets per track.** Each registry poll also reads `scheduler.marketOfSlot(slot)` for the current slot and
++  the 2 before it on every track (the same multicall). Ids outside the newest-40 window are read with
++  `readPredictionMarketsByIds` until they settle, so the 15-minute markets are not pushed out by the 1-minute ones.
++- **Picker.** `selectPredictionMarketsForPicker` groups open markets by track (up to 4 per track) and takes the 2 newest
++  settled markets of every track, newest expiry first. The clock ticks every second while a track of 2 minutes or less
++  exists. Markets no track claims go to "Other prediction markets"; with no tracks at all the picker falls back to one
++  "Prediction markets" section, as before.
++- **Full symbols.** `getCurrencySymbolDisplayText` (`symbolDisplay.ts`) returns the whole symbol of a registered
++  outcome token and the stock 6-character cut for anything else. Used by the token selector row
++  (`BaseTokenOptionItem`) and the swap form token button (`SelectTokenButton`). Other places (review screen, balances,
++  activity) still cut, so "ETH15MDOWN" reads "ETH15…" there.
++- **Market panel.** The question names the market's asset ("SOL above $151.20 at 14:15:00 UTC?") and the facts line
++  starts with the track's length ("15-minute market"). The spot price comes from the market's own oracle
++  (`marketInfo.oracle`): the registry's copy when the market is registered, else learned on the first read and
++  remembered per market. There is no deployment-wide ETH oracle fallback any more.
++
++| File | Change |
++|---|---|
++| `packages/uniswap/src/features/predictionMarkets/config.ts` | `PredictionTracksDeployment`, `parseTracksDeployment`, `PREDICTION_TRACK_SLOTS` |
++| `packages/uniswap/src/features/predictionMarkets/tracks.ts` (new) | Gatekeeper and scheduler ABIs, `readPredictionTracks`, labels, ordering, `classifyBySymbol`, `predictionMarketAsset`, `readPredictionMarketsByIds` |
++| `packages/uniswap/src/features/predictionMarkets/registry.ts` | Tracks read once, `schedulerOf` and `marketOfSlot` in one extra multicall per poll, `getPredictionTracks`, `getPredictionMarketTrack`, `getPredictionTokenTrack` |
++| `packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts` | Per-track groups, USDC once, 1 s clock for short tracks, options rebuilt only when the listed markets change |
++| `packages/uniswap/src/features/predictionMarkets/symbolDisplay.ts` (new) | `getCurrencySymbolDisplayText` |
++| `packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx` | One section per track, each with its own `sectionId` |
++| `packages/uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem.tsx`, `packages/uniswap/src/components/CurrencyInputPanel/SelectTokenButton.tsx` | Full outcome symbols |
++| `packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts`, `ui/PredictionMarketPanel.tsx`, `ui/predictionMarketLive.ts`, `ui/predictionErrors.ts` | Asset and track in the panel, per-market oracle, "The price oracle has no data" |
++| `packages/uniswap/src/features/predictionMarkets/tracks.test.ts`, `symbolDisplay.test.tsx` (new) and the updated panel, UI, trading API and swap list tests | Tests below |
++
++```sh
++# Tracks from the gatekeeper and their order, ETH1M vs ETH15M vs SOL1M by schedulerOf (even against the symbol),
++# 15-minute markets outside the newest-40 window, re-reads until settled, per-track picker groups and sections,
++# exact-symbol fallback, the pre-gatekeeper deployment, full symbols in the selector row and the token button,
++# the panel's asset, track and oracle
++(cd packages/uniswap && ../../node_modules/.bin/vitest run src/features/predictionMarkets src/components/TokenSelector)
++```
++
++That run passes every new and prediction test. Its only failures are pre-existing ones that fail the same way without
++these changes: the registry test "does nothing until a hook address is configured" (section 8), 3 Stocks tests in
++`TokenSelectorSwapList.test.tsx` and the `hooks.test.ts` tests, which expect testnet mode off (this fork turns it on
++by default) or time out at 1 s and flake between runs. Typecheck still reports the 64 (uniswap) and 50 (web)
++pre-existing errors, and oxlint and oxfmt are clean on every touched file (pass the files by name: this checkout sits
++inside the main repo, whose `.gitignore` lists `interface/`, so directory arguments match nothing).
++
++After the gatekeeper deployment, re-vendor with `node packages/swap-sdk/scripts/vendor-interface.mjs` from the main repo
++root so `deployment.generated.ts` carries `marketGatekeeper`, `marketSchedulers` and `underlyings`. Until then the fork
++runs the live single-scheduler deployment as one "ETH 2-minute" track, classified by symbol.
 diff --git a/apps/web/src/app/WebUniswapContext.tsx b/apps/web/src/app/WebUniswapContext.tsx
 index 6f8695c..018d80c 100644
 --- a/apps/web/src/app/WebUniswapContext.tsx
@@ -9065,8 +9133,40 @@ index 138037a..d6236a1 100644
    logBoundedOnce(`${what}:${key}`, message)
  }
  
+diff --git a/packages/uniswap/src/components/CurrencyInputPanel/SelectTokenButton.tsx b/packages/uniswap/src/components/CurrencyInputPanel/SelectTokenButton.tsx
+index 9f3b79d..34db499 100644
+--- a/packages/uniswap/src/components/CurrencyInputPanel/SelectTokenButton.tsx
++++ b/packages/uniswap/src/components/CurrencyInputPanel/SelectTokenButton.tsx
+@@ -8,8 +8,8 @@ import { RotatableChevron } from 'ui/src/components/icons/RotatableChevron'
+ import { iconSizes, spacing, validColor } from 'ui/src/theme'
+ import { CurrencyLogo } from 'uniswap/src/components/CurrencyLogo/CurrencyLogo'
+ import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
++import { getCurrencySymbolDisplayText } from 'uniswap/src/features/predictionMarkets/symbolDisplay'
+ import { TestIDType } from 'uniswap/src/test/fixtures/testIDs'
+-import { getSymbolDisplayText } from 'uniswap/src/utils/currency'
+ 
+ interface SelectTokenButtonProps {
+   onPress?: () => void
+@@ -42,7 +42,7 @@ export const SelectTokenButton = memo(function SelectTokenButtonInner({
+       <Flex centered row gap="$spacing4" p="$spacing4" pr={isWebPlatform ? undefined : '$spacing12'}>
+         <CurrencyLogo currencyInfo={selectedCurrencyInfo} size={iconSizes.icon28} />
+         <Text color="$neutral1" pl="$spacing4" testID={`${testID}-label`} variant="buttonLabel1">
+-          {getSymbolDisplayText(selectedCurrencyInfo.currency.symbol)}
++          {getCurrencySymbolDisplayText(selectedCurrencyInfo.currency)}
+         </Text>
+       </Flex>
+     )
+@@ -74,7 +74,7 @@ export const SelectTokenButton = memo(function SelectTokenButtonInner({
+         )}
+         <Text color={textColor} testID={`${testID}-label`} variant="buttonLabel2">
+           {selectedCurrencyInfo
+-            ? getSymbolDisplayText(selectedCurrencyInfo.currency.symbol)
++            ? getCurrencySymbolDisplayText(selectedCurrencyInfo.currency)
+             : t('tokens.selector.button.choose')}
+         </Text>
+         {!isCompact && (
 diff --git a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
-index 3f9bd69..ad0dc2d 100644
+index 3f9bd69..7374c25 100644
 --- a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
 +++ b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.test.tsx
 @@ -17,12 +17,14 @@ const {
@@ -9084,13 +9184,14 @@ index 3f9bd69..ad0dc2d 100644
  }))
  
  vi.mock('@universe/gating', async (importOriginal) => ({
-@@ -42,6 +44,15 @@ vi.mock('uniswap/src/components/TokenSelector/hooks/useCommonTokensOptionsWithFa
+@@ -42,6 +44,16 @@ vi.mock('uniswap/src/components/TokenSelector/hooks/useCommonTokensOptionsWithFa
  vi.mock('uniswap/src/features/bridging/hooks/tokens', () => ({
    useBridgingTokensOptions: mockUseBridgingTokensOptions,
  }))
 +// Falls through to the real hook unless a test sets a return value.
 +vi.mock('uniswap/src/features/predictionMarkets/usePredictionTokenOptions', async (importOriginal) => {
-+  const actual = await importOriginal<typeof import('uniswap/src/features/predictionMarkets/usePredictionTokenOptions')>()
++  const actual =
++    await importOriginal<typeof import('uniswap/src/features/predictionMarkets/usePredictionTokenOptions')>()
 +  return {
 +    ...actual,
 +    usePredictionTokenOptions: (...args: Parameters<typeof actual.usePredictionTokenOptions>) =>
@@ -9100,7 +9201,7 @@ index 3f9bd69..ad0dc2d 100644
  
  const stock: RwaTokenOption = {
    type: OnchainItemListOptionType.Rwa,
-@@ -192,3 +203,44 @@ describe('useTokenSectionsForSwap Stocks section', () => {
+@@ -192,3 +204,114 @@ describe('useTokenSectionsForSwap Stocks section', () => {
      )
    })
  })
@@ -9132,7 +9233,10 @@ index 3f9bd69..ad0dc2d 100644
 +  })
 +
 +  it('does not report a failed backend list when the prediction markets loaded', () => {
-+    mockUsePredictionTokenOptions.mockReturnValue({ open: [tokenOption], settled: undefined })
++    mockUsePredictionTokenOptions.mockReturnValue({
++      open: [{ id: 'usdc', name: 'Prediction markets', options: [tokenOption] }],
++      settled: undefined,
++    })
 +    const { data, error } = renderSwapSections(TokenSelectorVariation.SwapOutput)
 +    expect(data?.length).toBeGreaterThan(0)
 +    expect(error).toBeUndefined()
@@ -9145,8 +9249,75 @@ index 3f9bd69..ad0dc2d 100644
 +    expect(error).toBe(backendError)
 +  })
 +})
++
++describe('useTokenSectionsForSwap prediction market sections', () => {
++  const option = (currencyId: string): TokenOption =>
++    ({ type: OnchainItemListOptionType.Token, currencyInfo: { currencyId } }) as TokenOption
++
++  beforeEach(() => {
++    mockUseRwaTokenOptions.mockReturnValue([])
++    mockUseFeatureFlag.mockReturnValue(false)
++    mockUseIsFeatureGated.mockReturnValue(false)
++    mockUseCommonTokensOptionsWithFallback.mockReturnValue({
++      data: undefined,
++      error: undefined,
++      refetch: vi.fn(),
++      loading: false,
++    })
++    mockUseBridgingTokensOptions.mockReturnValue({
++      data: undefined,
++      error: undefined,
++      refetch: vi.fn(),
++      loading: false,
++      shouldNest: false,
++    })
++  })
++
++  afterEach(() => {
++    mockUsePredictionTokenOptions.mockReset()
++  })
++
++  it('shows one section per track in the given order, USDC once, then the settled markets', () => {
++    mockUsePredictionTokenOptions.mockReturnValue({
++      open: [
++        { id: 'usdc', name: 'Prediction markets', options: [option('usdc')] },
++        { id: '0x01', name: 'ETH 1-minute', options: [option('eth1m-up'), option('eth1m-down')] },
++        { id: '0x02', name: 'ETH 15-minute', options: [option('eth15m-up'), option('eth15m-down')] },
++        { id: '0x03', name: 'SOL 1-minute', options: [option('sol1m-up'), option('sol1m-down')] },
++        { id: '0x04', name: 'SOL 15-minute', options: [option('sol15m-up'), option('sol15m-down')] },
++      ],
++      settled: [option('old-up'), option('old-down')],
++    })
++    const { data } = renderSwapSections(TokenSelectorVariation.SwapOutput)
++    const prediction = data?.filter((section) => section.sectionId?.startsWith('prediction')) ?? []
++    expect(prediction.map((section) => section.name)).toEqual([
++      'Prediction markets',
++      'ETH 1-minute',
++      'ETH 15-minute',
++      'SOL 1-minute',
++      'SOL 15-minute',
++      'Settled prediction markets (sell to redeem)',
++    ])
++    expect(data?.slice(0, prediction.length)).toEqual(prediction)
++    expect(new Set(prediction.map((section) => section.sectionId)).size).toBe(prediction.length)
++    const ids = prediction.flatMap((section) =>
++      section.data.map((o) => (o as TokenOption).currencyInfo.currencyId as string),
++    )
++    expect(ids.filter((id) => id === 'usdc')).toHaveLength(1)
++  })
++
++  it('leaves the settled section out when no market has settled', () => {
++    mockUsePredictionTokenOptions.mockReturnValue({
++      open: [{ id: '0x01', name: 'ETH 1-minute', options: [option('eth1m-up')] }],
++      settled: undefined,
++    })
++    const { data } = renderSwapSections(TokenSelectorVariation.SwapOutput)
++    expect(data?.map((section) => section.name)).not.toContain('Settled prediction markets (sell to redeem)')
++    expect(data?.[0]?.name).toBe('ETH 1-minute')
++  })
++})
 diff --git a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
-index 9fdfacb..1c79998 100644
+index 9fdfacb..404ed8c 100644
 --- a/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
 +++ b/packages/uniswap/src/components/TokenSelector/lists/TokenSelectorSwapList.tsx
 @@ -25,6 +25,8 @@ import {
@@ -9158,33 +9329,37 @@ index 9fdfacb..1c79998 100644
  import { ClearRecentSearchesButton } from 'uniswap/src/features/search/ClearRecentSearchesButton'
  
  // Matches the default 40px section header plus the single-line outage banner and spacing on web.
-@@ -105,6 +107,25 @@ export function useTokenSectionsForSwap({
+@@ -105,6 +107,29 @@ export function useTokenSectionsForSwap({
  
    // we draw the Suggested pills as a single item of a section list, so `data` is TokenOption[][]
  
 +  const predictionTokenOptions = usePredictionTokenOptions(
-+    chainFilter ?? (isPredictionChain(oppositeSelectedToken?.chainId) ? oppositeSelectedToken?.chainId : PREDICTION_CHAIN_ID),
++    chainFilter ??
++      (isPredictionChain(oppositeSelectedToken?.chainId) ? oppositeSelectedToken?.chainId : PREDICTION_CHAIN_ID),
 +  )
-+  const predictionOpenSection = useOnchainItemListSection({
-+    sectionKey: OnchainItemSectionName.Category,
-+    options: predictionTokenOptions.open,
-+    name: 'Prediction markets',
-+  })
-+  const predictionSettledSection = useOnchainItemListSection({
-+    sectionKey: OnchainItemSectionName.Category,
-+    options: predictionTokenOptions.settled,
-+    name: 'Settled prediction markets (sell to redeem)',
-+  })
++  // One section per market track ("ETH 1-minute"), each with its own row-key namespace, then the settled markets
 +  const predictionSection = useMemo(() => {
-+    const settled = predictionSettledSection?.map((section) => ({ ...section, sectionId: 'predictionSettled' }))
-+    const all = [...(predictionOpenSection ?? []), ...(settled ?? [])]
++    const all: OnchainItemSection<TokenSelectorListOption>[] = (predictionTokenOptions.open ?? []).map((section) => ({
++      sectionKey: OnchainItemSectionName.Category,
++      sectionId: `prediction-${section.id}`,
++      name: section.name,
++      data: section.options,
++    }))
++    if (predictionTokenOptions.settled?.length) {
++      all.push({
++        sectionKey: OnchainItemSectionName.Category,
++        sectionId: 'predictionSettled',
++        name: 'Settled prediction markets (sell to redeem)',
++        data: predictionTokenOptions.settled,
++      })
++    }
 +    return all.length ? all : undefined
-+  }, [predictionOpenSection, predictionSettledSection])
++  }, [predictionTokenOptions])
 +
    const suggestedSectionOptions = useMemo(() => [commonTokenOptions ?? []], [commonTokenOptions])
    const suggestedSection = useOnchainItemListSection({
      sectionKey: OnchainItemSectionName.SuggestedTokens,
-@@ -182,7 +203,7 @@ export function useTokenSectionsForSwap({
+@@ -182,7 +207,7 @@ export function useTokenSectionsForSwap({
    // the only case `SelectorBaseList` should render its skeleton for.
    const sections = useMemo(() => {
      if (isTestnetModeEnabled) {
@@ -9193,7 +9368,7 @@ index 9fdfacb..1c79998 100644
        return builtForTestnet.length ? builtForTestnet : undefined
      }
  
-@@ -197,6 +218,7 @@ export function useTokenSectionsForSwap({
+@@ -197,6 +222,7 @@ export function useTokenSectionsForSwap({
      return built.length ? built : undefined
    }, [
      portfolioSection,
@@ -9201,7 +9376,7 @@ index 9fdfacb..1c79998 100644
      trendingSection,
      suggestedSection,
      stocksSection,
-@@ -210,7 +232,8 @@ export function useTokenSectionsForSwap({
+@@ -210,7 +236,8 @@ export function useTokenSectionsForSwap({
      () => ({
        data: sections,
        loading,
@@ -9211,6 +9386,29 @@ index 9fdfacb..1c79998 100644
        refetch,
      }),
      [error, loading, refetch, sections],
+diff --git a/packages/uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem.tsx b/packages/uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem.tsx
+index 7fe1df7..d951974 100644
+--- a/packages/uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem.tsx
++++ b/packages/uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem.tsx
+@@ -16,8 +16,8 @@ import { TokenOptionWarningBadge } from 'uniswap/src/components/lists/items/toke
+ import { WarningSeverity } from 'uniswap/src/components/modals/WarningModal/types'
+ import { getWarningIconColors } from 'uniswap/src/components/warnings/utils'
+ import WarningIcon from 'uniswap/src/components/warnings/WarningIcon'
++import { getCurrencySymbolDisplayText } from 'uniswap/src/features/predictionMarkets/symbolDisplay'
+ import { getTokenWarningSeverity } from 'uniswap/src/features/tokens/warnings/safetyUtils'
+-import { getSymbolDisplayText } from 'uniswap/src/utils/currency'
+ import { shortenAddress } from 'utilities/src/addresses'
+ import { dismissNativeKeyboard } from 'utilities/src/device/keyboard/dismissNativeKeyboard'
+ 
+@@ -80,7 +80,7 @@ export const BaseTokenOptionItem = memo(function BaseTokenOptionItemInner(
+       subtitle={
+         <Flex row alignItems="center" gap="$spacing8">
+           <Text color="$neutral2" numberOfLines={1} variant="body3">
+-            {getSymbolDisplayText(currency.symbol)}
++            {getCurrencySymbolDisplayText(currency)}
+           </Text>
+           {volumeLabel ? (
+             <Text color="$neutral3" numberOfLines={1} variant="body3">
 diff --git a/packages/uniswap/src/constants/routing.ts b/packages/uniswap/src/constants/routing.ts
 index c299259..87f162c 100644
 --- a/packages/uniswap/src/constants/routing.ts
@@ -10456,16 +10654,17 @@ index 0000000..a82d404
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/config.ts b/packages/uniswap/src/features/predictionMarkets/config.ts
 new file mode 100644
-index 0000000..17d48e7
+index 0000000..260e488
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/config.ts
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,131 @@
 +import { UniverseChainId } from '@universe/chains'
 +import { PREDICTION_DEPLOYMENT_JSON } from 'uniswap/src/features/predictionMarkets/deployment.generated'
 +import {
 +  isPlaceholderAddress,
 +  parseDeployment,
 +  type PredictionDeployment,
++  sameAddress,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
 +import { type Address, getAddress } from 'viem'
 +
@@ -10479,6 +10678,11 @@ index 0000000..17d48e7
 +export const PREDICTION_REGISTRY_POLL_MS = 5_000
 +/** Newest markets read on every registry poll; older tokens are resolved on demand via `OutcomeToken.hook()`. */
 +export const PREDICTION_REGISTRY_WINDOW = 40
++/**
++ * Slots read per track on every registry poll (`scheduler.marketOfSlot(slot)` for the current slot and the ones before
++ * it), so a slow track's markets stay listed however many faster markets opened since.
++ */
++export const PREDICTION_TRACK_SLOTS = 3
 +/**
 + * Auto slippage covers this many seconds of price movement between the quote and inclusion (wallet confirmation plus a
 + * block). It is sized per trade from the market's time to expiry, see `autoSlippageBps`.
@@ -10513,13 +10717,73 @@ index 0000000..17d48e7
 +  }
 +}
 +
-+let cached: PredictionDeployment | undefined
++/** One price source from the deployment's `underlyings` list */
++export interface PredictionUnderlying {
++  /** "ETH", "SOL" */
++  symbol: string
++  token?: Address
++  oracle?: Address
++}
 +
-+/** Contracts from `deployment.generated.ts` (Uniswap defaults for anything missing), plus the optional hook override. */
-+export function getPredictionDeployment(): PredictionDeployment {
-+  cached ??= parseDeployment(PREDICTION_DEPLOYMENT_JSON)
++/**
++ * Market tracks. A deployment from before the MarketGatekeeper has neither key but a single `marketScheduler`, which
++ * becomes the only entry of `marketSchedulers`.
++ */
++export interface PredictionTracksDeployment {
++  /** The PredictionHook owner that forwards `createMarket` from the track schedulers */
++  marketGatekeeper?: Address
++  /** One MarketScheduler per track, in the gatekeeper's order */
++  marketSchedulers: Address[]
++  /** Without an `underlyings` key, one ETH entry built from the flat `underlyingOracle` and `demoWeth` keys */
++  underlyings: PredictionUnderlying[]
++}
++
++export type PredictionForkDeployment = PredictionDeployment & PredictionTracksDeployment
++
++function jsonAddress(value: unknown): Address | undefined {
++  return typeof value === 'string' && !isPlaceholderAddress(value) ? getAddress(value) : undefined
++}
++
++function jsonAddressList(value: unknown): Address[] {
++  return Array.isArray(value) ? value.map(jsonAddress).filter((a): a is Address => !!a) : []
++}
++
++export function parseTracksDeployment(json: Record<string, unknown>): PredictionTracksDeployment {
++  const schedulers = jsonAddressList(json['marketSchedulers'])
++  const legacyScheduler = jsonAddress(json['marketScheduler'])
++  const underlyings = Array.isArray(json['underlyings'])
++    ? json['underlyings'].flatMap((u: unknown): PredictionUnderlying[] => {
++        const entry = u && typeof u === 'object' ? (u as Record<string, unknown>) : {}
++        const symbol = entry['symbol']
++        return typeof symbol === 'string' && symbol
++          ? [{ symbol, token: jsonAddress(entry['token']), oracle: jsonAddress(entry['oracle']) }]
++          : []
++      })
++    : undefined
++  const ethOracle = jsonAddress(json['underlyingOracle'])
++  return {
++    marketGatekeeper: jsonAddress(json['marketGatekeeper']),
++    marketSchedulers: schedulers.length ? schedulers : legacyScheduler ? [legacyScheduler] : [],
++    underlyings:
++      underlyings ?? (ethOracle ? [{ symbol: 'ETH', token: jsonAddress(json['demoWeth']), oracle: ethOracle }] : []),
++  }
++}
++
++let cached: PredictionForkDeployment | undefined
++
++/**
++ * Contracts from `deployment.generated.ts` (Uniswap defaults for anything missing), plus the optional hook override.
++ * An overriding hook other than the deployment's has no known tracks.
++ */
++export function getPredictionDeployment(): PredictionForkDeployment {
++  cached ??= { ...parseDeployment(PREDICTION_DEPLOYMENT_JSON), ...parseTracksDeployment(PREDICTION_DEPLOYMENT_JSON) }
 +  const hook = readHookOverride()
-+  return hook ? { ...cached, predictionHook: hook } : cached
++  if (!hook) {
++    return cached
++  }
++  return sameAddress(hook, cached.predictionHook)
++    ? { ...cached, predictionHook: hook }
++    : { ...cached, predictionHook: hook, marketGatekeeper: undefined, marketSchedulers: [] }
 +}
 +
 +export function isPredictionChain(chainId: number | undefined): boolean {
@@ -10527,25 +10791,32 @@ index 0000000..17d48e7
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts b/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts
 new file mode 100644
-index 0000000..acf118f
+index 0000000..19c904e
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/deployment.generated.ts
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,81 @@
 +// Generated by packages/swap-sdk/scripts/vendor-interface.mjs from deployments/unichain-sepolia.json.
 +export const PREDICTION_DEPLOYMENT_JSON: Record<string, unknown> = {
 +  chainId: 1301,
 +  demoLiquidity: '1000000000000000000',
 +  demoUsdc: '0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D',
 +  demoWeth: '0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5',
-+  deployBlock: 63569309,
-+  deployedAt: 1790421737,
++  deployBlock: 63591962,
++  deployedAt: 1790444390,
 +  deployer: '0x2d1697607Cd75fb012114391c1320a0c3ed6b25C',
 +  explorer: 'https://sepolia.uniscan.xyz',
 +  initialEthPriceUsd: '2684.93',
 +  initialSqrtPriceX96: '4105314865866007812399485',
 +  keeper: '0x2d1697607Cd75fb012114391c1320a0c3ed6b25C',
-+  legacyPredictionHooks: ['0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8'],
-+  marketScheduler: '0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd',
++  legacyMarketSchedulers: ['0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd'],
++  legacyPredictionHooks: ['0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8', '0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8'],
++  marketGatekeeper: '0x755dBc10AB4b9BFDB8c46939702dC08B8F3e607A',
++  marketSchedulers: [
++    '0x8f1b371e41FeCBb825d0baAB19f906E645C760e0',
++    '0x02f0B250120c817A45C6ba580FE68eB461E0A10e',
++    '0x067180DE54F4a800C88C3dC9EDa8b106f7126b83',
++    '0x950eEDA8303253b76f0d47f4a3eD33aA7fF54E74',
++  ],
 +  multicall3: '0xcA11bde05977b3631167028862bE2a173976CA11',
 +  network: 'unichain-sepolia',
 +  oracleParams: {
@@ -10560,7 +10831,7 @@ index 0000000..acf118f
 +  },
 +  permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
 +  poolManager: '0x00B036B58a818B1BC34d502D3fE730Db729e62AC',
-+  predictionHook: '0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8',
++  predictionHook: '0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8',
 +  priceSteerer: '0x21C55279188072E6BfeF14c4920eA1cEFEd358a3',
 +  rpcUrl: 'https://sepolia.unichain.org',
 +  stateView: '0xc199F1072a74D4e905ABa1A84d9a45E2546B6222',
@@ -10573,16 +10844,44 @@ index 0000000..acf118f
 +    tickSpacing: 10,
 +  },
 +  underlyingPoolId: '0xb2b89f12e31fa12e75c4e85bd234fa5fdc5ee19d65e11a12c4f57dfe0e437331',
++  underlyings: [
++    {
++      oracle: '0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080',
++      pool: {
++        currency0: '0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5',
++        currency1: '0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D',
++        fee: 500,
++        hooks: '0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080',
++        tickSpacing: 10,
++      },
++      poolId: '0xb2b89f12e31fa12e75c4e85bd234fa5fdc5ee19d65e11a12c4f57dfe0e437331',
++      symbol: 'ETH',
++      token: '0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5',
++    },
++    {
++      oracle: '0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080',
++      pool: {
++        currency0: '0x49f3768635A2Db5e4bdcB76A4F191EC48B770417',
++        currency1: '0xCcecf4Cef79Bb924E92B60bAc8ab5d8F9a147c2D',
++        fee: 500,
++        hooks: '0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080',
++        tickSpacing: 10,
++      },
++      poolId: '0x9453ba24ab75a174fec0d7ccdac237961e41fa4dd094e8146708c246cde35394',
++      symbol: 'SOL',
++      token: '0x49f3768635A2Db5e4bdcB76A4F191EC48B770417',
++    },
++  ],
 +  universalRouter: '0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D',
 +  usdc: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
 +  v4Quoter: '0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472',
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts
 new file mode 100644
-index 0000000..95c0a42
+index 0000000..0c96d50
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/predictionTradingApi.test.ts
-@@ -0,0 +1,848 @@
+@@ -0,0 +1,849 @@
 +import { AllowanceTransfer, PERMIT2_ADDRESS } from '@uniswap/permit2-sdk'
 +import { Token, TradeType } from '@uniswap/sdk-core'
 +import {
@@ -11426,8 +11725,9 @@ index 0000000..95c0a42
 +    const open = at(4n, now + 60, 'Trading')
 +    const closed = at(3n, now + 5, 'Trading')
 +    const settled = at(2n, now - 60, 'Settled')
-+    const { open: o, settled: s } = selectPredictionMarketsForPicker([open, closed, settled], now)
-+    expect(o.map((m) => m.id)).toEqual([4n])
++    // Without market tracks every market lands in one untracked group
++    const { open: o, settled: s } = selectPredictionMarketsForPicker([open, closed, settled], { nowSeconds: now })
++    expect(o.map((g) => [g.name, g.markets.map((m) => m.id)])).toEqual([['Prediction markets', [4n]]])
 +    expect(s.map((m) => m.id)).toEqual([2n])
 +  })
 +})
@@ -12158,18 +12458,20 @@ index 0000000..4a11638
 +})
 diff --git a/packages/uniswap/src/features/predictionMarkets/registry.ts b/packages/uniswap/src/features/predictionMarkets/registry.ts
 new file mode 100644
-index 0000000..96658ac
+index 0000000..de56b01
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/registry.ts
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,391 @@
 +import { normalizeTokenAddressForCache } from '@universe/chains'
 +import { useEffect, useSyncExternalStore } from 'react'
 +import {
 +  getPredictionDeployment,
 +  isPredictionChain,
++  type PredictionForkDeployment,
 +  PREDICTION_QUOTE_POLL_MS,
 +  PREDICTION_REGISTRY_POLL_MS,
 +  PREDICTION_REGISTRY_WINDOW,
++  PREDICTION_TRACK_SLOTS,
 +} from 'uniswap/src/features/predictionMarkets/config'
 +import { getPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
 +import {
@@ -12181,8 +12483,17 @@ index 0000000..96658ac
 +  resolveOutcomeToken,
 +  sameAddress,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  classifyBySymbol,
++  MARKET_GATEKEEPER_ABI,
++  type PredictionTrack,
++  readPredictionMarketsByIds,
++  readPredictionTracks,
++  TRACK_SCHEDULER_ABI,
++} from 'uniswap/src/features/predictionMarkets/tracks'
 +import { logger } from 'utilities/src/logger/logger'
-+import type { Address } from 'viem'
++import type { Address, Client } from 'viem'
++import { multicall } from 'viem/actions'
 +
 +/** Outcome tokens discovered from the hook's market registry, keyed by lowercase address. */
 +const tokens = new Map<string, OutcomeTokenInfo>()
@@ -12190,6 +12501,11 @@ index 0000000..96658ac
 +const foreign = new Set<string>()
 +const pending = new Map<string, Promise<OutcomeTokenInfo | undefined>>()
 +const listeners = new Set<() => void>()
++/** Market id -> the scheduler that opened it, from `gatekeeper.schedulerOf` or `scheduler.marketOfSlot` */
++const marketSchedulers = new Map<string, Address>()
++let tracks: PredictionTrack[] = []
++/** The gatekeeper and scheduler list `tracks` were read for; undefined until a read succeeds */
++let tracksSource: string | undefined
 +let version = 0
 +let timer: ReturnType<typeof setInterval> | undefined
 +let inflight: Promise<void> | undefined
@@ -12232,21 +12548,128 @@ index 0000000..96658ac
 +  }
 +}
 +
-+/** Reads the newest markets from the hook. No-op until a hook address is configured. */
++async function ensureTracks(client: Client, d: PredictionForkDeployment): Promise<void> {
++  const source = [d.marketGatekeeper ?? '', ...d.marketSchedulers].join(',').toLowerCase()
++  if (tracksSource === source) {
++    return
++  }
++  const next = await readPredictionTracks(client, {
++    gatekeeper: d.marketGatekeeper,
++    schedulers: d.marketSchedulers,
++    underlyings: d.underlyings,
++    multicallAddress: d.multicall3,
++  })
++  tracks = next
++  tracksSource = source
++  marketSchedulers.clear()
++  notify()
++}
++
++/**
++ * Classifies `list` with `gatekeeper.schedulerOf` and registers each track's markets of the last
++ * `PREDICTION_TRACK_SLOTS` slots, which the newest-N window can miss for a slow track. Markets outside the window are
++ * re-read until they are settled.
++ */
++async function refreshTrackMarkets({
++  client,
++  d,
++  hook,
++  list,
++}: {
++  client: Client
++  d: PredictionForkDeployment
++  hook: Address
++  list: readonly Market[]
++}): Promise<void> {
++  const gatekeeper = d.marketGatekeeper
++  if (!gatekeeper || !tracks.length) {
++    return
++  }
++  const now = Math.floor(Date.now() / 1000)
++  const slots = tracks.flatMap((t) =>
++    Array.from({ length: PREDICTION_TRACK_SLOTS }, (_, i) => ({
++      track: t,
++      slot: BigInt(Math.floor(now / t.periodSec) - i),
++    })),
++  )
++  const unclassified = list.filter((m) => !marketSchedulers.has(m.id.toString())).map((m) => m.id)
++  const results = await multicall(client, {
++    contracts: [
++      ...slots.map(
++        ({ track, slot }) =>
++          ({ address: track.scheduler, abi: TRACK_SCHEDULER_ABI, functionName: 'marketOfSlot', args: [slot] }) as const,
++      ),
++      ...unclassified.map(
++        (id) => ({ address: gatekeeper, abi: MARKET_GATEKEEPER_ABI, functionName: 'schedulerOf', args: [id] }) as const,
++      ),
++    ],
++    allowFailure: true,
++    multicallAddress: d.multicall3,
++  })
++  const classify = (id: bigint, scheduler: Address): boolean => {
++    if (sameAddress(marketSchedulers.get(id.toString()), scheduler)) {
++      return false
++    }
++    marketSchedulers.set(id.toString(), scheduler)
++    return true
++  }
++  let classified = false
++  const trackIds: bigint[] = []
++  for (const [i, { track }] of slots.entries()) {
++    const r = results[i]
++    if (r?.status === 'success' && typeof r.result === 'bigint' && r.result > 0n) {
++      classified = classify(r.result, track.scheduler) || classified
++      trackIds.push(r.result)
++    }
++  }
++  for (const [i, id] of unclassified.entries()) {
++    const r = results[slots.length + i]
++    if (r?.status === 'success' && typeof r.result === 'string') {
++      // The zero address (an id the gatekeeper never created) is cached too, and leaves the symbol fallback
++      classified = classify(id, r.result as Address) || classified
++    }
++  }
++  const inWindow = new Set(list.map((m) => m.id.toString()))
++  const stale = trackIds.filter((id) => {
++    const known = markets.get(id.toString())
++    return !inWindow.has(id.toString()) && known?.status !== 'Settled' && known?.status !== 'Invalid'
++  })
++  const changed = registerPredictionMarkets(
++    await readPredictionMarketsByIds(client, { hook, ids: stale, multicallAddress: d.multicall3 }),
++  )
++  if (classified && !changed) {
++    notify()
++  }
++}
++
++async function refreshOnce(hook: Address): Promise<void> {
++  const client = getPredictionPublicClient()
++  const d = getPredictionDeployment()
++  const [list] = await Promise.all([
++    listMarkets(client, {
++      hook,
++      limit: PREDICTION_REGISTRY_WINDOW,
++      quotes: false,
++      multicallAddress: d.multicall3,
++    }),
++    ensureTracks(client, d).catch((error: unknown) => {
++      logger.warn('predictionMarkets/registry', 'ensureTracks', 'market track read failed', { error })
++    }),
++  ])
++  registerPredictionMarkets(list)
++  await refreshTrackMarkets({ client, d, hook, list })
++}
++
++/**
++ * Reads the newest markets from the hook, the market tracks once, and each track's recent markets. No-op until a
++ * hook address is configured.
++ */
 +export function refreshPredictionRegistry(): Promise<void> {
 +  const hook = getPredictionDeployment().predictionHook
 +  if (!hook) {
 +    return Promise.resolve()
 +  }
-+  inflight ??= listMarkets(getPredictionPublicClient(), {
-+    hook,
-+    limit: PREDICTION_REGISTRY_WINDOW,
-+    quotes: false,
-+    multicallAddress: getPredictionDeployment().multicall3,
-+  })
-+    .then((list) => {
-+      registerPredictionMarkets(list)
-+    })
++  inflight ??= refreshOnce(hook)
 +    .catch((error: unknown) => {
 +      logger.warn('predictionMarkets/registry', 'refreshPredictionRegistry', 'market registry read failed', { error })
 +    })
@@ -12294,6 +12717,30 @@ index 0000000..96658ac
 +
 +export function getPredictionMarket(id: bigint): Market | undefined {
 +  return markets.get(id.toString())
++}
++
++/** The deployment's market tracks, ordered by asset then period; empty until read */
++export function getPredictionTracks(): PredictionTrack[] {
++  return tracks
++}
++
++/**
++ * The track that opened a market: `gatekeeper.schedulerOf(id)` (or the `marketOfSlot` read) when known, else the track
++ * whose ticker built the outcome symbol exactly.
++ */
++export function getPredictionTokenTrack(
++  token: Pick<OutcomeTokenInfo, 'marketId' | 'symbol'> | undefined,
++): PredictionTrack | undefined {
++  if (!token) {
++    return undefined
++  }
++  const scheduler = marketSchedulers.get(token.marketId.toString())
++  const byScheduler = scheduler ? tracks.find((t) => sameAddress(t.scheduler, scheduler)) : undefined
++  return byScheduler ?? classifyBySymbol(token.symbol, tracks)
++}
++
++export function getPredictionMarketTrack(market: Pick<Market, 'yes'> | undefined): PredictionTrack | undefined {
++  return getPredictionTokenTrack(market?.yes)
 +}
 +
 +/**
@@ -12401,6 +12848,9 @@ index 0000000..96658ac
 +  markets.clear()
 +  foreign.clear()
 +  pending.clear()
++  marketSchedulers.clear()
++  tracks = []
++  tracksSource = undefined
 +  notify()
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/rpc.ts b/packages/uniswap/src/features/predictionMarkets/rpc.ts
@@ -12473,18 +12923,19 @@ index 0000000..5609b95
 +] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts
 new file mode 100644
-index 0000000..73bf70f
+index 0000000..617b651
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/index.ts
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,80 @@
 +import { hookErrorsAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated'
++import { marketGatekeeperAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/marketGatekeeper.generated'
 +import { marketSchedulerAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated'
 +import { outcomeTokenAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated'
 +import { predictionHookAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/predictionHook.generated'
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
 +import { erc20Abi, parseAbi } from 'viem'
 +
-+export { erc20Abi, hookErrorsAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi }
++export { erc20Abi, hookErrorsAbi, marketGatekeeperAbi, marketSchedulerAbi, outcomeTokenAbi, predictionHookAbi }
 +
 +const POOL_KEY =
 +  'struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }'
@@ -12556,12 +13007,93 @@ index 0000000..73bf70f
 +  'error PriceLimitOutOfBounds(uint160 sqrtPriceLimitX96)',
 +  'error SafeCastOverflow()',
 +])
+diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketGatekeeper.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketGatekeeper.generated.ts
+new file mode 100644
+index 0000000..b4a64aa
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketGatekeeper.generated.ts
+@@ -0,0 +1,75 @@
++// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
++// Generated by scripts/gen-abi.mjs from src/interfaces/IMarketGatekeeper.sol. Do not edit.
++export const marketGatekeeperAbi = [
++  {
++    type: 'function',
++    name: 'createMarket',
++    stateMutability: 'nonpayable',
++    inputs: [
++      {
++        name: 'p',
++        type: 'tuple',
++        components: [
++          { name: 'oracle', type: 'address' },
++          { name: 'lnStrikeWad', type: 'int256' },
++          { name: 'openTime', type: 'uint64' },
++          { name: 'expiry', type: 'uint64' },
++          { name: 'window', type: 'uint32' },
++          { name: 'cutoffBuffer', type: 'uint32' },
++          { name: 'nSamples', type: 'uint32' },
++          { name: 'budget', type: 'uint256' },
++          {
++            name: 'quote',
++            type: 'tuple',
++            components: [
++              { name: 'h0Wad', type: 'uint64' },
++              { name: 'gammaSWad', type: 'uint64' },
++              { name: 'lambdaWad', type: 'uint128' },
++              { name: 'qEpochMax', type: 'uint128' },
++              { name: 'pMinWad', type: 'uint64' },
++            ],
++          },
++          { name: 'sigmaMode', type: 'uint8' },
++          { name: 'fixedVarE36', type: 'uint256' },
++          { name: 'kernel', type: 'uint8' },
++          { name: 'yesName', type: 'string' },
++          { name: 'yesSymbol', type: 'string' },
++          { name: 'noName', type: 'string' },
++          { name: 'noSymbol', type: 'string' },
++        ],
++      },
++    ],
++    outputs: [{ name: 'marketId', type: 'uint256' }],
++  },
++  { type: 'function', name: 'hook', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] },
++  {
++    type: 'function',
++    name: 'isScheduler',
++    stateMutability: 'view',
++    inputs: [{ name: 'account', type: 'address' }],
++    outputs: [{ name: '', type: 'bool' }],
++  },
++  {
++    type: 'function',
++    name: 'schedulerCount',
++    stateMutability: 'view',
++    inputs: [],
++    outputs: [{ name: '', type: 'uint256' }],
++  },
++  {
++    type: 'function',
++    name: 'schedulerOf',
++    stateMutability: 'view',
++    inputs: [{ name: 'marketId', type: 'uint256' }],
++    outputs: [{ name: '', type: 'address' }],
++  },
++  {
++    type: 'function',
++    name: 'schedulers',
++    stateMutability: 'view',
++    inputs: [],
++    outputs: [{ name: '', type: 'address[]' }],
++  },
++  { type: 'error', name: 'InvalidTracks', inputs: [] },
++  { type: 'error', name: 'NotScheduler', inputs: [] },
++] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts
 new file mode 100644
-index 0000000..d90c14c
+index 0000000..8735f7b
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/abi/marketScheduler.generated.ts
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,99 @@
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
 +// Generated by scripts/gen-abi.mjs from src/interfaces/IMarketScheduler.sol. Do not edit.
 +export const marketSchedulerAbi = [
@@ -12599,8 +13131,22 @@ index 0000000..d90c14c
 +      },
 +    ],
 +  },
++  {
++    type: 'function',
++    name: 'gatekeeper',
++    stateMutability: 'view',
++    inputs: [],
++    outputs: [{ name: '', type: 'address' }],
++  },
 +  { type: 'function', name: 'hook', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] },
 +  { type: 'function', name: 'lastSlot', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
++  {
++    type: 'function',
++    name: 'marketOfSlot',
++    stateMutability: 'view',
++    inputs: [{ name: 'slot', type: 'uint256' }],
++    outputs: [{ name: '', type: 'uint256' }],
++  },
 +  {
 +    type: 'function',
 +    name: 'nextOpenTime',
@@ -12614,6 +13160,13 @@ index 0000000..d90c14c
 +    stateMutability: 'nonpayable',
 +    inputs: [],
 +    outputs: [{ name: 'marketId', type: 'uint256' }],
++  },
++  {
++    type: 'function',
++    name: 'openDeadline',
++    stateMutability: 'view',
++    inputs: [{ name: 'slot', type: 'uint256' }],
++    outputs: [{ name: '', type: 'uint256' }],
 +  },
 +  { type: 'function', name: 'oracle', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] },
 +  {
@@ -12638,6 +13191,7 @@ index 0000000..d90c14c
 +    ],
 +  },
 +  { type: 'error', name: 'InvalidConfig', inputs: [] },
++  { type: 'error', name: 'TooLate', inputs: [{ name: 'slot', type: 'uint256' }] },
 +] as const
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/outcomeToken.generated.ts
 new file mode 100644
@@ -13198,26 +13752,43 @@ index 0000000..838c7b8
 +export const PERMIT_SIG_DEADLINE_SECONDS = 30 * 60
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts b/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts
 new file mode 100644
-index 0000000..e51706c
+index 0000000..ce68169
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/deployments.ts
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,220 @@
 +import {
 +  type ChainContracts,
 +  FORBIDDEN_ROUTERS,
 +  UNICHAIN_SEPOLIA,
 +} from 'uniswap/src/features/predictionMarkets/sdk/constants'
++import { type PoolKey, poolId } from 'uniswap/src/features/predictionMarkets/sdk/pool'
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
-+import { type Address, getAddress, isAddress, zeroAddress } from 'viem'
++import { type Address, getAddress, type Hex, isAddress, zeroAddress } from 'viem'
++
++/** One `underlyings` entry, a demo token with its oracle hook and the pool that hook sits on */
++export interface Underlying {
++  /** Upper-case asset symbol such as "ETH" or "SOL" */
++  symbol: string
++  token: Address
++  oracle: Address
++  pool: PoolKey
++  poolId: Hex
++}
 +
 +/** Our contracts on one chain. Addresses that are missing or placeholders in the JSON are `undefined`. */
 +export interface PredictionDeployment extends ChainContracts {
 +  predictionHook?: Address
 +  underlyingOracle?: Address
-+  /** The ownerless MarketScheduler that owns `predictionHook` and is the only account able to open markets. */
-+  marketScheduler?: Address
-+  /** Prior `predictionHook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
++  /** The ownerless MarketGatekeeper that owns `predictionHook` and forwards `createMarket` from its schedulers only */
++  marketGatekeeper?: Address
++  /** One MarketScheduler per track in gatekeeper order, empty for a file with none */
++  marketSchedulers: Address[]
++  /** Schedulers of earlier hooks, oldest first */
++  legacyMarketSchedulers: Address[]
++  /** Prior `predictionHook` addresses the vault migrated away from, oldest first */
 +  legacyPredictionHooks: Address[]
++  /** Price sources in file order, empty when the file has no `underlyings` list */
++  underlyings: Underlying[]
 +  deployBlock?: bigint
 +  /** Keys that were present but held a placeholder value. */
 +  placeholders: string[]
@@ -13226,7 +13797,8 @@ index 0000000..e51706c
 +const ALIASES: Record<string, string[]> = {
 +  predictionHook: ['predictionHook', 'PredictionHook', 'prediction_hook', 'hook'],
 +  underlyingOracle: ['underlyingOracle', 'UnderlyingOracleHook', 'underlyingOracleHook', 'oracleHook', 'oracle'],
-+  marketScheduler: ['marketScheduler', 'MarketScheduler'],
++  marketGatekeeper: ['marketGatekeeper', 'MarketGatekeeper'],
++  marketSchedulers: ['marketSchedulers', 'MarketSchedulers'],
 +  usdc: ['usdc', 'USDC', 'collateral'],
 +  poolManager: ['poolManager', 'PoolManager'],
 +  v4Quoter: ['v4Quoter', 'V4Quoter', 'quoter'],
@@ -13269,13 +13841,63 @@ index 0000000..e51706c
 +  return { present: false, value: undefined }
 +}
 +
-+/** `legacyPredictionHooks` checksummed, skipping placeholders and non-address entries. Missing or not an array yields []. */
-+function legacyPredictionHooks(flat: Record<string, unknown>): Address[] {
-+  const { value } = pick(flat, 'legacyPredictionHooks')
++/** Checksummed addresses of a list key, skipping placeholders, [] when missing or not an array */
++function addressList(flat: Record<string, unknown>, key: string): Address[] {
++  const { value } = pick(flat, key)
 +  if (!Array.isArray(value)) {
 +    return []
 +  }
 +  return value.filter((v): v is string => !isPlaceholderAddress(v)).map((v) => getAddress(v))
++}
++
++function asInteger(v: unknown): number | undefined {
++  const n = typeof v === 'string' && /^-?\d+$/.test(v.trim()) ? Number(v) : v
++  return typeof n === 'number' && Number.isSafeInteger(n) ? n : undefined
++}
++
++function asPoolKey(v: unknown): PoolKey | undefined {
++  if (!v || typeof v !== 'object' || Array.isArray(v)) {
++    return undefined
++  }
++  const p = v as Record<string, unknown>
++  const addr = (x: unknown) => (typeof x === 'string' && isAddress(x, { strict: false }) ? getAddress(x) : undefined)
++  const currency0 = addr(p['currency0'])
++  const currency1 = addr(p['currency1'])
++  const hooks = addr(p['hooks'])
++  const fee = asInteger(p['fee'])
++  const tickSpacing = asInteger(p['tickSpacing'])
++  if (!currency0 || !currency1 || !hooks || fee === undefined || tickSpacing === undefined) {
++    return undefined
++  }
++  return { currency0, currency1, fee, tickSpacing, hooks }
++}
++
++/** Skips malformed or placeholder entries but throws on a `poolId` that contradicts its pool key */
++function underlyings(flat: Record<string, unknown>): Underlying[] {
++  const list = flat['underlyings']
++  if (!Array.isArray(list)) {
++    return []
++  }
++  const out: Underlying[] = []
++  list.forEach((entry: unknown, i) => {
++    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
++      return
++    }
++    const e = entry as Record<string, unknown>
++    const symbol = typeof e['symbol'] === 'string' ? e['symbol'].trim().toUpperCase() : ''
++    const pool = asPoolKey(e['pool'])
++    if (!symbol || !pool || isPlaceholderAddress(e['token']) || isPlaceholderAddress(e['oracle'])) {
++      return
++    }
++    const id = poolId(pool)
++    const given = e['poolId']
++    if (given !== undefined && (typeof given !== 'string' || given.toLowerCase() !== id)) {
++      throw new Error(`underlyings[${i}] (${symbol}) poolId ${String(given)} does not match its pool key (${id})`)
++    }
++    const token = getAddress(e['token'] as string)
++    out.push({ symbol, token, oracle: getAddress(e['oracle'] as string), pool, poolId: id })
++  })
++  return out
 +}
 +
 +/**
@@ -13315,8 +13937,11 @@ index 0000000..e51706c
 +    chainId,
 +    predictionHook: address('predictionHook'),
 +    underlyingOracle: address('underlyingOracle'),
-+    marketScheduler: address('marketScheduler'),
-+    legacyPredictionHooks: legacyPredictionHooks(flat),
++    marketGatekeeper: address('marketGatekeeper'),
++    marketSchedulers: addressList(flat, 'marketSchedulers'),
++    legacyMarketSchedulers: addressList(flat, 'legacyMarketSchedulers'),
++    legacyPredictionHooks: addressList(flat, 'legacyPredictionHooks'),
++    underlyings: underlyings(flat),
 +    usdc: address('usdc') ?? defaults.usdc,
 +    poolManager: address('poolManager') ?? defaults.poolManager,
 +    v4Quoter: address('v4Quoter') ?? defaults.v4Quoter,
@@ -13334,6 +13959,22 @@ index 0000000..e51706c
 +    throw new Error('PredictionHook address is missing or a placeholder in the deployment file')
 +  }
 +  return d.predictionHook
++}
++
++/** Throws a readable error when the gatekeeper address is not deployed yet */
++export function requireGatekeeper(d: PredictionDeployment): Address {
++  if (!d.marketGatekeeper) {
++    throw new Error('MarketGatekeeper address is missing or a placeholder in the deployment file')
++  }
++  return d.marketGatekeeper
++}
++
++/** Throws a readable error when the deployment file lists no market schedulers */
++export function requireSchedulers(d: PredictionDeployment): Address[] {
++  if (!d.marketSchedulers.length) {
++    throw new Error('marketSchedulers is missing or empty in the deployment file')
++  }
++  return d.marketSchedulers
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/errors.ts b/packages/uniswap/src/features/predictionMarkets/sdk/errors.ts
 new file mode 100644
@@ -13604,10 +14245,10 @@ index 0000000..44f7bb5
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/index.ts b/packages/uniswap/src/features/predictionMarkets/sdk/index.ts
 new file mode 100644
-index 0000000..2ecddf5
+index 0000000..6dedc1f
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/sdk/index.ts
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,11 @@
 +// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
 +export * from 'uniswap/src/features/predictionMarkets/sdk/abi/index'
 +export * from 'uniswap/src/features/predictionMarkets/sdk/constants'
@@ -13618,6 +14259,7 @@ index 0000000..2ecddf5
 +export * from 'uniswap/src/features/predictionMarkets/sdk/pool'
 +export * from 'uniswap/src/features/predictionMarkets/sdk/quote'
 +export * from 'uniswap/src/features/predictionMarkets/sdk/swap'
++export * from 'uniswap/src/features/predictionMarkets/sdk/tracks'
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/markets.ts b/packages/uniswap/src/features/predictionMarkets/sdk/markets.ts
 new file mode 100644
 index 0000000..a90a9f9
@@ -14436,6 +15078,1085 @@ index 0000000..0d11788
 +    throw toSwapError(err, extraErrors)
 +  }
 +}
+diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/tracks.ts b/packages/uniswap/src/features/predictionMarkets/sdk/tracks.ts
+new file mode 100644
+index 0000000..97842cd
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/sdk/tracks.ts
+@@ -0,0 +1,163 @@
++import { marketGatekeeperAbi, marketSchedulerAbi } from 'uniswap/src/features/predictionMarkets/sdk/abi/index'
++import { UNICHAIN_SEPOLIA } from 'uniswap/src/features/predictionMarkets/sdk/constants'
++import type { PredictionDeployment } from 'uniswap/src/features/predictionMarkets/sdk/deployments'
++import { sameAddress } from 'uniswap/src/features/predictionMarkets/sdk/pool'
++// Vendored from packages/swap-sdk by packages/swap-sdk/scripts/vendor-interface.mjs. Do not edit here.
++import { type Address, type Client, type ContractFunctionReturnType, zeroAddress } from 'viem'
++import { multicall } from 'viem/actions'
++
++/** `IMarketScheduler.Config` as viem decodes it */
++export type SchedulerConfig = ContractFunctionReturnType<typeof marketSchedulerAbi, 'view', 'config'>
++
++/** One MarketScheduler and its frozen config, the unit the UI groups markets by */
++export interface Track {
++  scheduler: Address
++  oracle: Address
++  /** On-chain ticker such as "ETH1M", outcome symbols are `${ticker}UP` and `${ticker}DOWN` */
++  ticker: string
++  /** Ticker without its window suffix, "SOL1M" gives "SOL" */
++  asset: string
++  /** Short period label such as "1m" or "15m" */
++  label: string
++  period: number
++  tenor: number
++  window: number
++  cutoffBuffer: number
++  nSamples: number
++  maxBudget: bigint
++  minBudget: bigint
++}
++
++export interface TrackReadOptions {
++  blockNumber?: bigint
++  multicallAddress?: Address
++}
++
++/** "1m" for 60, "15m" for 900, "<n>h" for whole hours, "<n>m" for whole minutes, else "<n>s" */
++export function periodLabel(period: number): string {
++  if (period > 0 && period % 3600 === 0) {
++    return `${period / 3600}h`
++  }
++  if (period > 0 && period % 60 === 0) {
++    return `${period / 60}m`
++  }
++  return `${period}s`
++}
++
++/** The asset part of a ticker, dropping a trailing window suffix like "1M", "15M" or "4H" */
++export function trackAsset(ticker: string): string {
++  const m = /^(.*\D)\d+[SMHD]$/i.exec(ticker)
++  return m?.[1] ?? ticker
++}
++
++export function trackFromConfig(scheduler: Address, oracle: Address, c: SchedulerConfig): Track {
++  return {
++    scheduler,
++    oracle,
++    ticker: c.ticker,
++    asset: trackAsset(c.ticker),
++    label: periodLabel(c.period),
++    period: c.period,
++    tenor: c.tenor,
++    window: c.window,
++    cutoffBuffer: c.cutoffBuffer,
++    nSamples: c.nSamples,
++    maxBudget: c.maxBudget,
++    minBudget: c.minBudget,
++  }
++}
++
++/** Reads `config()` and `oracle()` of every listed scheduler in one multicall, in deployment order */
++export async function readTracks(
++  client: Client,
++  d: Pick<PredictionDeployment, 'marketSchedulers'> & { multicall3?: Address },
++  opts: TrackReadOptions = {},
++): Promise<Track[]> {
++  const schedulers = d.marketSchedulers
++  if (!schedulers.length) {
++    return []
++  }
++  const results = await multicall(client, {
++    contracts: schedulers.flatMap((address) => [
++      { address, abi: marketSchedulerAbi, functionName: 'config' } as const,
++      { address, abi: marketSchedulerAbi, functionName: 'oracle' } as const,
++    ]),
++    allowFailure: true,
++    multicallAddress: opts.multicallAddress ?? d.multicall3 ?? UNICHAIN_SEPOLIA.multicall3,
++    blockNumber: opts.blockNumber,
++  })
++  return schedulers.map((scheduler, i) => {
++    const config = results[i * 2]
++    const oracle = results[i * 2 + 1]
++    if (config?.status !== 'success' || oracle?.status !== 'success') {
++      throw new Error(`MarketScheduler ${scheduler} did not answer config() and oracle()`)
++    }
++    return trackFromConfig(scheduler, oracle.result as Address, config.result as SchedulerConfig)
++  })
++}
++
++/** Market ids of the track's last `k` slots up to the one holding `nowSec`, newest first, skipping unopened slots */
++export async function recentTrackMarketIds(
++  client: Client,
++  track: Pick<Track, 'scheduler' | 'period'>,
++  nowSec: number | bigint,
++  k: number,
++  opts: TrackReadOptions = {},
++): Promise<bigint[]> {
++  if (track.period <= 0 || k <= 0) {
++    return []
++  }
++  const now = typeof nowSec === 'bigint' ? nowSec : BigInt(Math.floor(nowSec))
++  const current = now / BigInt(track.period)
++  const slots: bigint[] = []
++  for (let slot = current; slot >= 0n && slots.length < k; slot--) {
++    slots.push(slot)
++  }
++  const ids = await multicall(client, {
++    contracts: slots.map(
++      (slot) =>
++        ({ address: track.scheduler, abi: marketSchedulerAbi, functionName: 'marketOfSlot', args: [slot] }) as const,
++    ),
++    allowFailure: false,
++    multicallAddress: opts.multicallAddress ?? UNICHAIN_SEPOLIA.multicall3,
++    blockNumber: opts.blockNumber,
++  })
++  return ids.filter((id) => id !== 0n)
++}
++
++/** `gatekeeper.schedulerOf(id)` for each id, aligned with `ids`, undefined for ids the gatekeeper never created */
++export async function schedulerOfMarkets(
++  client: Client,
++  gatekeeper: Address,
++  ids: readonly bigint[],
++  opts: TrackReadOptions = {},
++): Promise<(Address | undefined)[]> {
++  if (!ids.length) {
++    return []
++  }
++  const owners = await multicall(client, {
++    contracts: ids.map(
++      (id) => ({ address: gatekeeper, abi: marketGatekeeperAbi, functionName: 'schedulerOf', args: [id] }) as const,
++    ),
++    allowFailure: false,
++    multicallAddress: opts.multicallAddress ?? UNICHAIN_SEPOLIA.multicall3,
++    blockNumber: opts.blockNumber,
++  })
++  return owners.map((s) => (sameAddress(s, zeroAddress) ? undefined : s))
++}
++
++/** Matches an outcome symbol to its track by exact `${ticker}UP` or `${ticker}DOWN`, never by prefix or expiry */
++export function classifyBySymbol<T extends Pick<Track, 'ticker'>>(
++  symbol: string,
++  tracks: readonly T[],
++): { track: T; isYes: boolean } | undefined {
++  for (const track of tracks) {
++    if (symbol === `${track.ticker}UP`) {
++      return { track, isYes: true }
++    }
++    if (symbol === `${track.ticker}DOWN`) {
++      return { track, isYes: false }
++    }
++  }
++  return undefined
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/symbolDisplay.test.tsx b/packages/uniswap/src/features/predictionMarkets/symbolDisplay.test.tsx
+new file mode 100644
+index 0000000..d5b5a5f
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/symbolDisplay.test.tsx
+@@ -0,0 +1,92 @@
++import { Token } from '@uniswap/sdk-core'
++import { SelectTokenButton } from 'uniswap/src/components/CurrencyInputPanel/SelectTokenButton'
++import { BaseTokenOptionItem } from 'uniswap/src/components/lists/items/tokens/TokenOptionItem/BaseTokenOptionItem'
++import { TokenContextMenuVariant } from 'uniswap/src/components/lists/items/tokens/TokenOptionItem/types'
++import { OnchainItemListOptionType } from 'uniswap/src/components/lists/items/types'
++import { getCommonBase } from 'uniswap/src/constants/routing'
++import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import { type Market, predictionPoolKey, UNICHAIN_SEPOLIA } from 'uniswap/src/features/predictionMarkets/sdk'
++import { getCurrencySymbolDisplayText } from 'uniswap/src/features/predictionMarkets/symbolDisplay'
++import { renderWithProviders } from 'uniswap/src/test/render'
++import { getAddress, zeroAddress } from 'viem'
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const YES = getAddress('0xfe000000000000000000000000000000000000a1')
++const NO = getAddress('0x01000000000000000000000000000000000000a1')
++const OTHER = getAddress('0xdead0000000000000000000000000000000000a1')
++
++function market15m(): Market {
++  const token = (isYes: boolean): Market['yes'] => ({
++    address: isYes ? YES : NO,
++    symbol: isYes ? 'ETH15MUP' : 'ETH15MDOWN',
++    name: `ETH15M ${isYes ? '>' : '<'} $2690.13 26 Sep 14:15`,
++    decimals: 6,
++    isYes,
++    marketId: 161n,
++    poolKey: predictionPoolKey({ token: isYes ? YES : NO, usdc: UNICHAIN_SEPOLIA.usdc, hook: HOOK }),
++  })
++  return {
++    id: 161n,
++    hook: HOOK,
++    status: 'Trading',
++    info: {
++      yes: YES,
++      no: NO,
++      oracle: zeroAddress,
++      lnStrikeWad: 0n,
++      openTime: 0n,
++      expiry: 900n,
++      window: 30,
++      cutoffBuffer: 2,
++      status: 1,
++      yesWon: false,
++      bucket: 0n,
++      outYes: 0n,
++      outNo: 0n,
++      invYes: 0n,
++      invNo: 0n,
++    },
++    yes: token(true),
++    no: token(false),
++    strikeUsd: 2690.13,
++    cutoff: 868n,
++  }
++}
++
++describe('outcome token symbols', () => {
++  beforeEach(() => {
++    resetPredictionRegistry()
++    registerPredictionMarkets([market15m()])
++  })
++
++  it('shows registered outcome tokens in full and cuts other long symbols as before', () => {
++    expect(getCurrencySymbolDisplayText(new Token(1301, NO, 6, 'ETH15MDOWN'))).toBe('ETH15MDOWN')
++    expect(getCurrencySymbolDisplayText(new Token(1301, OTHER, 6, 'ETH15MDOWN'))).toBe('ETH15…')
++    // The same address on another chain is not ours
++    expect(getCurrencySymbolDisplayText(new Token(1, NO, 6, 'ETH15MDOWN'))).toBe('ETH15…')
++    expect(getCurrencySymbolDisplayText(new Token(1301, OTHER, 6, 'USDC'))).toBe('USDC')
++    expect(getCurrencySymbolDisplayText(undefined)).toBeUndefined()
++  })
++
++  it('shows the full symbol on the swap form token button', () => {
++    const { getByText } = renderWithProviders(
++      <SelectTokenButton selectedCurrencyInfo={getCommonBase(1301, NO)} testID={undefined} onPress={(): void => {}} />,
++    )
++    expect(getByText('ETH15MDOWN')).toBeTruthy()
++  })
++
++  it('shows the full symbol in the token selector row', () => {
++    const currencyInfo = getCommonBase(1301, YES)
++    if (!currencyInfo) {
++      throw new Error('outcome token not registered')
++    }
++    const { getByText } = renderWithProviders(
++      <BaseTokenOptionItem
++        option={{ type: OnchainItemListOptionType.Token, currencyInfo, quantity: null, balanceUSD: undefined }}
++        contextMenuVariant={TokenContextMenuVariant.TokenSelector}
++        onPress={(): void => {}}
++      />,
++    )
++    expect(getByText('ETH15MUP')).toBeTruthy()
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/symbolDisplay.ts b/packages/uniswap/src/features/predictionMarkets/symbolDisplay.ts
+new file mode 100644
+index 0000000..86e7ac1
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/symbolDisplay.ts
+@@ -0,0 +1,14 @@
++import type { Currency } from '@uniswap/sdk-core'
++import { getPredictionToken } from 'uniswap/src/features/predictionMarkets/registry'
++import { getSymbolDisplayText } from 'uniswap/src/utils/currency'
++
++/**
++ * The symbol to show for a currency: our outcome tokens in full (a 15-minute track's "ETH15MDOWN" is 10 characters,
++ * and the stock 6-character cut would show "ETH15…" for both of its sides), anything else as `getSymbolDisplayText`.
++ */
++export function getCurrencySymbolDisplayText(currency: Maybe<Currency>): Maybe<string> {
++  if (currency?.isToken && getPredictionToken(currency.chainId, currency.address)) {
++    return currency.symbol
++  }
++  return getSymbolDisplayText(currency?.symbol)
++}
+diff --git a/packages/uniswap/src/features/predictionMarkets/tracks.test.ts b/packages/uniswap/src/features/predictionMarkets/tracks.test.ts
+new file mode 100644
+index 0000000..53e391f
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/tracks.test.ts
+@@ -0,0 +1,502 @@
++import { act, renderHook } from '@testing-library/react'
++import { parseTracksDeployment } from 'uniswap/src/features/predictionMarkets/config'
++import {
++  getPredictionMarket,
++  getPredictionMarkets,
++  getPredictionMarketTrack,
++  getPredictionTokenTrack,
++  getPredictionTracks,
++  refreshPredictionRegistry,
++  resetPredictionRegistry,
++} from 'uniswap/src/features/predictionMarkets/registry'
++import { setPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
++import {
++  outcomeTokenAbi,
++  predictionHookAbi,
++  predictionPoolKey,
++  UNICHAIN_SEPOLIA,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import {
++  assetFromTicker,
++  classifyBySymbol,
++  formatTrackDuration,
++  MARKET_GATEKEEPER_ABI,
++  makePredictionTrack,
++  predictionMarketAsset,
++  sortPredictionTracks,
++  TRACK_SCHEDULER_ABI,
++} from 'uniswap/src/features/predictionMarkets/tracks'
++import {
++  selectPredictionMarketsForPicker,
++  usePredictionTokenOptions,
++} from 'uniswap/src/features/predictionMarkets/usePredictionTokenOptions'
++import {
++  type Abi,
++  type Address,
++  createClient,
++  custom,
++  decodeFunctionData,
++  encodeFunctionResult,
++  getAddress,
++  type Hex,
++  parseAbi,
++  RpcRequestError,
++  zeroAddress,
++} from 'viem'
++import { unichainSepolia } from 'viem/chains'
++
++vi.mock('uniswap/src/features/predictionMarkets/deployment.generated', () => ({
++  PREDICTION_DEPLOYMENT_JSON: {
++    chainId: 1301,
++    predictionHook: '0x00000000000000000000000000000000c0de2aa8',
++    marketGatekeeper: '0x00000000000000000000000000000000000060a7',
++    // Deliberately not the gatekeeper's order: the gatekeeper's own list wins
++    marketSchedulers: ['0x0000000000000000000000000000000000005c01'],
++    underlyingOracle: '0x0000000000000000000000000000000000001080',
++    underlyings: [
++      {
++        symbol: 'ETH',
++        token: '0xe000000000000000000000000000000000000001',
++        oracle: '0x0000000000000000000000000000000000001080',
++      },
++      {
++        symbol: 'SOL',
++        token: '0x0500000000000000000000000000000000000003',
++        oracle: '0x0000000000000000000000000000000000002080',
++      },
++    ],
++  },
++}))
++
++const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++const GATEKEEPER = getAddress('0x00000000000000000000000000000000000060a7')
++const ETH_ORACLE = getAddress('0x0000000000000000000000000000000000001080')
++const SOL_ORACLE = getAddress('0x0000000000000000000000000000000000002080')
++const USDC = UNICHAIN_SEPOLIA.usdc
++const NOW = 1_790_499_980 // 20 s into a minute, 380 s into a quarter hour
++
++interface TrackFixture {
++  scheduler: Address
++  ticker: string
++  period: number
++  oracle: Address
++}
++const ETH1M: TrackFixture = {
++  scheduler: getAddress('0x0000000000000000000000000000000000005c01'),
++  ticker: 'ETH1M',
++  period: 60,
++  oracle: ETH_ORACLE,
++}
++const ETH15M: TrackFixture = {
++  scheduler: getAddress('0x0000000000000000000000000000000000005c02'),
++  ticker: 'ETH15M',
++  period: 900,
++  oracle: ETH_ORACLE,
++}
++const SOL1M: TrackFixture = {
++  scheduler: getAddress('0x0000000000000000000000000000000000005c03'),
++  ticker: 'SOL1M',
++  period: 60,
++  oracle: SOL_ORACLE,
++}
++const SOL15M: TrackFixture = {
++  scheduler: getAddress('0x0000000000000000000000000000000000005c04'),
++  ticker: 'SOL15M',
++  period: 900,
++  oracle: SOL_ORACLE,
++}
++// Gatekeeper order is not display order: the picker sorts by asset, then period
++const GATEKEEPER_ORDER = [ETH1M, SOL1M, ETH15M, SOL15M]
++
++interface MarketFixture {
++  track: TrackFixture
++  status: number
++  expiry: number
++  /** Overrides the ticker-built YES symbol, to prove `schedulerOf` wins over the symbol */
++  yesSymbol?: string
++}
++
++// Ids 1..45; the registry window (40) starts at 6, so the two 15-minute markets (3, 4) are outside it
++const fixtures = new Map<bigint, MarketFixture>()
++function slotExpiry(t: TrackFixture, back: number): number {
++  return (Math.floor(NOW / t.period) - back) * t.period + t.period
++}
++function resetFixtures(): void {
++  fixtures.clear()
++  fixtures.set(1n, { track: ETH15M, status: 2, expiry: slotExpiry(ETH15M, 2) })
++  fixtures.set(2n, { track: SOL15M, status: 2, expiry: slotExpiry(SOL15M, 2) })
++  fixtures.set(3n, { track: ETH15M, status: 1, expiry: slotExpiry(ETH15M, 0) })
++  fixtures.set(4n, { track: SOL15M, status: 1, expiry: slotExpiry(SOL15M, 0) })
++  fixtures.set(5n, { track: ETH15M, status: 2, expiry: slotExpiry(ETH15M, 1) })
++  // Settled 1-minute markets, ETH then SOL each minute: 42 and 43 a minute ago, 40 and 41 two minutes ago, ...
++  for (let id = 6; id <= 43; id++) {
++    const back = Math.floor((43 - id) / 2) + 1
++    fixtures.set(BigInt(id), { track: id % 2 ? SOL1M : ETH1M, status: 2, expiry: slotExpiry(ETH1M, back) })
++  }
++  fixtures.set(42n, { track: ETH1M, status: 2, expiry: slotExpiry(ETH1M, 1), yesSymbol: 'ODDUP' })
++  fixtures.set(44n, { track: ETH1M, status: 1, expiry: slotExpiry(ETH1M, 0) })
++  fixtures.set(45n, { track: SOL1M, status: 1, expiry: slotExpiry(SOL1M, 0) })
++}
++
++const yesOf = (id: bigint): Address => getAddress(`0xfe${id.toString(16).padStart(38, '0')}`)
++const noOf = (id: bigint): Address => getAddress(`0x01${id.toString(16).padStart(38, '0')}`)
++
++class Revert {
++  constructor(readonly data: Hex) {}
++}
++
++const innerCalls: string[] = []
++
++function contract(name: string, abi: Abi, impl: Record<string, (...args: never[]) => unknown>): (data: Hex) => Hex {
++  return (data) => {
++    let decoded
++    try {
++      decoded = decodeFunctionData({ abi, data })
++    } catch {
++      throw new Revert('0x')
++    }
++    const fn = impl[decoded.functionName] as ((...a: unknown[]) => unknown) | undefined
++    if (!fn) {
++      throw new Revert('0x')
++    }
++    innerCalls.push(`${name}.${decoded.functionName}(${(decoded.args ?? []).join(',')})`)
++    return encodeFunctionResult({
++      abi,
++      functionName: decoded.functionName,
++      result: fn(...(decoded.args ?? [])),
++    } as never)
++  }
++}
++
++function marketInfo(id: bigint): Record<string, unknown> {
++  const f = fixtures.get(id)
++  return {
++    yes: f ? yesOf(id) : zeroAddress,
++    no: f ? noOf(id) : zeroAddress,
++    oracle: f?.track.oracle ?? zeroAddress,
++    lnStrikeWad: 0n,
++    openTime: f ? BigInt(f.expiry - f.track.period) : 0n,
++    expiry: BigInt(f?.expiry ?? 0),
++    window: 10,
++    cutoffBuffer: 2,
++    status: f?.status ?? 0,
++    yesWon: false,
++    bucket: 0n,
++    outYes: 0n,
++    outNo: 0n,
++    invYes: 0n,
++    invNo: 0n,
++  }
++}
++
++const handlers: Record<string, (data: Hex) => Hex> = {
++  [HOOK.toLowerCase()]: contract('hook', predictionHookAbi, {
++    marketCount: () => 45n,
++    marketInfo: (id: bigint) => marketInfo(id),
++    poolKeys: (id: bigint) => [
++      predictionPoolKey({ token: yesOf(id), usdc: USDC, hook: HOOK }),
++      predictionPoolKey({ token: noOf(id), usdc: USDC, hook: HOOK }),
++    ],
++  }),
++  [GATEKEEPER.toLowerCase()]: contract('gatekeeper', MARKET_GATEKEEPER_ABI, {
++    schedulers: () => GATEKEEPER_ORDER.map((t) => t.scheduler),
++    schedulerOf: (id: bigint) => fixtures.get(id)?.track.scheduler ?? zeroAddress,
++  }),
++}
++for (const t of GATEKEEPER_ORDER) {
++  handlers[t.scheduler.toLowerCase()] = contract(t.ticker, TRACK_SCHEDULER_ABI, {
++    config: () => ({
++      period: t.period,
++      tenor: t.period,
++      window: t.period === 60 ? 10 : 30,
++      cutoffBuffer: 2,
++      nSamples: 10,
++      quote: { h0Wad: 0n, gammaSWad: 0n, lambdaWad: 0n, qEpochMax: 0n, pMinWad: 0n },
++      maxBudget: 0n,
++      minBudget: 0n,
++      ticker: t.ticker,
++    }),
++    oracle: () => t.oracle,
++    marketOfSlot: (slot: bigint) => {
++      for (const [id, f] of fixtures) {
++        if (f.track === t && BigInt(f.expiry / t.period - 1) === slot) {
++          return id
++        }
++      }
++      return 0n
++    },
++  })
++}
++
++function tokenHandler(id: bigint, isYes: boolean): (data: Hex) => Hex {
++  const f = fixtures.get(id)
++  const symbol = (): string =>
++    isYes ? (fixtures.get(id)?.yesSymbol ?? `${f?.track.ticker}UP`) : `${f?.track.ticker}DOWN`
++  return contract('token', outcomeTokenAbi, {
++    symbol,
++    name: () => `${f?.track.ticker} > $2690.13`,
++    hook: () => HOOK,
++    marketId: () => id,
++    isYes: () => isYes,
++  })
++}
++
++function run(to: string, data: Hex): Hex {
++  const lower = to.toLowerCase()
++  const h = handlers[lower]
++  if (h) {
++    return h(data)
++  }
++  const id = BigInt(`0x${lower.slice(4)}`)
++  if (lower.startsWith('0xfe') || lower.startsWith('0x01')) {
++    return tokenHandler(id, lower.startsWith('0xfe'))(data)
++  }
++  throw new Revert('0x')
++}
++
++handlers[UNICHAIN_SEPOLIA.multicall3.toLowerCase()] = contract(
++  'multicall',
++  parseAbi([
++    'struct Call3 { address target; bool allowFailure; bytes callData; }',
++    'struct Result { bool success; bytes returnData; }',
++    'function aggregate3(Call3[] calls) payable returns (Result[] returnData)',
++  ]),
++  {
++    aggregate3: (calls: readonly { target: Address; callData: Hex }[]) =>
++      calls.map((c) => {
++        try {
++          return { success: true, returnData: run(c.target, c.callData) }
++        } catch (e) {
++          return { success: false, returnData: e instanceof Revert ? e.data : '0x' }
++        }
++      }),
++  },
++)
++
++const client = createClient({
++  chain: unichainSepolia,
++  transport: custom({
++    async request({ method, params }: { method: string; params: unknown[] }) {
++      if (method === 'eth_chainId') {
++        return '0x515'
++      }
++      if (method !== 'eth_call') {
++        throw new Error(`unsupported ${method}`)
++      }
++      const [tx] = params as [{ to: string; data?: Hex; input?: Hex }]
++      try {
++        return run(tx.to, (tx.data ?? tx.input) as Hex)
++      } catch (e) {
++        if (e instanceof Revert) {
++          throw new RpcRequestError({
++            body: {},
++            url: 'mock://',
++            error: { code: 3, message: 'execution reverted', data: e.data },
++          })
++        }
++        throw e
++      }
++    },
++  }),
++})
++
++function ticker(id: bigint): string | undefined {
++  return getPredictionMarketTrack(getPredictionMarket(id))?.ticker
++}
++
++describe('market tracks', () => {
++  beforeEach(() => {
++    vi.useFakeTimers({ toFake: ['Date'] })
++    vi.setSystemTime(NOW * 1000)
++    resetFixtures()
++    setPredictionPublicClient(client)
++    resetPredictionRegistry()
++    innerCalls.length = 0
++  })
++
++  afterEach(() => {
++    vi.useRealTimers()
++  })
++
++  afterAll(() => {
++    setPredictionPublicClient(undefined)
++  })
++
++  it('reads the tracks from the gatekeeper and orders them by asset, then period', async () => {
++    await refreshPredictionRegistry()
++    expect(getPredictionTracks().map((t) => t.label)).toEqual([
++      'ETH 1-minute',
++      'ETH 15-minute',
++      'SOL 1-minute',
++      'SOL 15-minute',
++    ])
++    expect(getPredictionTracks().map((t) => t.asset)).toEqual(['ETH', 'ETH', 'SOL', 'SOL'])
++  })
++
++  it('classifies markets by gatekeeper.schedulerOf: ETH1M, ETH15M and SOL1M apart, whatever the symbol says', async () => {
++    await refreshPredictionRegistry()
++    expect(ticker(44n)).toBe('ETH1M')
++    expect(ticker(45n)).toBe('SOL1M')
++    expect(ticker(43n)).toBe('SOL1M')
++    // Market 42's YES symbol matches no ticker; the gatekeeper still knows its scheduler
++    expect(getPredictionMarket(42n)?.yes.symbol).toBe('ODDUP')
++    expect(ticker(42n)).toBe('ETH1M')
++  })
++
++  it('registers each track recent markets, so 15-minute markets outside the newest-40 window are listed', async () => {
++    await refreshPredictionRegistry()
++    // 40 in the window (6..45) and 1..5 through `marketOfSlot` of the 15-minute tracks
++    expect(getPredictionMarkets().length).toBe(45)
++    expect(getPredictionMarket(3n)?.status).toBe('Trading')
++    expect(ticker(3n)).toBe('ETH15M')
++    expect(ticker(4n)).toBe('SOL15M')
++    expect(ticker(5n)).toBe('ETH15M')
++    expect(getPredictionMarket(3n)?.yes.symbol).toBe('ETH15MUP')
++    expect(getPredictionTokenTrack(getPredictionMarket(4n)?.no)?.label).toBe('SOL 15-minute')
++  })
++
++  it('re-reads an out-of-window market until it settles, then stops', async () => {
++    await refreshPredictionRegistry()
++    fixtures.set(3n, { ...(fixtures.get(3n) as MarketFixture), status: 2 })
++    innerCalls.length = 0
++    await refreshPredictionRegistry()
++    expect(getPredictionMarket(3n)?.status).toBe('Settled')
++    expect(innerCalls).toContain('hook.marketInfo(3)')
++
++    innerCalls.length = 0
++    await refreshPredictionRegistry()
++    expect(innerCalls).not.toContain('hook.marketInfo(3)')
++    // Market 4 is still trading, so it is read again
++    expect(innerCalls).toContain('hook.marketInfo(4)')
++  })
++
++  it('groups the picker by track: open markets per track, settled markets of every track together', async () => {
++    await refreshPredictionRegistry()
++    const { open, settled } = selectPredictionMarketsForPicker(getPredictionMarkets(), {
++      nowSeconds: NOW,
++      tracks: getPredictionTracks(),
++      trackOf: getPredictionMarketTrack,
++    })
++    expect(open.map((g) => [g.name, g.markets.map((m) => m.id)])).toEqual([
++      ['ETH 1-minute', [44n]],
++      ['ETH 15-minute', [3n]],
++      ['SOL 1-minute', [45n]],
++      ['SOL 15-minute', [4n]],
++    ])
++    // Newest two per track, newest expiry first (ties in track order); the older 15-minute markets come last
++    expect(settled.map((m) => m.id)).toEqual([42n, 43n, 40n, 41n, 5n, 1n, 2n])
++  })
++
++  it('gives the token selector one section per track and USDC once', async () => {
++    await refreshPredictionRegistry()
++    const { result, unmount } = renderHook(() => usePredictionTokenOptions(1301))
++    await act(async () => {
++      await refreshPredictionRegistry()
++    })
++    const open = result.current.open ?? []
++    expect(open.map((s) => s.name)).toEqual([
++      'Prediction markets',
++      'ETH 1-minute',
++      'ETH 15-minute',
++      'SOL 1-minute',
++      'SOL 15-minute',
++    ])
++    expect(new Set(open.map((s) => s.id)).size).toBe(open.length)
++    const symbols = open.map((s) => s.options.map((o) => o.currencyInfo.currency.symbol))
++    expect(symbols).toEqual([
++      ['USDC'],
++      ['ETH1MUP', 'ETH1MDOWN'],
++      ['ETH15MUP', 'ETH15MDOWN'],
++      ['SOL1MUP', 'SOL1MDOWN'],
++      ['SOL15MUP', 'SOL15MDOWN'],
++    ])
++    const settledSymbols = (result.current.settled ?? []).map((o) => o.currencyInfo.currency.symbol)
++    expect(settledSymbols).not.toContain('USDC')
++    expect(settledSymbols.slice(0, 4)).toEqual(['ODDUP', 'ETH1MDOWN', 'SOL1MUP', 'SOL1MDOWN'])
++    unmount()
++  })
++})
++
++describe('track helpers', () => {
++  const tracks = sortPredictionTracks(
++    [SOL15M, ETH15M, SOL1M, ETH1M].map((t) =>
++      makePredictionTrack({
++        scheduler: t.scheduler,
++        oracle: t.oracle,
++        ticker: t.ticker,
++        periodSec: t.period,
++        tenorSec: t.period,
++        underlyings: [
++          { symbol: 'ETH', oracle: ETH_ORACLE },
++          { symbol: 'SOL', oracle: SOL_ORACLE },
++        ],
++      }),
++    ),
++  )
++
++  it('orders by asset in first-seen order, then by period', () => {
++    expect(tracks.map((t) => t.ticker)).toEqual(['SOL1M', 'SOL15M', 'ETH1M', 'ETH15M'])
++  })
++
++  it('classifies an outcome symbol by exact ticker match only', () => {
++    expect(classifyBySymbol('ETH1MUP', tracks)?.ticker).toBe('ETH1M')
++    expect(classifyBySymbol('ETH15MDOWN', tracks)?.ticker).toBe('ETH15M')
++    expect(classifyBySymbol('SOL1MDOWN', tracks)?.ticker).toBe('SOL1M')
++    expect(classifyBySymbol('ETHUP', tracks)).toBeUndefined()
++    expect(classifyBySymbol('ETH15MUPX', tracks)).toBeUndefined()
++    // The pre-gatekeeper "ETH" ticker is a prefix of "ETH15M"; prefixes never match
++    const legacy = makePredictionTrack({
++      scheduler: ETH1M.scheduler,
++      ticker: 'ETH',
++      periodSec: 60,
++      tenorSec: 120,
++      underlyings: [],
++    })
++    expect(classifyBySymbol('ETH15MUP', [legacy, ...tracks])?.ticker).toBe('ETH15M')
++    expect(classifyBySymbol('ETHDOWN', [legacy, ...tracks])?.label).toBe('ETH 2-minute')
++  })
++
++  it('names durations and assets', () => {
++    expect([60, 900, 120, 3_600, 86_400, 90].map(formatTrackDuration)).toEqual([
++      '1-minute',
++      '15-minute',
++      '2-minute',
++      '1-hour',
++      '1-day',
++      '90-second',
++    ])
++    expect(['ETH1M', 'ETH15M', 'SOL1M', 'ETH'].map(assetFromTicker)).toEqual(['ETH', 'ETH', 'SOL', 'ETH'])
++    const underlyings = [{ symbol: 'SOL', oracle: SOL_ORACLE }]
++    expect(predictionMarketAsset({ oracle: SOL_ORACLE, underlyings })).toBe('SOL')
++    expect(predictionMarketAsset({ symbol: 'ETH15MDOWN', underlyings })).toBe('ETH')
++    expect(predictionMarketAsset({ symbol: 'YES', oracle: zeroAddress, underlyings })).toBeUndefined()
++  })
++
++  it('reads the pre-gatekeeper deployment: its single scheduler, and ETH from the flat oracle keys', () => {
++    const legacy = parseTracksDeployment({
++      marketScheduler: '0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd',
++      underlyingOracle: ETH_ORACLE,
++      demoWeth: '0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5',
++    })
++    expect(legacy).toEqual({
++      marketGatekeeper: undefined,
++      marketSchedulers: [getAddress('0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd')],
++      underlyings: [
++        { symbol: 'ETH', token: getAddress('0x7fcf39acb2934d1A93D6469AE8DE0EcF33eb26E5'), oracle: ETH_ORACLE },
++      ],
++    })
++    expect(parseTracksDeployment({})).toEqual({ marketGatekeeper: undefined, marketSchedulers: [], underlyings: [] })
++    expect(
++      parseTracksDeployment({
++        marketGatekeeper: GATEKEEPER,
++        marketSchedulers: [ETH1M.scheduler, 'TBD', ETH15M.scheduler],
++        marketScheduler: '0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd',
++        underlyings: [{ symbol: 'SOL', oracle: SOL_ORACLE }, { oracle: ETH_ORACLE }],
++      }),
++    ).toEqual({
++      marketGatekeeper: GATEKEEPER,
++      marketSchedulers: [ETH1M.scheduler, ETH15M.scheduler],
++      underlyings: [{ symbol: 'SOL', token: undefined, oracle: SOL_ORACLE }],
++    })
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/tracks.ts b/packages/uniswap/src/features/predictionMarkets/tracks.ts
+new file mode 100644
+index 0000000..b67c7de
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/tracks.ts
+@@ -0,0 +1,278 @@
++import type { PredictionUnderlying } from 'uniswap/src/features/predictionMarkets/config'
++import {
++  type Market,
++  type MarketInfo,
++  MarketStatus,
++  type MarketStatusName,
++  OUTCOME_DECIMALS,
++  type OutcomeTokenInfo,
++  type PoolKey,
++  predictionHookAbi,
++  sameAddress,
++  strikeUsdFromLn,
++} from 'uniswap/src/features/predictionMarkets/sdk'
++import { type Address, type Client, erc20Abi, parseAbi, zeroAddress } from 'viem'
++import { multicall } from 'viem/actions'
++
++export const MARKET_GATEKEEPER_ABI = parseAbi([
++  'function schedulers() view returns (address[])',
++  'function schedulerOf(uint256 marketId) view returns (address)',
++])
++
++export const TRACK_SCHEDULER_ABI = parseAbi([
++  'struct QuoteParams { uint64 h0Wad; uint64 gammaSWad; uint128 lambdaWad; uint128 qEpochMax; uint64 pMinWad; }',
++  'struct Config { uint32 period; uint32 tenor; uint32 window; uint32 cutoffBuffer; uint32 nSamples; QuoteParams quote; uint256 maxBudget; uint256 minBudget; string ticker; }',
++  'function config() view returns (Config)',
++  'function oracle() view returns (address)',
++  'function marketOfSlot(uint256 slot) view returns (uint256)',
++])
++
++/** One MarketScheduler: a fixed asset, cadence and market length */
++export interface PredictionTrack {
++  scheduler: Address
++  oracle?: Address
++  /** "ETH1M"; the YES/NO symbols are the ticker plus UP/DOWN */
++  ticker: string
++  /** "ETH", "SOL" */
++  asset: string
++  periodSec: number
++  tenorSec: number
++  /** Market length, "1-minute" */
++  duration: string
++  /** "ETH 1-minute" */
++  label: string
++}
++
++const UNITS: [number, string][] = [
++  [86_400, 'day'],
++  [3_600, 'hour'],
++  [60, 'minute'],
++]
++
++/** A market length as a compound adjective: 60 -> "1-minute", 900 -> "15-minute", 90 -> "90-second" */
++export function formatTrackDuration(seconds: number): string {
++  for (const [size, unit] of UNITS) {
++    if (seconds >= size && seconds % size === 0) {
++      return `${seconds / size}-${unit}`
++    }
++  }
++  return `${seconds}-second`
++}
++
++/** The asset a ticker names, without its period suffix: "ETH15M" -> "ETH", "SOL1M" -> "SOL", "ETH" -> "ETH" */
++export function assetFromTicker(ticker: string): string {
++  return ticker.replace(/\d+[SMHD]$/i, '') || ticker
++}
++
++/** The ticker an outcome-token symbol was built from ("ETH15MDOWN" -> "ETH15M"), or undefined */
++export function tickerFromOutcomeSymbol(symbol: string | undefined): string | undefined {
++  const match = symbol ? /^(.+?)(UP|DOWN)$/.exec(symbol) : null
++  return match?.[1]
++}
++
++export function underlyingForOracle(
++  underlyings: readonly PredictionUnderlying[],
++  oracle: string | undefined,
++): PredictionUnderlying | undefined {
++  return oracle && !sameAddress(oracle, zeroAddress)
++    ? underlyings.find((u) => sameAddress(u.oracle, oracle))
++    : undefined
++}
++
++/**
++ * The asset a market is on: its track's, else the deployment underlying behind its oracle, else the one its outcome
++ * symbol names ("SOL15MUP" -> "SOL").
++ */
++export function predictionMarketAsset(p: {
++  track?: PredictionTrack
++  oracle?: string
++  symbol?: string
++  underlyings: readonly PredictionUnderlying[]
++}): string | undefined {
++  const ticker = tickerFromOutcomeSymbol(p.symbol)
++  return (
++    p.track?.asset ??
++    underlyingForOracle(p.underlyings, p.oracle)?.symbol ??
++    (ticker ? assetFromTicker(ticker) : undefined)
++  )
++}
++
++export function makePredictionTrack(p: {
++  scheduler: Address
++  oracle?: Address
++  ticker: string
++  periodSec: number
++  tenorSec: number
++  underlyings: readonly PredictionUnderlying[]
++}): PredictionTrack {
++  const asset = underlyingForOracle(p.underlyings, p.oracle)?.symbol ?? assetFromTicker(p.ticker)
++  const duration = formatTrackDuration(p.tenorSec)
++  return {
++    scheduler: p.scheduler,
++    oracle: p.oracle,
++    ticker: p.ticker,
++    asset,
++    periodSec: p.periodSec,
++    tenorSec: p.tenorSec,
++    duration,
++    label: `${asset} ${duration}`,
++  }
++}
++
++/** By asset in order of first appearance, then by period and market length: ETH 1m, ETH 15m, SOL 1m, SOL 15m */
++export function sortPredictionTracks(tracks: readonly PredictionTrack[]): PredictionTrack[] {
++  const assetRank = new Map<string, number>()
++  for (const t of tracks) {
++    if (!assetRank.has(t.asset)) {
++      assetRank.set(t.asset, assetRank.size)
++    }
++  }
++  return [...tracks].sort(
++    (a, b) =>
++      (assetRank.get(a.asset) ?? 0) - (assetRank.get(b.asset) ?? 0) ||
++      a.periodSec - b.periodSec ||
++      a.tenorSec - b.tenorSec,
++  )
++}
++
++/**
++ * The track whose ticker built `symbol` exactly (`ticker + "UP"` or `ticker + "DOWN"`). Never a prefix match: "ETH" is
++ * a prefix of "ETH15M", and markets of different tracks can share an expiry.
++ */
++export function classifyBySymbol(
++  symbol: string | undefined,
++  tracks: readonly PredictionTrack[],
++): PredictionTrack | undefined {
++  return symbol ? tracks.find((t) => symbol === `${t.ticker}UP` || symbol === `${t.ticker}DOWN`) : undefined
++}
++
++/**
++ * Reads each scheduler's `config()` and `oracle()`. With a gatekeeper, its `schedulers()` list wins over `schedulers`.
++ * Schedulers whose config cannot be read are left out.
++ */
++export async function readPredictionTracks(
++  client: Client,
++  p: {
++    gatekeeper?: Address
++    schedulers: readonly Address[]
++    underlyings: readonly PredictionUnderlying[]
++    multicallAddress: Address
++  },
++): Promise<PredictionTrack[]> {
++  let schedulers = [...p.schedulers]
++  if (p.gatekeeper) {
++    const [listed] = await multicall(client, {
++      contracts: [{ address: p.gatekeeper, abi: MARKET_GATEKEEPER_ABI, functionName: 'schedulers' }],
++      allowFailure: true,
++      multicallAddress: p.multicallAddress,
++    })
++    if (listed.status === 'success' && listed.result.length) {
++      schedulers = [...listed.result]
++    }
++  }
++  if (!schedulers.length) {
++    return []
++  }
++  const results = await multicall(client, {
++    contracts: schedulers.flatMap((address) => [
++      { address, abi: TRACK_SCHEDULER_ABI, functionName: 'config' } as const,
++      { address, abi: TRACK_SCHEDULER_ABI, functionName: 'oracle' } as const,
++    ]),
++    allowFailure: true,
++    multicallAddress: p.multicallAddress,
++  })
++  const tracks: PredictionTrack[] = []
++  schedulers.forEach((scheduler, i) => {
++    const config = results[i * 2]
++    const oracle = results[i * 2 + 1]
++    if (config?.status !== 'success') {
++      return
++    }
++    const c = config.result as { period: number; tenor: number; ticker: string }
++    tracks.push(
++      makePredictionTrack({
++        scheduler,
++        oracle: oracle?.status === 'success' ? (oracle.result as Address) : undefined,
++        ticker: c.ticker,
++        periodSec: Number(c.period),
++        tenorSec: Number(c.tenor),
++        underlyings: p.underlyings,
++      }),
++    )
++  })
++  return sortPredictionTracks(tracks)
++}
++
++const STATUS_NAMES: MarketStatusName[] = ['None', 'Trading', 'Settled', 'Invalid']
++
++/** `listMarkets` for arbitrary ids: `marketInfo`, `poolKeys` and the YES/NO symbol and name. Unknown ids are skipped. */
++export async function readPredictionMarketsByIds(
++  client: Client,
++  p: { hook: Address; ids: readonly bigint[]; multicallAddress: Address },
++): Promise<Market[]> {
++  if (!p.ids.length) {
++    return []
++  }
++  const results = await multicall(client, {
++    contracts: p.ids.flatMap((id) => [
++      { address: p.hook, abi: predictionHookAbi, functionName: 'marketInfo', args: [id] } as const,
++      { address: p.hook, abi: predictionHookAbi, functionName: 'poolKeys', args: [id] } as const,
++    ]),
++    allowFailure: true,
++    multicallAddress: p.multicallAddress,
++  })
++  const found: { id: bigint; info: MarketInfo; keys: readonly [PoolKey, PoolKey] }[] = []
++  p.ids.forEach((id, i) => {
++    const info = results[i * 2]
++    const keys = results[i * 2 + 1]
++    if (info?.status !== 'success' || keys?.status !== 'success') {
++      return
++    }
++    const mi = info.result as MarketInfo
++    if (mi.status === MarketStatus.None || sameAddress(mi.yes, zeroAddress)) {
++      return
++    }
++    found.push({ id, info: mi, keys: keys.result as readonly [PoolKey, PoolKey] })
++  })
++  if (!found.length) {
++    return []
++  }
++  const meta = await multicall(client, {
++    contracts: found.flatMap((m) =>
++      [m.info.yes, m.info.no].flatMap((address) => [
++        { address, abi: erc20Abi, functionName: 'symbol' } as const,
++        { address, abi: erc20Abi, functionName: 'name' } as const,
++      ]),
++    ),
++    allowFailure: true,
++    multicallAddress: p.multicallAddress,
++  })
++  const text = (j: number): string | undefined => {
++    const r = meta[j]
++    return r?.status === 'success' ? (r.result as string) : undefined
++  }
++  return found.map((m, i) => {
++    const token = (isYes: boolean): OutcomeTokenInfo => {
++      const j = i * 4 + (isYes ? 0 : 2)
++      return {
++        address: isYes ? m.info.yes : m.info.no,
++        symbol: text(j) ?? `${isYes ? 'YES' : 'NO'}-${m.id}`,
++        name: text(j + 1) ?? `${isYes ? 'Yes' : 'No'} #${m.id}`,
++        decimals: OUTCOME_DECIMALS,
++        isYes,
++        marketId: m.id,
++        poolKey: isYes ? m.keys[0] : m.keys[1],
++      }
++    }
++    return {
++      id: m.id,
++      hook: p.hook,
++      info: m.info,
++      status: STATUS_NAMES[m.info.status] ?? 'None',
++      strikeUsd: strikeUsdFromLn(m.info.lnStrikeWad),
++      cutoff: m.info.expiry - BigInt(m.info.window) - BigInt(m.info.cutoffBuffer),
++      yes: token(true),
++      no: token(false),
++    }
++  })
++}
 diff --git a/packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts b/packages/uniswap/src/features/predictionMarkets/tradingApiFormat.ts
 new file mode 100644
 index 0000000..7e4296b
@@ -14657,10 +16378,10 @@ index 0000000..7e4296b
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx
 new file mode 100644
-index 0000000..7212cf5
+index 0000000..8d1b8ee
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.test.tsx
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,186 @@
 +import { waitFor } from '@testing-library/react-native'
 +import { Token } from '@uniswap/sdk-core'
 +import { SharedQueryClient } from '@universe/api'
@@ -14673,16 +16394,18 @@ index 0000000..7212cf5
 +  UNICHAIN_SEPOLIA,
 +  WAD,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
++import { makePredictionTrack, type PredictionTrack } from 'uniswap/src/features/predictionMarkets/tracks'
 +import { predictionFetchError } from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
 +import type { PredictionMarketLive } from 'uniswap/src/features/predictionMarkets/ui/predictionMarketLive'
 +import { PredictionMarketPanel } from 'uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel'
 +import { renderWithProviders } from 'uniswap/src/test/render'
 +import { CurrencyField } from 'uniswap/src/types/currency'
-+import { getAddress, zeroAddress } from 'viem'
++import { getAddress } from 'viem'
 +
 +const state = vi.hoisted(() => ({
 +  derived: {} as Record<string, unknown>,
 +  live: undefined as PredictionMarketLive | undefined,
++  track: undefined as PredictionTrack | undefined,
 +}))
 +
 +vi.mock('uniswap/src/features/transactions/swap/stores/swapFormStore/useSwapFormStore', () => ({
@@ -14692,6 +16415,7 @@ index 0000000..7212cf5
 +vi.mock('uniswap/src/features/predictionMarkets/registry', async (importOriginal) => ({
 +  ...(await importOriginal<object>()),
 +  usePredictionRegistry: (): number => 0,
++  getPredictionTokenTrack: (): PredictionTrack | undefined => state.track,
 +}))
 +
 +vi.mock('uniswap/src/features/predictionMarkets/ui/predictionMarketLive', () => ({
@@ -14703,6 +16427,9 @@ index 0000000..7212cf5
 +}))
 +
 +const HOOK = getAddress('0x00000000000000000000000000000000c0de2aa8')
++// The vendored deployment's ETH oracle (`underlyingOracle`), so the market reads as an ETH market
++const ETH_ORACLE = getAddress('0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080')
++const SOL_ORACLE = getAddress('0x0000000000000000000000000000000000002080')
 +const USDC = UNICHAIN_SEPOLIA.usdc
 +const YES = getAddress('0xfe00000000000000000000000000000000000001')
 +const NO = getAddress('0x0100000000000000000000000000000000000001')
@@ -14717,7 +16444,7 @@ index 0000000..7212cf5
 +  return {
 +    yes: YES,
 +    no: NO,
-+    oracle: zeroAddress,
++    oracle: ETH_ORACLE,
 +    lnStrikeWad: LN_STRIKE,
 +    openTime: expiry - 60n,
 +    expiry,
@@ -14734,10 +16461,10 @@ index 0000000..7212cf5
 +  }
 +}
 +
-+function market(i: MarketInfo): Market {
++function market(i: MarketInfo, ticker?: string): Market {
 +  const token = (isYes: boolean): Market['yes'] => ({
 +    address: isYes ? YES : NO,
-+    symbol: isYes ? 'YES' : 'NO',
++    symbol: ticker ? `${ticker}${isYes ? 'UP' : 'DOWN'}` : isYes ? 'YES' : 'NO',
 +    name: isYes ? 'YES' : 'NO',
 +    decimals: 6,
 +    isYes,
@@ -14780,6 +16507,7 @@ index 0000000..7212cf5
 +  beforeEach(() => {
 +    resetPredictionRegistry()
 +    SharedQueryClient.clear()
++    state.track = undefined
 +  })
 +
 +  it('renders nothing for tokens that are not YES/NO outcome tokens', () => {
@@ -14809,6 +16537,25 @@ index 0000000..7212cf5
 +    expect(getByText(/outside the band the market quotes/)).toBeTruthy()
 +  })
 +
++  it('names the market asset and track, and prices it from the market oracle', async () => {
++    const live = info({ oracle: SOL_ORACLE, lnStrikeWad: 5_018_603_463_745_432_548n })
++    registerPredictionMarkets([{ ...market(live, 'SOL15M'), strikeUsd: 151.2 }])
++    state.track = makePredictionTrack({
++      scheduler: getAddress('0x0000000000000000000000000000000000005c04'),
++      oracle: SOL_ORACLE,
++      ticker: 'SOL15M',
++      periodSec: 900,
++      tenorSec: 900,
++      underlyings: [{ symbol: 'SOL', oracle: SOL_ORACLE }],
++    })
++    state.live = { info: live, quote, spotUsd: 151.35 }
++    selectPair()
++    const { getByText, queryByText } = renderWithProviders(<PredictionMarketPanel />)
++    expect(getByText(/^SOL above \$151\.20 at \d\d:\d\d:\d\d UTC\?$/)).toBeTruthy()
++    await waitFor(() => expect(getByText(/15-minute market · SOL \$151\.35, \$0\.15 above strike/)).toBeTruthy())
++    expect(queryByText(/ETH/)).toBeNull()
++  })
++
 +  it('tells a holder of the losing token that it cannot be sold', async () => {
 +    const settled = info({ status: 2, yesWon: false, expiry: BigInt(Math.floor(Date.now() / 1000) - 20) })
 +    registerPredictionMarkets([market(settled)])
@@ -14823,20 +16570,23 @@ index 0000000..7212cf5
 +})
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx
 new file mode 100644
-index 0000000..b9ec28a
+index 0000000..abcd147
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/PredictionMarketPanel.tsx
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,204 @@
 +import { useQuery } from '@tanstack/react-query'
 +import type { Currency } from '@uniswap/sdk-core'
 +import { type ColorTokens, Flex, Text } from '@universe/mycelium'
 +import { memo, useMemo, useState } from 'react'
++import { getPredictionDeployment } from 'uniswap/src/features/predictionMarkets/config'
 +import {
 +  getPredictionMarket,
 +  getPredictionToken,
++  getPredictionTokenTrack,
 +  usePredictionRegistry,
 +} from 'uniswap/src/features/predictionMarkets/registry'
 +import { type OutcomeTokenInfo, strikeUsdFromLn } from 'uniswap/src/features/predictionMarkets/sdk'
++import { predictionMarketAsset } from 'uniswap/src/features/predictionMarkets/tracks'
 +import { getPredictionErrorData } from 'uniswap/src/features/predictionMarkets/tradingApiFormat'
 +import {
 +  formatCountdown,
@@ -14899,9 +16649,9 @@ index 0000000..b9ec28a
 +  )
 +}
 +
-+function formatSpot(spotUsd: number, strikeUsd: number): string {
++function formatSpot({ asset, spotUsd, strikeUsd }: { asset?: string; spotUsd: number; strikeUsd: number }): string {
 +  const gap = spotUsd - strikeUsd
-+  return `ETH ${formatUsd(spotUsd)}, ${formatUsd(Math.abs(gap))} ${gap >= 0 ? 'above' : 'below'} strike`
++  return `${asset ?? 'Spot'} ${formatUsd(spotUsd)}, ${formatUsd(Math.abs(gap))} ${gap >= 0 ? 'above' : 'below'} strike`
 +}
 +
 +function hintColor(phase: PredictionMarketPhase, selectedWon: boolean): ColorTokens {
@@ -14947,7 +16697,14 @@ index 0000000..b9ec28a
 +  const cutoff = info.expiry - BigInt(info.window) - BigInt(info.cutoffBuffer)
 +  const summary = summarizePredictionMarket({ market: { cutoff, info }, isYes: token.isYes, now })
 +  const strikeUsd = strikeUsdFromLn(info.lnStrikeWad)
-+  const question = formatMarketQuestion({ strikeUsd, info }, now)
++  const track = getPredictionTokenTrack(token)
++  const asset = predictionMarketAsset({
++    track,
++    oracle: info.oracle,
++    symbol: token.symbol,
++    underlyings: getPredictionDeployment().underlyings,
++  })
++  const question = formatMarketQuestion({ strikeUsd, info, asset }, now)
 +  const isFinal = summary.phase === 'settled' || summary.phase === 'invalid'
 +  const errorData = getPredictionErrorData(tradeError)
 +  const errorText =
@@ -14955,7 +16712,8 @@ index 0000000..b9ec28a
 +      ? describePredictionError(errorData, now).message
 +      : undefined
 +  const facts = [
-+    live?.spotUsd === undefined || isFinal ? undefined : formatSpot(live.spotUsd, strikeUsd),
++    track ? `${track.duration} market` : undefined,
++    live?.spotUsd === undefined || isFinal ? undefined : formatSpot({ asset, spotUsd: live.spotUsd, strikeUsd }),
 +    summary.phase === 'upcoming' ? `Opens in ${formatCountdown(Number(info.openTime) - now)}` : undefined,
 +    summary.phase === 'trading' || summary.phase === 'closing'
 +      ? `Closes in ${formatCountdown(Number(cutoff) - now)}`
@@ -15022,10 +16780,10 @@ index 0000000..b9ec28a
 +})
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts b/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts
 new file mode 100644
-index 0000000..88fbf09
+index 0000000..b1e1489
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/marketFormat.ts
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +import type { Market } from 'uniswap/src/features/predictionMarkets/sdk'
 +
 +const DAY_SECONDS = 86_400
@@ -15073,9 +16831,12 @@ index 0000000..88fbf09
 +  return `${((Number(wad) / 1e18) * 100).toFixed(1)}%`
 +}
 +
-+/** "ETH above $2,691.96 at 23:02:04 UTC?" */
-+export function formatMarketQuestion(market: Pick<Market, 'strikeUsd' | 'info'>, now: number): string {
-+  return `ETH above ${formatUsd(market.strikeUsd)} at ${formatMarketTime(market.info.expiry, now)}?`
++/** "SOL above $151.20 at 23:02:04 UTC?", or "Price above ..." when the market's asset is unknown */
++export function formatMarketQuestion(
++  market: Pick<Market, 'strikeUsd' | 'info'> & { asset: string | undefined },
++  now: number,
++): string {
++  return `${market.asset ?? 'Price'} above ${formatUsd(market.strikeUsd)} at ${formatMarketTime(market.info.expiry, now)}?`
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts b/packages/uniswap/src/features/predictionMarkets/ui/marketStatus.ts
 new file mode 100644
@@ -15219,7 +16980,7 @@ index 0000000..cc29b77
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts
 new file mode 100644
-index 0000000..866b4ff
+index 0000000..13ae5c6
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionErrors.ts
 @@ -0,0 +1,145 @@
@@ -15330,7 +17091,7 @@ index 0000000..866b4ff
 +    case 'ORACLE':
 +      return {
 +        title: 'Price feed unavailable',
-+        message: 'The ETH price oracle has no data right now. Try again in a few seconds.',
++        message: 'The price oracle has no data right now. Try again in a few seconds.',
 +      }
 +    case 'SLIPPAGE':
 +      return { title: 'Price moved', message: 'The price moved beyond your slippage tolerance. Review the new price.' }
@@ -15370,10 +17131,10 @@ index 0000000..866b4ff
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts
 new file mode 100644
-index 0000000..3caaa11
+index 0000000..1ea3498
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketLive.ts
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,110 @@
 +import { queryOptions } from '@tanstack/react-query'
 +import { getPredictionDeployment, PREDICTION_QUOTE_POLL_MS } from 'uniswap/src/features/predictionMarkets/config'
 +import { getPredictionPublicClient } from 'uniswap/src/features/predictionMarkets/rpc'
@@ -15382,11 +17143,12 @@ index 0000000..3caaa11
 +  type MarketInfo,
 +  MarketStatus,
 +  predictionHookAbi,
++  sameAddress,
 +  wadToNumber,
 +} from 'uniswap/src/features/predictionMarkets/sdk'
 +import type { QueryOptionsResult } from 'utilities/src/reactQuery/queryOptions'
 +import { type Address, parseAbi, zeroAddress } from 'viem'
-+import { multicall } from 'viem/actions'
++import { multicall, readContract } from 'viem/actions'
 +
 +const ORACLE_ABI = parseAbi(['function lnSpotSoBWad() view returns (int256)'])
 +const MULTICALL_BLOCK_ABI = parseAbi([
@@ -15397,25 +17159,35 @@ index 0000000..3caaa11
 +export interface PredictionMarketRef {
 +  hook: Address
 +  marketId: bigint
-+  /** The market's oracle when known, else the deployment's */
++  /** The market's own oracle (`marketInfo.oracle`) when known; otherwise it is learned from the first read */
 +  oracle?: Address
 +}
 +
 +export interface PredictionMarketLive {
 +  info: MarketInfo
 +  quote?: HookQuote
-+  /** ETH price in USD from the oracle, at the start of the latest block */
++  /** The market's underlying (ETH, SOL) in USD from the market's own oracle, at the start of the latest block */
 +  spotUsd?: number
 +  /** The block these reads ran against */
 +  block?: { number: bigint; timestamp: number }
 +}
 +
-+/** `hook.marketInfo`, `hook.quote`, the oracle's spot price and the block in one multicall */
++/** `marketInfo.oracle` per `hook:marketId`, so every read after the first prices from the market's own oracle */
++const marketOracles = new Map<string, Address>()
++
++function lnSpotToUsd(lnSpot: bigint): number {
++  return Math.exp(wadToNumber(lnSpot))
++}
++
++/** `hook.marketInfo`, `hook.quote`, the market oracle's spot price and the block in one multicall */
 +export async function readPredictionMarketLive(ref: PredictionMarketRef): Promise<PredictionMarketLive> {
++  const key = `${ref.hook.toLowerCase()}:${ref.marketId}`
++  const known = ref.oracle ?? marketOracles.get(key)
 +  // A call to the zero address fails decoding, which leaves `spotUsd` empty
-+  const oracle = ref.oracle ?? getPredictionDeployment().underlyingOracle ?? zeroAddress
++  const oracle = known ?? zeroAddress
 +  const { multicall3 } = getPredictionDeployment()
-+  const [info, quote, lnSpot, blockNumber, timestamp] = await multicall(getPredictionPublicClient(), {
++  const client = getPredictionPublicClient()
++  const [info, quote, lnSpot, blockNumber, timestamp] = await multicall(client, {
 +    contracts: [
 +      { address: ref.hook, abi: predictionHookAbi, functionName: 'marketInfo', args: [ref.marketId] },
 +      { address: ref.hook, abi: predictionHookAbi, functionName: 'quote', args: [ref.marketId] },
@@ -15429,10 +17201,21 @@ index 0000000..3caaa11
 +  if (info.status !== 'success') {
 +    throw info.error
 +  }
++  const mi = info.result as MarketInfo
++  const marketOracle = sameAddress(mi.oracle, zeroAddress) ? undefined : mi.oracle
++  let spotUsd =
++    lnSpot.status === 'success' && sameAddress(oracle, marketOracle) ? lnSpotToUsd(lnSpot.result) : undefined
++  if (marketOracle && !sameAddress(oracle, marketOracle)) {
++    // First read of this market: price it from the oracle `marketInfo` names, then remember that oracle
++    marketOracles.set(key, marketOracle)
++    spotUsd = await readContract(client, { address: marketOracle, abi: ORACLE_ABI, functionName: 'lnSpotSoBWad' })
++      .then(lnSpotToUsd)
++      .catch(() => undefined)
++  }
 +  return {
-+    info: info.result as MarketInfo,
++    info: mi,
 +    quote: quote.status === 'success' ? (quote.result as HookQuote) : undefined,
-+    spotUsd: lnSpot.status === 'success' ? Math.exp(wadToNumber(lnSpot.result)) : undefined,
++    spotUsd,
 +    block:
 +      blockNumber.status === 'success' && timestamp.status === 'success'
 +        ? { number: blockNumber.result, timestamp: Number(timestamp.result) }
@@ -15464,10 +17247,10 @@ index 0000000..3caaa11
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts
 new file mode 100644
-index 0000000..8497fa9
+index 0000000..ca0c716
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/ui/predictionMarketUi.test.ts
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,273 @@
 +import { FetchError, TradingApi } from '@universe/api'
 +import { WarningAction, WarningLabel } from 'uniswap/src/components/modals/WarningModal/types'
 +import { registerPredictionMarkets, resetPredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
@@ -15567,7 +17350,10 @@ index 0000000..8497fa9
 +
 +describe('prediction market formatting', () => {
 +  it('writes the market question and times in UTC, like the market names', () => {
-+    expect(formatMarketQuestion(market(), EXPIRY - 30)).toBe('ETH above $2,691.96 at 23:02:04 UTC?')
++    const m = market()
++    expect(formatMarketQuestion({ ...m, asset: 'ETH' }, EXPIRY - 30)).toBe('ETH above $2,691.96 at 23:02:04 UTC?')
++    expect(formatMarketQuestion({ ...m, asset: 'SOL' }, EXPIRY - 30)).toBe('SOL above $2,691.96 at 23:02:04 UTC?')
++    expect(formatMarketQuestion({ ...m, asset: undefined }, EXPIRY - 30)).toBe('Price above $2,691.96 at 23:02:04 UTC?')
 +    expect(formatMarketTime(EXPIRY, EXPIRY - 3 * 86_400)).toBe('Sep 25, 23:02:04 UTC')
 +  })
 +
@@ -16067,72 +17853,190 @@ index 0000000..7dd084a
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts b/packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts
 new file mode 100644
-index 0000000..a4a2137
+index 0000000..0d6a1bd
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/usePredictionTokenOptions.ts
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,181 @@
 +import { useEffect, useMemo, useState } from 'react'
 +import type { TokenOption } from 'uniswap/src/components/lists/items/types'
 +import { currencyInfosToTokenOptions } from 'uniswap/src/components/TokenSelector/hooks/useCurrencyInfosToTokenOptions'
 +import { getCommonBase } from 'uniswap/src/constants/routing'
 +import { USDC_UNICHAIN_SEPOLIA } from 'uniswap/src/constants/tokens'
 +import { isPredictionChain, PREDICTION_REGISTRY_POLL_MS } from 'uniswap/src/features/predictionMarkets/config'
-+import { getPredictionMarkets, usePredictionRegistry } from 'uniswap/src/features/predictionMarkets/registry'
++import {
++  getPredictionMarkets,
++  getPredictionMarketTrack,
++  getPredictionTracks,
++  usePredictionRegistry,
++} from 'uniswap/src/features/predictionMarkets/registry'
 +import type { Market } from 'uniswap/src/features/predictionMarkets/sdk'
++import type { PredictionTrack } from 'uniswap/src/features/predictionMarkets/tracks'
++import { ONE_SECOND_MS } from 'utilities/src/time/time'
 +
-+const OPEN_MARKETS_SHOWN = 8
-+const SETTLED_MARKETS_SHOWN = 4
++const OPEN_MARKETS_PER_TRACK = 4
++const SETTLED_MARKETS_PER_TRACK = 2
++/** Caps for markets no track claims (every market, when the deployment lists no tracks) */
++const OPEN_MARKETS_UNTRACKED = 8
++const SETTLED_MARKETS_UNTRACKED = 4
++/** A track this short or shorter makes the picker re-check cutoffs every second */
++const FAST_TRACK_SECONDS = 120
++
++export const PREDICTION_UNTRACKED_GROUP_ID = 'untracked'
++export const PREDICTION_UNTRACKED_GROUP_NAME = 'Prediction markets'
++
++export interface PredictionPickerGroup {
++  /** The track's scheduler address, or `PREDICTION_UNTRACKED_GROUP_ID` */
++  id: string
++  /** "ETH 1-minute" */
++  name: string
++  markets: Market[]
++}
++
++function isOpen(m: Market, now: bigint): boolean {
++  return m.status === 'Trading' && now >= m.info.openTime && now < m.cutoff
++}
++
++function isFinal(m: Market): boolean {
++  return m.status === 'Settled' || m.status === 'Invalid'
++}
 +
 +/**
-+ * Markets for the token selector: open ones (buy and sell) and the newest settled ones (sell to redeem). Markets
-+ * past their cutoff but not yet settled accept no trades and are left out.
++ * Markets for the token selector: one group per track with its open markets (buy and sell), in track order, and the
++ * newest settled markets of every track in one list (sell to redeem), newest expiry first. Markets past their cutoff
++ * but not yet settled accept no trades and are left out. `markets` is newest first.
 + */
 +export function selectPredictionMarketsForPicker(
 +  markets: readonly Market[],
-+  nowSeconds: number,
-+): { open: Market[]; settled: Market[] } {
++  {
++    nowSeconds,
++    tracks = [],
++    trackOf = (): undefined => undefined,
++  }: {
++    nowSeconds: number
++    tracks?: readonly PredictionTrack[]
++    trackOf?: (m: Market) => PredictionTrack | undefined
++  },
++): { open: PredictionPickerGroup[]; settled: Market[] } {
 +  const now = BigInt(Math.floor(nowSeconds))
-+  return {
-+    open: markets
-+      .filter((m) => m.status === 'Trading' && now >= m.info.openTime && now < m.cutoff)
-+      .slice(0, OPEN_MARKETS_SHOWN),
-+    settled: markets.filter((m) => m.status === 'Settled' || m.status === 'Invalid').slice(0, SETTLED_MARKETS_SHOWN),
++  const byTrack = new Map<string, Market[]>()
++  const untracked: Market[] = []
++  for (const m of markets) {
++    const track = trackOf(m)
++    if (track) {
++      const list = byTrack.get(track.scheduler) ?? []
++      list.push(m)
++      byTrack.set(track.scheduler, list)
++    } else {
++      untracked.push(m)
++    }
 +  }
++  const open: PredictionPickerGroup[] = []
++  const settled: Market[] = []
++  for (const track of tracks) {
++    const list = byTrack.get(track.scheduler) ?? []
++    const openHere = list.filter((m) => isOpen(m, now)).slice(0, OPEN_MARKETS_PER_TRACK)
++    if (openHere.length) {
++      open.push({ id: track.scheduler, name: track.label, markets: openHere })
++    }
++    settled.push(...list.filter(isFinal).slice(0, SETTLED_MARKETS_PER_TRACK))
++  }
++  const untrackedOpen = untracked.filter((m) => isOpen(m, now)).slice(0, OPEN_MARKETS_UNTRACKED)
++  if (untrackedOpen.length) {
++    open.push({ id: PREDICTION_UNTRACKED_GROUP_ID, name: PREDICTION_UNTRACKED_GROUP_NAME, markets: untrackedOpen })
++  }
++  settled.push(...untracked.filter(isFinal).slice(0, SETTLED_MARKETS_UNTRACKED))
++  const rank = new Map(settled.map((m, i) => [m, i]))
++  settled.sort(
++    (a, b) =>
++      (a.info.expiry === b.info.expiry ? 0 : a.info.expiry > b.info.expiry ? -1 : 1) ||
++      (rank.get(a) ?? 0) - (rank.get(b) ?? 0),
++  )
++  return { open, settled }
 +}
 +
-+function useNowSeconds(active: boolean): number {
++function useNowSeconds(active: boolean, intervalMs: number): number {
 +  const [now, setNow] = useState(() => Date.now() / 1000)
 +  useEffect(() => {
 +    if (!active) {
 +      return undefined
 +    }
-+    const id = setInterval(() => setNow(Date.now() / 1000), PREDICTION_REGISTRY_POLL_MS)
++    const id = setInterval(() => setNow(Date.now() / 1000), intervalMs)
 +    return () => clearInterval(id)
-+  }, [active])
++  }, [active, intervalMs])
 +  return now
 +}
 +
-+/** USDC plus the YES/NO tokens of the open markets, and the recently settled markets, for the token selector's prediction sections. */
++export interface PredictionPickerSection {
++  /** Unique per section, for list row keys */
++  id: string
++  name: string
++  options: TokenOption[]
++}
++
++/**
++ * The token selector's prediction sections: USDC (the markets' collateral) once, then one section per track with the
++ * YES/NO tokens of its open markets, and the recently settled markets of every track in `settled`.
++ */
 +export function usePredictionTokenOptions(chainId: number | undefined): {
-+  open?: TokenOption[]
++  open?: PredictionPickerSection[]
 +  settled?: TokenOption[]
 +} {
 +  const version = usePredictionRegistry(chainId)
-+  const now = useNowSeconds(isPredictionChain(chainId))
++  const active = isPredictionChain(chainId)
++  const tracks = getPredictionTracks()
++  const hasTracks = tracks.length > 0
++  const fast = !hasTracks || tracks.some((t) => t.tenorSec <= FAST_TRACK_SECONDS)
++  const now = useNowSeconds(active, fast ? ONE_SECOND_MS : PREDICTION_REGISTRY_POLL_MS)
++
++  // Recomputed on every tick; the options below only change when the listed markets do
++  const selection = useMemo(
++    () =>
++      active
++        ? selectPredictionMarketsForPicker(getPredictionMarkets(), {
++            nowSeconds: now,
++            tracks,
++            trackOf: getPredictionMarketTrack,
++          })
++        : undefined,
++    // oxlint-disable-next-line react-hooks/exhaustive-deps -- re-read the registry when it changes
++    [active, version, now, tracks],
++  )
++  const signature = selection
++    ? JSON.stringify([
++        selection.open.map((g) => [g.id, g.name, ...g.markets.map((m) => m.id.toString())]),
++        selection.settled.map((m) => m.id.toString()),
++      ])
++    : ''
++
 +  return useMemo(() => {
-+    if (!isPredictionChain(chainId) || !chainId) {
++    if (!selection || !chainId) {
 +      return {}
 +    }
-+    const { open, settled } = selectPredictionMarketsForPicker(getPredictionMarkets(), now)
-+    const options = (list: Market[]): TokenOption[] | undefined =>
++    const options = (list: Market[]): TokenOption[] =>
 +      currencyInfosToTokenOptions(
 +        list.flatMap((m) => [getCommonBase(chainId, m.yes.address), getCommonBase(chainId, m.no.address)]),
-+      )
-+    // USDC (the markets' collateral) first, so both sides of a trade can be picked from this section
-+    const usdc = getCommonBase(chainId, USDC_UNICHAIN_SEPOLIA.address)
-+    return { open: currencyInfosToTokenOptions([usdc, ...(options(open) ?? []).map((o) => o.currencyInfo)]), settled: options(settled) }
-+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- re-read the registry when it changes
-+  }, [chainId, version, now])
++      ) ?? []
++    // USDC once, first, so both sides of a trade can be picked from these sections
++    const usdc = currencyInfosToTokenOptions([getCommonBase(chainId, USDC_UNICHAIN_SEPOLIA.address)]) ?? []
++    const groups = selection.open.map((g) => ({ id: g.id, name: g.name, options: options(g.markets) }))
++    const open: PredictionPickerSection[] = hasTracks
++      ? [
++          { id: 'usdc', name: PREDICTION_UNTRACKED_GROUP_NAME, options: usdc },
++          ...groups.map((g) =>
++            g.id === PREDICTION_UNTRACKED_GROUP_ID ? { ...g, name: 'Other prediction markets' } : g,
++          ),
++        ]
++      : [
++          {
++            id: PREDICTION_UNTRACKED_GROUP_ID,
++            name: PREDICTION_UNTRACKED_GROUP_NAME,
++            options: [...usdc, ...groups.flatMap((g) => g.options)],
++          },
++        ]
++    const settled = options(selection.settled)
++    return { open: open.filter((section) => section.options.length), settled: settled.length ? settled : undefined }
++    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `signature` stands for `selection`
++  }, [chainId, version, signature, hasTracks])
 +}
 diff --git a/packages/uniswap/src/features/providers/resolveRpcConfig.web.ts b/packages/uniswap/src/features/providers/resolveRpcConfig.web.ts
 index 2afa350..a114313 100644
