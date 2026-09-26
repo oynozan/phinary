@@ -1,32 +1,24 @@
-# Phinary: binary options, traded as Uniswap swaps
+# Uniswap developer feedback
 
-Developer feedback from ETHGlobal Tokyo 2026.
-
-Phinary brings binary options into Uniswap v4. A trader buys an UP or DOWN token with USDC. At expiry, the winning side redeems for $1 per token. Buying and selling use the same Uniswap swap infrastructure that already handles token trades.
-
-The interesting part is inside the hook. Our [`beforeSwap` implementation](src/PredictionHook.sol#L221-L247) calculates an option price from the underlying pool price, volatility and time to expiry, then returns the swap delta. The pricing model is Black-Scholes adapted to the settlement window. A shared USDC vault supplies the backing, and settlement reads the underlying Uniswap pool's average price over that window.
-
-That is what we wanted to explore with v4: how much of an options venue can fit inside a hook while keeping the existing swap interface? Phinary puts the option pricing and accounting there, with V4Quoter, Permit2 and UniversalRouter handling the trader's route into it. We built a [TypeScript SDK](packages/swap-sdk/README.md), a dashboard, and an integration in a local fork of the Uniswap interface around that route.
-
-The contracts are deployed on Unichain Sepolia. One distinction matters for the demo: a bot trades our testnet underlying pools toward external reference prices because those pools do not have organic arbitrage. The contracts read the pools; they do not consume the external feed directly. Our mainnet oracle design is separate and is not deployed. Current addresses are in the [deployment file](deployments/unichain-sepolia.json).
+From the Phinary team, ETHGlobal Tokyo 2026.
 
 ## Give each hook a page people can find
 
-Once the integration exists, sharing it should be straightforward. We want to send someone one link where they can see what Phinary does, which chain it runs on, and which hook address to use.
+Finding a hook should start with a page that explains what it does and where it is deployed. We want to share one link that gives another developer enough information to try it.
 
 The [Uniswap hooklist](https://github.com/Uniswap/hooklist) already contains deployment metadata, and [Hook Discovery](https://developers.uniswap.org/docs/community/learning/hook-discovery) points to community catalogs. A useful next step would be an official browsing experience that brings the description, deployments, permissions, source and a working example together on a page for each hook.
 
-For Phinary, that page could explain that a swap buys a binary option, show its expiry and settlement rules, and give an integrator a quote example. An address and a set of permission flags do not tell that story on their own.
+A quote example would be especially helpful for custom pricing hooks. An address and a set of permission flags tell an integrator where to start, but leave them to work out how the hook behaves.
 
 The page should also say whether a hook is simply listed or has been reviewed for routing compatibility. Neither label should imply a security audit. This is the improvement we would put first: make a working hook easier for the next developer to find and try.
 
 ## Take the reference example all the way to the wallet
 
-Our swap path includes pool discovery, a V4Quoter call, ERC-20 approval, Permit2, UniversalRouter calldata, simulation and receipt handling. The pieces come together in our SDK, but there is quite a bit of integration between a hook contract and a usable buy button.
+Our swap path includes pool discovery, a V4Quoter call, ERC-20 approval, Permit2, UniversalRouter calldata, simulation and receipt handling. There is quite a bit of integration between a hook contract and a usable buy button.
 
 A small reference app for a custom pricing hook would help. Pin the router address and ABI for a testnet, show a buy and a sell, and include the approval and failure paths. For a new builder, being able to compare one complete transaction against a known working example is more useful than another isolated code snippet.
 
-Please put the routing review step beside that example. Phinary uses `beforeSwapReturnDelta`, and the [routing allowlist form](https://developers.uniswap.org/hook-allowlist) covers hooks using return deltas. Executing through UniversalRouter and appearing in the public Uniswap app are separate milestones. Our interface demo uses a local fork; it does not establish public routing support.
+Please put the routing review step beside that example. Our hook uses `beforeSwapReturnDelta`, and the [routing allowlist form](https://developers.uniswap.org/hook-allowlist) covers hooks using return deltas. Executing through UniversalRouter and appearing in the public Uniswap app are separate milestones. Our interface demo uses a local fork; it does not establish public routing support.
 
 ## Keep the hook's error visible
 
