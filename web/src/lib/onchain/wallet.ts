@@ -7,6 +7,8 @@ import { getConnectionConfig } from "./config.ts";
 import { createChainClient } from "./client.ts";
 import { assertWalletNetwork, isRejected, walletIdentity, type BrowserProvider } from "./wallet-core.ts";
 
+import { walletConnectionError } from "./wallet-connection-error.ts";
+
 export interface WalletOption { id: string; name: string; provider: BrowserProvider }
 interface Session {
     status: "disconnected" | "connecting" | "connected";
@@ -93,7 +95,7 @@ export async function connectWallet(id?: string) {
         attach(option); saved(option.id); await syncIdentity();
     } catch (error) {
         if (epoch === version) set({ status: "disconnected" });
-        throw new Error(isRejected(error) ? "Connection cancelled" : "Could not connect wallet");
+        throw new Error(walletConnectionError(error), { cause: error });
     }
 }
 export function disconnectWallet() {

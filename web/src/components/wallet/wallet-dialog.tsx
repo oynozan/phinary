@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { ArrowUpRight, ChevronRight, LoaderCircle, Wallet } from "lucide-react";
-import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { connectWallet, useWalletSession } from "@/lib/onchain/wallet";
 import "./wallet-dialog.css";
@@ -12,8 +11,10 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     const wallet = useWalletSession();
     const opener = useRef<HTMLElement | null>(null);
     const [selected, setSelected] = useState<string | null>(null);
+    const [connectionError, setConnectionError] = useState<string | null>(null);
     const connecting = wallet.status === "connecting";
     return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="wallet-dialog" onOpenAutoFocus={() => {
+        setConnectionError(null);
         opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }} onCloseAutoFocus={(event) => {
         if (opener.current?.isConnected) {
@@ -35,9 +36,13 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 const metamask = option.id === "io.metamask" || option.name.toLowerCase() === "metamask";
                 const pending = connecting && selected === option.id;
                 return <button type="button" className="wallet-option" key={option.id} disabled={connecting} aria-label={`Connect ${option.name}`} aria-busy={pending} onClick={async () => {
+                    setConnectionError(null);
                     setSelected(option.id);
                     try { await connectWallet(option.id); onOpenChange(false); }
-                    catch (error) { toast.error(error instanceof Error ? error.message : "Could not connect"); }
+                    catch (error) {
+                        const message = error instanceof Error ? error.message : "Could not connect";
+                        setConnectionError(message);
+                    }
                     finally { setSelected(null); }
                 }}>
                     <span className="wallet-option-icon">{metamask ? <Image src="/wallets/metamask.svg" alt="" width={36} height={36} /> : <Wallet size={28} aria-hidden="true" />}</span>
@@ -46,6 +51,7 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 </button>;
             })}
         </div>}
+        {connectionError && <p className="wallet-dialog-error" role="alert">{connectionError}</p>}
         <p className="wallet-dialog-note" role="status">{connecting ? 'Approve the connection in your wallet.' : 'Connecting does not submit a transaction.'}</p>
     </DialogContent></Dialog>;
 }

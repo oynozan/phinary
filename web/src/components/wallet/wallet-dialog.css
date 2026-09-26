@@ -39,3 +39,6 @@
   .wallet-dialog-empty { margin-inline: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .wallet-dialog * { animation: none !important; transition: none !important; } }
+
+.wallet-dialog-error { margin: 0 24px 20px; padding: 12px; border: 1px solid #71403e; border-radius: 8px; background: #27171b; color: #ffb5af; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .wallet-dialog-error { margin-inline: 20px; } }

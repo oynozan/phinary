@@ -12,10 +12,11 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => {
         window.walletRequests = 0;
+        window.walletFailureCode = 4001;
         const provider = { request: ({ method }) => {
             if (method !== 'eth_requestAccounts') throw Error('Unexpected fixture RPC');
             window.walletRequests++;
-            return new Promise((resolve, reject) => { window.rejectWallet = () => reject({ code: 4001 }); });
+            return new Promise((resolve, reject) => { window.rejectWallet = () => reject({ code: window.walletFailureCode }); });
         } };
         window.addEventListener('eip6963:requestProvider', () => {
             for (const [rdns, name, wallet] of [['io.metamask', 'MetaMask', provider], ['example.wallet', 'Another wallet', { request: provider.request }]]) {
@@ -42,6 +43,12 @@ try {
         await page.evaluate(() => window.rejectWallet());
         await page.getByText('Connection cancelled', { exact: true }).waitFor();
         await page.waitForFunction(() => !document.querySelector('.wallet-option').disabled);
+        await page.evaluate(() => { window.walletFailureCode = -32002; });
+        await dialog.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+        await dialog.getByText('Confirm in MetaMask', { exact: true }).waitFor();
+        await page.evaluate(() => window.rejectWallet());
+        await dialog.getByRole('alert').filter({ hasText: 'A connection request is already pending.' }).waitFor();
+        assert.equal(await dialog.isVisible(), true);
         await page.keyboard.press('Escape');
         await dialog.waitFor({ state: 'hidden' });
         await page.waitForFunction(() => document.querySelector('.header-wallet') === document.activeElement, undefined, { timeout: 2000 });
