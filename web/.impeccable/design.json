@@ -1,16 +1,20 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-26T06:40:50.993433+00:00",
+  "generatedAt": "2026-09-26T07:10:28.084774+00:00",
   "title": "Design System: Phinary",
   "extensions": {
     "scope": [
       "Markets route /",
+      "Market Detail route /market/[id]",
       "shared header"
     ],
     "sources": [
       "src/app/markets.css",
       "src/app/globals.css",
-      "src/components/layout/header.tsx"
+      "src/components/layout/header.tsx",
+      "src/app/market/[id]/_components/market-detail.css",
+      "src/app/market/[id]/_components/detail-presentation.tsx",
+      "src/components/trade/trade-card.tsx"
     ],
     "breakpoints": [
       {
@@ -30,7 +34,29 @@
       "shellTop": "76px",
       "shellTopBelow640": "68px",
       "headerHeight": "52px",
-      "containerMax": "1536px"
+      "containerMax": "1536px",
+      "marketDetail": {
+        "desktopColumns": "minmax(0, 1.95fr) minmax(340px, 1fr)",
+        "below1280Columns": "minmax(0, 1.75fr) minmax(340px, 1fr)",
+        "gap": "12px 24px",
+        "gapBelow1280": "12px 16px",
+        "stickyTop": "var(--shell-top)",
+        "stackBelow": "1024px",
+        "stackContainerMax": "780px",
+        "gutters": "48px / 28px below1280 / 20px below640",
+        "mobileOrder": [
+          "overview",
+          "chart",
+          "trade",
+          "position",
+          "pricing",
+          "rules",
+          "recent trades",
+          "onchain info"
+        ],
+        "chartHeight": "235px",
+        "chartHeightBelow640": "220px"
+      }
     },
     "shadows": [
       {
@@ -44,27 +70,331 @@
         "name": "markets-reduced-motion",
         "value": "animation: none; transition: none",
         "purpose": "Applied throughout Markets under prefers-reduced-motion: reduce."
+      },
+      {
+        "name": "detail-control",
+        "value": "color 150ms, background-color 150ms, border-color 150ms",
+        "purpose": "Scoped detail controls; enabled buttons translateY(1px) on press."
+      },
+      {
+        "name": "detail-reduced-motion",
+        "value": "animation: none; transition: none; scroll-behavior: auto; transform: none on pressed buttons",
+        "purpose": "Detail prefers-reduced-motion override."
       }
     ],
     "effects": {
       "headerBackdrop": "Opaque #080b13 with static orbit artwork at 0.45 opacity",
-      "heroArtworkOpacity": 0.65
+      "heroArtworkOpacity": 0.65,
+      "detailArtwork": {
+        "asset": "/markets/orbit.webp",
+        "opacity": 0.45,
+        "height": "380px",
+        "mask": "linear-gradient(#000 0%, transparent 100%)"
+      }
     },
-    "previewData": "Price values in component snippets are illustrative design-panel examples, never application data."
+    "previewData": "Price values in component snippets are illustrative design-panel examples, never application data.",
+    "colorMeta": {
+      "detail-panel": {
+        "displayName": "Panel",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-recess": {
+        "displayName": "Recess",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-input": {
+        "displayName": "Input",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-control": {
+        "displayName": "Control",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-control-border": {
+        "displayName": "Control Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-input-border": {
+        "displayName": "Input Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-focus": {
+        "displayName": "Focus",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-hover-border": {
+        "displayName": "Hover Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-link-hover": {
+        "displayName": "Link Hover",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-selection": {
+        "displayName": "Selection",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-active": {
+        "displayName": "Active",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-active-border": {
+        "displayName": "Active Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-up-selected": {
+        "displayName": "Up Selected",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-up-selected-border": {
+        "displayName": "Up Selected Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-down-selected": {
+        "displayName": "Down Selected",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-quick": {
+        "displayName": "Quick",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-quick-selected": {
+        "displayName": "Quick Selected",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-disabled-text": {
+        "displayName": "Disabled Text",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-disabled-selected": {
+        "displayName": "Disabled Selected",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-disabled-selected-border": {
+        "displayName": "Disabled Selected Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-disabled-selected-text": {
+        "displayName": "Disabled Selected Text",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-start": {
+        "displayName": "Primary Start",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-end": {
+        "displayName": "Primary End",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-border": {
+        "displayName": "Primary Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-hover": {
+        "displayName": "Primary Hover",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-disabled": {
+        "displayName": "Primary Disabled",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-disabled-border": {
+        "displayName": "Primary Disabled Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-primary-disabled-text": {
+        "displayName": "Primary Disabled Text",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-status": {
+        "displayName": "Status",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-status-border": {
+        "displayName": "Status Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-live-surface": {
+        "displayName": "Live Surface",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-live-border": {
+        "displayName": "Live Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-model-border": {
+        "displayName": "Model Border",
+        "role": "primary",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-empty-text": {
+        "displayName": "Empty Text",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-tooltip-border": {
+        "displayName": "Tooltip Border",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-divider": {
+        "displayName": "Divider",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-link-underline": {
+        "displayName": "Link Underline",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      },
+      "detail-scrollbar": {
+        "displayName": "Scrollbar",
+        "role": "neutral",
+        "scope": "Market Detail only",
+        "purpose": "Implemented detail CSS tonal state; normative value is in DESIGN.md frontmatter."
+      }
+    },
+    "typographyMeta": {
+      "detail-heading": {
+        "displayName": "Detail Heading",
+        "purpose": "Scoped Market Detail heading role."
+      },
+      "detail-heading-mobile": {
+        "displayName": "Detail Heading Mobile",
+        "purpose": "Scoped Market Detail heading mobile role."
+      },
+      "detail-section": {
+        "displayName": "Detail Section",
+        "purpose": "Scoped Market Detail section role."
+      },
+      "detail-trade-title": {
+        "displayName": "Detail Trade Title",
+        "purpose": "Scoped Market Detail trade title role."
+      },
+      "detail-body": {
+        "displayName": "Detail Body",
+        "purpose": "Scoped Market Detail body role."
+      },
+      "detail-label": {
+        "displayName": "Detail Label",
+        "purpose": "Scoped Market Detail label role."
+      },
+      "detail-control": {
+        "displayName": "Detail Control",
+        "purpose": "Scoped Market Detail control role."
+      },
+      "detail-empty": {
+        "displayName": "Detail Empty",
+        "purpose": "Scoped Market Detail empty role."
+      },
+      "detail-pricing": {
+        "displayName": "Detail Pricing",
+        "purpose": "Scoped Market Detail pricing role."
+      },
+      "detail-quote": {
+        "displayName": "Detail Quote",
+        "purpose": "Scoped Market Detail quote role."
+      },
+      "detail-metric": {
+        "displayName": "Detail Metric",
+        "purpose": "Scoped Market Detail metric role."
+      },
+      "detail-action": {
+        "displayName": "Detail Action",
+        "purpose": "Scoped Market Detail action role."
+      },
+      "detail-model-output": {
+        "displayName": "Detail Model Output",
+        "purpose": "Scoped Market Detail model output role."
+      },
+      "detail-amount": {
+        "displayName": "Detail Amount",
+        "purpose": "Scoped Market Detail amount role."
+      }
+    }
   },
   "components": [
     {
       "name": "UP price action",
       "kind": "button",
       "description": "Featured available UP price link.",
-      "html": "<a class=\"ds-up\" href=\"#\">Buy UP 63¢</a>",
+      "html": "<a class=\"ds-up\" href=\"#\">Buy UP 63\u00a2</a>",
       "css": ".ds-up{display:flex;align-items:center;justify-content:center;gap:5px;min-height:43px;border-radius:8px;font:800 15px Manrope,sans-serif;color:white;background:linear-gradient(110deg,#9918d0,#7733cf);text-decoration:none}.ds-up:hover{filter:brightness(1.14)}.ds-up:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
     },
     {
       "name": "DOWN price action",
       "kind": "button",
       "description": "Featured DOWN navigation retains existing preview behavior.",
-      "html": "<a class=\"ds-down\" href=\"#\">Buy DOWN 37¢</a>",
+      "html": "<a class=\"ds-down\" href=\"#\">Buy DOWN 37\u00a2</a>",
       "css": ".ds-down{display:flex;align-items:center;justify-content:center;min-height:43px;border-radius:8px;font:800 15px Manrope,sans-serif;color:white;background:#bb3739;text-decoration:none}.ds-down:hover{filter:brightness(1.14)}.ds-down:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
     },
     {
@@ -97,7 +427,53 @@
       "description": "Translucent preview surface with whole-card focus and hover.",
       "html": "<a class=\"ds-card\" href=\"#\">Featured market</a>",
       "css": ".ds-card{display:block;min-width:0;padding:20px;border:1px solid #252a38;border-radius:12px;background:rgb(12 16 25 / 88%);color:#f5f5fa;font:13px Manrope,sans-serif;text-decoration:none}.ds-card:hover,.ds-card:focus-visible{border-color:#654085}.ds-card:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
+    },
+    {
+      "name": "Detail purchase action",
+      "kind": "button",
+      "description": "Enabled UP purchase presentation; availability remains controlled by the existing quote and wallet flow.",
+      "html": "<button class=\"ds-detail-buy\">Buy UP</button>",
+      "css": ".ds-detail-buy{width:100%;min-height:48px;padding:10px 16px;border-radius:8px;border:1px solid #a63ce5;background:linear-gradient(100deg,#a50cdf,#6f18f5);color:white;font:700 18px/1.5 Manrope,sans-serif;cursor:pointer;transition:color 150ms,background-color 150ms,border-color 150ms}.ds-detail-buy:hover:not(:disabled){background:#8222ce;border-color:#b986dd}.ds-detail-buy:focus-visible{outline:2px solid #db9bff;outline-offset:3px}.ds-detail-buy:active:not(:disabled){transform:translateY(1px)}.ds-detail-buy:disabled{background:#252034;border-color:#4a365d;color:#c6b8d9;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-detail-buy{transition:none}.ds-detail-buy:active:not(:disabled){transform:none}}"
+    },
+    {
+      "name": "Detail amount",
+      "kind": "input",
+      "refersTo": "detail-amount",
+      "description": "USDC amount with a border focus treatment and explicit keyboard focus.",
+      "html": "<label class=\"ds-detail-amount\"><input aria-label=\"Amount in USDC\" inputmode=\"decimal\" placeholder=\"0.00\" /><span>USDC</span></label>",
+      "css": ".ds-detail-amount{display:flex;align-items:center;border:1px solid #384055;border-radius:8px;background:#080d15;padding:0 14px;height:48px;color:#f5f5fa;font:14px Manrope,sans-serif}.ds-detail-amount:focus-within{border-color:#d773ff}.ds-detail-amount input{width:100%;min-width:0;background:transparent;border:0;color:#f5f5fa;caret-color:#db9bff;font:24px/1.5 Manrope,sans-serif}.ds-detail-amount input:focus-visible{outline:2px solid #db9bff;outline-offset:3px}.ds-detail-amount input:disabled{color:#aeb6c9}"
+    },
+    {
+      "name": "Detail panel",
+      "kind": "card",
+      "refersTo": "detail-panel",
+      "description": "Compact terminal panel; content here is an unavailable state, not simulated data.",
+      "html": "<section class=\"ds-detail-panel\"><h2>Recent Trades</h2><p>Recent trades unavailable</p></section>",
+      "css": ".ds-detail-panel{border:1px solid #252a38;border-radius:10px;background:rgb(11 16 25 / 94%);padding:14px 18px;color:#f5f5fa;font:13px/1.5 Manrope,sans-serif}.ds-detail-panel h2{font:800 17px/1.3 Manrope,sans-serif;letter-spacing:-.025em;margin:0 0 8px}.ds-detail-panel p{color:#b4bdd3}"
     }
   ],
-  "narrative": "# Design System: Phinary\n\n## Overview\n\nThis refresh applies to the Markets route and shared header only. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface brief is `.impeccable/markets.md`; product and data constraints remain in `PRODUCT.md`.\n\n## Colors\n\nViolet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css` and the shared-header rules in `src/app/globals.css`.\n\n## Typography\n\nMarkets and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.\n\n## Layout\n\nShared header height is 52px on every route. The shell supplies 76px top padding, reduced to 68px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.\n\nMarkets and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.\n\n## Elevation & Depth\n\nThin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets honors reduced motion.\n\n## Shapes\n\nCards and table containers use the card radius. Search, select and featured actions use the control radius. Filter buttons use the smaller filter radius; filter groups, row actions and header wallet controls use the control-group radius. Status labels and ETH symbols are rounded independently.\n\n## Components\n\nThe header keeps a Phi mark and wordmark, luminous active underline and existing wallet behavior. Connected wallet controls show a blue USDC icon and wallet/address/chevron in compact 34px bordered controls; disconnected wallets show Connect wallet. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.\n\n## Do's and Don'ts\n\n- Do preserve the scoped Markets palette, compact density and visible keyboard focus.\n- Do keep the shared header offset consistent across every route.\n- Don't apply this refresh to other route bodies without a separate decision.\n- Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.\n\n## Legacy body reference\n\nThe following rules apply only to other route bodies and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.\n\n### Hard rules\n\n- **No gradients anywhere.** No `linear-` / `radial-` / `conic-gradient` in CSS or inline styles, no Tailwind `bg-linear-*` / `bg-gradient-*` / `from-` / `via-` / `to-`, no SVG `<linearGradient>` / `<radialGradient>`, no gradient chart fills, masks or text. Flat solid colours only. Charts are a line, no area fill.\n- **Buttons are solid.** Every button, pill button, segmented / tab item, dock icon, menu trigger and the LiquidMetal Trade button has an opaque fill. No `bg-x/NN` alpha fills, no transparent ghost fills, no `backdrop-blur`, no `opacity-*` on a button surface. Tinted buttons use the opaque tint tokens (`bg-up-soft`, `bg-primary-soft`, ...). Outline buttons sit on `bg-surface-2`. Disabled is an opaque muted fill (`bg-primary-disabled` for primary, `bg-surface-2` + `text-subtle` for the rest), never reduced opacity.\n- **No labels on or above headings.** No status pill, eyebrow, kicker, overline or tag above, on or attached to a heading or market question. Status is the countdown itself (a live market shows its countdown), disabled / closed actions, or the value in a result line (\"Resolved ▲ UP\", \"Settled $2,696.45\").\n- **No mock logos.** The header shows the plain \"Phinary\" wordmark in Akt, no mark. The favicon is a solid orchid \"P\" on carbon. No generated token discs: where a side needs an indicator use plain inline \"▲ UP\" / \"▼ DOWN\" text in the side colour (`SideMark`).\n\n### Copy rules\n\n- No em dashes anywhere (UI, code, comments, docs). Avoid en dashes in UI copy. Use a hyphen, colon or comma.\n- No eyebrow / kicker / overline text or status pill above, on or beside headings. Headings stand alone.\n- Minimal: numbers and actions. No helper paragraphs, no explanatory labels, no marketing copy. Empty states are one line plus at most one button.\n- Sides are always **UP** / **DOWN** (never YES / NO). Prices as cents (`63¢`) or chance (`62%`). Tickers `ETHUP` / `ETHDOWN`.\n\n### Tokens (`src/app/globals.css`)\n\n| Token (Tailwind) | Value | Use |\n|---|---|---|\n| `bg-background` | `#191919` Carbon Black | page |\n| `bg-surface` | `#201f21` | panels, cards, top section of a stacked card |\n| `bg-surface-2` / `bg-secondary` | `#282629` | lower stacked section, inputs on panels |\n| `bg-surface-3` | `#312e32` | hover on surface-2 |\n| `text-foreground` | `#f4f2f5` | primary text |\n| `text-muted-foreground` | `#a19ea4` | labels, secondary numbers |\n| `text-subtle` | `#8a8790` | tertiary (4.6:1 on carbon) |\n| `primary` / `accent` / `orchid` | `#C828D6` Vivid Orchid | primary buttons, active pills, accent word, focus |\n| `accent-2` / `amethyst` | `#9C30A5` | hover of primary, depth, Averaging phase |\n| `up` | `#e070ea` | UP side, ▲ (lighter and pinker than the brand orchid, so chrome never reads as a side) |\n| `down` | `#e5604f` | DOWN side, ▼ |\n| `up-soft` / `up-soft-hover` | up 16% / 26% mixed into surface (opaque) | Buy UP button, UP pill, active UP selector |\n| `down-soft` / `down-soft-hover` | down 16% / 26% into surface (opaque) | Buy DOWN, DOWN pill, destructive |\n| `primary-soft` / `primary-soft-hover` | orchid 16% / 26% into surface (opaque) | active dock icon, \"You\" rows and pills, icon discs, menu focus |\n| `primary-disabled` | orchid 32% into carbon (opaque) | disabled primary button |\n| `warn-soft` | warn 14% into surface (opaque) | Closed phase pill |\n| `wash` | orchid 12% into surface (opaque) | `Panel highlight`, `EmptyState` |\n| `warn` | `#e0a64a` | Closed phase, warnings |\n| `border` | white 10% | every border (atomic.cash) |\n| `border-strong` | white 16% | chart guides, emphasis |\n\nAlways pair UP / DOWN colours with ▲ / ▼ or the words UP / DOWN. Profit is not a side: positive profit is `foreground` with a `+`, losses are `down` (use `Profit`). Tints are always the opaque `*-soft` tokens (a colour mixed into a surface with `color-mix`), never `bg-up/15`-style alpha.\n\nUtilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash` (flat `wash` colour for highlight and empty panels), `animate-live` (pulsing dot), `no-scrollbar`.\n\n### Fonts\n\n| Class | Font | When |\n|---|---|---|\n| `font-heading` | Akt 400/500 | h1-h4 (automatic), big numbers (chance %, totals), market questions |\n| `font-sans` (default) | Lexend Deca | body, buttons, inputs |\n| `font-secondary` | Manrope | small UI text: pills, badges, table numbers, axis ticks, captions |\n| `font-mono` | Ubuntu Mono | addresses and tx hashes only, rarely |\n\n### Layout\n\n- Shell: the shared translucent header and existing floating dock live in `app/layout.tsx`. `<main>` provides the shared top offset described above and existing bottom padding (`--shell-bottom`), with `overflow-x-clip` so sticky content works; pages start directly with content.\n- The dock is mobile and tablet navigation only (hidden from 1024 px, where the header nav takes over). Keep primary actions clear of it below 1024 px.\n- Containers (`@/components/layout/page`): `PageWide` (1200px, header gutters) for grids and tables; `PageNarrow` (`size=\"sm\"` 575px for trade box and forms, `size=\"md\"` 720px for lists and detail). Everything is centered.\n- Headings: `PageHeading` (centered h1, 3xl to 5xl) for section pages; `HeroHeading` + `Accent` (one accent word) for the home hero. Every page hero is centered on the page, above any two-column grid (the market page puts its question, its countdown and the timeline in a full-width row, then the grid). Titles of panels in a column sit inside the panel (`h2 text-xl` in the panel's padding); `SectionHeading` is for centered section titles in a single column.\n- Spacing: generous. Panels `p-5 sm:p-6`, grids `gap-5`, sections `space-y-10` or more. Large type.\n\n### Radii and shapes\n\n- `rounded-3xl` (24px): panels, cards, stacked trade card, dialogs. `rounded-4xl` (32px) for a big hero panel.\n- `rounded-full`: every button, pill, segmented control, input, badge, the round arrow between stacked sections.\n- `rounded-2xl`: menu popovers, list rows inside dialogs, chart tooltip.\n\n### Components\n\nLayout and wallet:\n\n| Import | What |\n|---|---|\n| `@/components/layout/page` | `PageWide`, `PageNarrow`, `PageHeading`, `HeroHeading`, `Accent`, `SectionHeading` |\n| `@/components/layout/panel` | `Panel` (rounded-3xl bordered surface; `highlight` for the orchid wash, `flush` for no padding), `EmptyState` (one line + action) |\n| `@/components/layout/logo` | `Logo` (the \"Phinary\" wordmark, no mark) |\n| `@/components/wallet/*` | `ConnectButton`, `BalancePill`, `WalletDialog`, `WrongNetworkBanner` (already in the shell) |\n| `@/config/brand` | `BRAND_NAME`, `DISPLAY_TIMEZONE` (UTC, matches token names), `CHAIN` |\n\nPrimitives (`@/components/ui/*`, shadcn, themed): `button` (variants `default` orchid, `outline` (surface-2), `secondary`, `ghost` (surface), `up`, `down`, `destructive`, all opaque; sizes `xs sm default lg xl`; `xl` = 56px full-width CTA), `card`, `tabs`, `input`, `badge`, `dialog`, `sheet`, `tooltip`, `separator`, `table`, `skeleton`, `dropdown-menu`, `toggle-group`, `progress`, `slider`, `scroll-area`, `sonner` (`toast` from `sonner`), `chart`.\n\n`@/components/ui/liquid-metal-button`: `LiquidMetalButton` (`label`, `fullWidth`, `disabled`, `onClick`, `type`, `href`). The Trade CTA in the trade box only; every other primary action is `<Button size=\"xl\">`. The shader draws only the rim; the rim backing and the inner surface are flat opaque colours, and disabled swaps both for a muted opaque fill and hides the shader.\n\nMarket (`@/components/market`):\n\n| Component | Props |\n|---|---|\n| `MarketQuestion` | `strike`, `expiry`, `as`, `accentStrike`: \"ETH > $2,684.53 at 00:48?\" |\n| `PhaseBadge` | `phase`: opaque phase pill for table cells only (e.g. an invalid outcome in the feed). Never on, above or beside a heading |\n| `Countdown` | `to` (unix s): live `m:ss`, client-only |\n| `ProbabilityBar` | `up` (0..1), `labels` |\n| `SideMark` | `side`: plain inline \"▲ UP\" / \"▼ DOWN\" text in the side colour, the side indicator wherever a logo would go |\n| `PriceTag` | `side`, `price?`: \"▲ UP 63¢\", or just \"▲ UP\" without a price. The one UP / DOWN pill everywhere (tables, feed, portfolio) |\n| `Chance` | `value`, `className` (number size): big \"48% ▲ UP\" |\n| `Money` | `value`, `dimCents`: $1,234 with small muted cents for hero numbers |\n| `Profit` | `value`: signed USD, foreground / coral / muted when flat |\n| `AssetChip` | `asset` (`{kind:\"usdc\"}`, `{kind:\"shares\"}`, `{kind:\"outcome\", side}`), `title`: the token pill of stacked cards; plain ticker text with no logo; outcome chips lead with a ▲ / ▼. `Balance` (wallet icon + amount) sits beside it |\n| `SwapStack` | `top`, `bottom`, `onFlip?` (arrow becomes a spinning button), `flipLabel`: the atomic.cash stacked card, focus ring on the card when its input has focus |\n| `SwapOutput` | `chip`, `value` (string or null for the grey 0), `htmlFor`, `label`: the \"You receive\" half |\n| `Sparkline` | `data` (0..1), `domain`, `color`: a line, no fill |\n| `ProbabilityChart` | `points` (`usePriceHistory`), `domain` (`[openTime, cutoff]` to show the full life), `height`: a line, no area fill |\n| `MarketCard` | `market`, `onBuy?` (defaults to linking `/market/[id]?side=up`). Question first, no phase pill. Live: Buy UP / DOWN and the countdown in the footer row; closed, averaging, settling: countdown row; resolved: winner and a \"Settled\" average row |\n| `AmountInput` | `value` (string), `onChange`, `label`, `adornment`, `quick` (default 1/5/10), `max`: 48px input + pills; the pill matching the value is filled orchid |\n| `SegmentedPills` | `options` (`activeClassName` per option, e.g. `bg-up text-white`), `value`, `onChange`, `size` `xs`/`sm`/`md`, `fullWidth`. Radio group with arrow keys and a focus ring |\n\nAlso exported: `PHASE_DOT` (status dot classes per phase) from `phase-badge`. Trade (`@/components/trade`): `TradeCard` (swaps to an outcome card with Claim once resolved), `useClaims` (`claimOne`, `claimAll`, switches network first; the only claim hook).\n\n### atomic.cash patterns to reuse\n\n- **Stacked trade card**: always `SwapStack` + `SwapOutput` + `AssetChip`, never a hand-rolled copy. One card, not a card inside a card: selectors (pills, outcome buttons) above it, the summary line and CTA below it.\n- **Settings row under a card**: `mt-3 flex justify-between px-1 text-xs text-muted-foreground` with `SegmentedPills size=\"xs\"`.\n- **Full-width CTA** under the card: `mt-3`, 56px, rounded-full.\n- **Stat tiles**: `Panel`, centered, `font-heading text-2xl` value with the `text-xs text-muted-foreground` label under it (never above: that reads as a kicker), in `grid gap-5 md:grid-cols-3`.\n- **Tables**: shadcn `Table` inside `<Panel flush>`; numbers right-aligned in `font-secondary num`; on mobile switch to stacked rows (`rounded-2xl border bg-surface-2 p-3`) with CSS breakpoints (`hidden lg:block` / `lg:hidden`), not JS media queries.\n- **Tabs**: `SegmentedPills size=\"sm\"` above the content, not underlined tabs.\n- **Empty / connect states**: `EmptyState` (flat orchid-tinted surface) with one line and one pill button.\n- **Disabled CTAs**: the label stays readable; the surface switches to an opaque muted fill (`LiquidMetalButton` uses its muted rim and surface, the default `Button` goes `bg-primary-disabled`), never reduced opacity.\n- **Error panels**: `rounded-3xl border border-down bg-down-soft text-down text-sm` centered one-liner.\n\n### Data\n\nPages read data only through `@/lib/data`: `useMarkets(tab?)` (rolling 90-minute window), `useMarket(id)`, `useLiveMarketId(exclude?)`, `useQuote(id)`, `usePriceHistory(id)`, `useMarketTrades(id)`, `useEthPrice()`, `usePortfolio()`, `useActivity(limit?)`, `useLeaderboard(limit?)`, `useVault()`, `useWallet()` (state + `connect`, `disconnect`, `switchNetwork`, `requestTestFunds`, `buy`, `sell`, `claim`, `vaultDeposit`, `vaultWithdraw`). Each returns `{ data, isLoading }` (`useWallet` returns state + actions + `isLoading`). `data` is `undefined` on the server and during hydration: render `Skeleton`s, never clock-dependent values. `useNow()` gives the ticking clock.\n\nHelpers: `@/lib/format` (`formatUsd`, `formatCents`, `formatPercent`, `formatCountdown`, `formatTime`, `shortAddress`, `tokenName`, `tokenTicker`, `formatTokens`, `formatAgo`), `@/lib/phase` (`phaseOf`, `PHASE_LABEL`, `DEADLINE_LABEL`, `tabOf`, `nextDeadline`, `isTradable`, `isResolved`, `payoutPerToken`), `@/lib/trade` (`previewBuy`, `previewSell`), `@/lib/pricing` (Black-Scholes port, `midAt` for what-if). Types in `@/lib/types`.\n\nMock start states: `?wallet=disconnected`, `?wallet=wrong-network`, `?wallet=empty`."
+  "narrative": {
+    "overview": "This refresh applies to Markets, Market Detail (`/market/[id]`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; product and data constraints remain in `PRODUCT.md`.",
+    "dos": [
+      "Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.",
+      "Do keep the shared header offset consistent across every route.",
+      "Do keep Detail controls and tonal extensions scoped to `.market-detail-page`, with route-conditioned body background/noise handling only.",
+      "Do use text and UP/DOWN triangles for detail hierarchy; avoid decorative icons."
+    ],
+    "donts": [
+      "Don't apply this refresh to other route bodies without a separate decision.",
+      "Don't animate the orbital artwork continuously or replace unavailable data with decorative charts."
+    ],
+    "sections": {
+      "Overview": "\nThis refresh applies to Markets, Market Detail (`/market/[id]`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; product and data constraints remain in `PRODUCT.md`.\n\n",
+      "Colors": "\nViolet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css`, `src/app/market/[id]/_components/market-detail.css` and the shared-header rules in `src/app/globals.css`. The `detail-*` primitives are intentional local tonal states for inputs, selectors, status, focus and disabled actions; they do not replace legacy global tokens. Violet gradients mark the primary purchase action, coral identifies DOWN selection, and green is reserved for positive/live/success states.\n\n",
+      "Typography": "\nMarkets, Market Detail and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.\n\nMarket Detail adds a compact hierarchy: responsive question, section heading, trade title, metric value, model output, amount and action roles. The exact observed sizes are in the `detail-*` typography tokens. Labels, notes and table cells use the label role; controls and secondary values use the control role. Question headings use tighter tracking and wrap to fit; their mobile role applies below 640px. These are intentional terminal-density steps, not new global heading defaults.\n\n",
+      "Layout": "\nShared header height is 52px on every route. The shell supplies 76px top padding, reduced to 68px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.\n\nMarkets, Market Detail and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.\n\nMarket Detail uses an approximately 65/35 desktop split: `minmax(0, 1.95fr) minmax(340px, 1fr)`, with 12px row and 24px column gaps. Below 1280px the ratio becomes 1.75:1 and the column gap 16px. The trade panel sticks at the shared shell offset. Below 1024px it returns to normal flow in a container capped at 780px, ordered overview, chart, trade, position, pricing, then settlement rules, recent trades and onchain information. Charts reserve 235px height, reduced to 220px below 640px. The lower desktop pair uses 1.4:1 columns and stacks below 1024px.\n\n",
+      "Elevation & Depth": "\nThin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets and Market Detail honor reduced motion. Detail uses the same static orbital asset at 0.45 opacity behind its upper 380px, translucent panels and fine separators. Detail controls transition colors/borders over 150ms and shift 1px on press; reduced motion removes transitions and the press transform. No new panel shadows are introduced.\n\n",
+      "Shapes": "\nCards and table containers use the card radius. Search, select and featured actions use the control radius. Filter buttons use the smaller filter radius; filter groups, row actions and header wallet controls use the control-group radius. Status labels and ETH symbols are rounded independently.\n\nDetail panels use their own smaller panel radius; its segment buttons, chart tooltips and status capsule use the corresponding detail radius tokens. Trade controls retain the shared control radius, and quick amounts retain the filter radius.\n\n",
+      "Components": "\nThe header keeps a Phi mark and wordmark, luminous active underline and existing wallet behavior. Connected wallet controls show a blue USDC icon and wallet/address/chevron in compact 34px bordered controls; disconnected wallets show Connect wallet. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.\n\nMarket Detail includes a question/date/status header, overview metrics, chart mode and range controls, position rows, pricing inputs/output, settlement rules and text-only onchain links. Its rectangular trade card has Buy/Sell controls, explicit UP/DOWN side selection, a USDC amount, quick amounts, a quote summary and a full-width primary action. Its chart controls retain visible selected and disabled states when history is unavailable. The primary action uses the scoped gradient, then an opaque muted fill when disabled. Focus is a 2px violet outline with a 3px offset; amount focus also highlights its border. Transaction steps appear only after an action starts. Data availability and action support are defined in PRODUCT.md and the surface brief.\n\n",
+      "Do's and Don'ts": "\n- Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.\n- Do keep the shared header offset consistent across every route.\n- Do keep Detail controls and tonal extensions scoped to `.market-detail-page`, with route-conditioned body background/noise handling only.\n- Do use text and UP/DOWN triangles for detail hierarchy; avoid decorative icons.\n- Don't apply this refresh to other route bodies without a separate decision.\n- Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.\n\n",
+      "Legacy body reference": "\nThe following rules apply only to other route bodies and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.\n\n### Hard rules\n\n- **No gradients anywhere.** No `linear-` / `radial-` / `conic-gradient` in CSS or inline styles, no Tailwind `bg-linear-*` / `bg-gradient-*` / `from-` / `via-` / `to-`, no SVG `<linearGradient>` / `<radialGradient>`, no gradient chart fills, masks or text. Flat solid colours only. Charts are a line, no area fill.\n- **Buttons are solid.** Every button, pill button, segmented / tab item, dock icon, menu trigger and the LiquidMetal Trade button has an opaque fill. No `bg-x/NN` alpha fills, no transparent ghost fills, no `backdrop-blur`, no `opacity-*` on a button surface. Tinted buttons use the opaque tint tokens (`bg-up-soft`, `bg-primary-soft`, ...). Outline buttons sit on `bg-surface-2`. Disabled is an opaque muted fill (`bg-primary-disabled` for primary, `bg-surface-2` + `text-subtle` for the rest), never reduced opacity.\n- **No labels on or above headings.** No status pill, eyebrow, kicker, overline or tag above, on or attached to a heading or market question. Status is the countdown itself (a live market shows its countdown), disabled / closed actions, or the value in a result line (\"Resolved \u25b2 UP\", \"Settled $2,696.45\").\n- **No mock logos.** The header shows the plain \"Phinary\" wordmark in Akt, no mark. The favicon is a solid orchid \"P\" on carbon. No generated token discs: where a side needs an indicator use plain inline \"\u25b2 UP\" / \"\u25bc DOWN\" text in the side colour (`SideMark`).\n\n### Copy rules\n\n- No em dashes anywhere (UI, code, comments, docs). Avoid en dashes in UI copy. Use a hyphen, colon or comma.\n- No eyebrow / kicker / overline text or status pill above, on or beside headings. Headings stand alone.\n- Minimal: numbers and actions. No helper paragraphs, no explanatory labels, no marketing copy. Empty states are one line plus at most one button.\n- Sides are always **UP** / **DOWN** (never YES / NO). Prices as cents (`63\u00a2`) or chance (`62%`). Tickers `ETHUP` / `ETHDOWN`.\n\n### Tokens (`src/app/globals.css`)\n\n| Token (Tailwind) | Value | Use |\n|---|---|---|\n| `bg-background` | `#191919` Carbon Black | page |\n| `bg-surface` | `#201f21` | panels, cards, top section of a stacked card |\n| `bg-surface-2` / `bg-secondary` | `#282629` | lower stacked section, inputs on panels |\n| `bg-surface-3` | `#312e32` | hover on surface-2 |\n| `text-foreground` | `#f4f2f5` | primary text |\n| `text-muted-foreground` | `#a19ea4` | labels, secondary numbers |\n| `text-subtle` | `#8a8790` | tertiary (4.6:1 on carbon) |\n| `primary` / `accent` / `orchid` | `#C828D6` Vivid Orchid | primary buttons, active pills, accent word, focus |\n| `accent-2` / `amethyst` | `#9C30A5` | hover of primary, depth, Averaging phase |\n| `up` | `#e070ea` | UP side, \u25b2 (lighter and pinker than the brand orchid, so chrome never reads as a side) |\n| `down` | `#e5604f` | DOWN side, \u25bc |\n| `up-soft` / `up-soft-hover` | up 16% / 26% mixed into surface (opaque) | Buy UP button, UP pill, active UP selector |\n| `down-soft` / `down-soft-hover` | down 16% / 26% into surface (opaque) | Buy DOWN, DOWN pill, destructive |\n| `primary-soft` / `primary-soft-hover` | orchid 16% / 26% into surface (opaque) | active dock icon, \"You\" rows and pills, icon discs, menu focus |\n| `primary-disabled` | orchid 32% into carbon (opaque) | disabled primary button |\n| `warn-soft` | warn 14% into surface (opaque) | Closed phase pill |\n| `wash` | orchid 12% into surface (opaque) | `Panel highlight`, `EmptyState` |\n| `warn` | `#e0a64a` | Closed phase, warnings |\n| `border` | white 10% | every border (atomic.cash) |\n| `border-strong` | white 16% | chart guides, emphasis |\n\nAlways pair UP / DOWN colours with \u25b2 / \u25bc or the words UP / DOWN. Profit is not a side: positive profit is `foreground` with a `+`, losses are `down` (use `Profit`). Tints are always the opaque `*-soft` tokens (a colour mixed into a surface with `color-mix`), never `bg-up/15`-style alpha.\n\nUtilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash` (flat `wash` colour for highlight and empty panels), `animate-live` (pulsing dot), `no-scrollbar`.\n\n### Fonts\n\n| Class | Font | When |\n|---|---|---|\n| `font-heading` | Akt 400/500 | h1-h4 (automatic), big numbers (chance %, totals), market questions |\n| `font-sans` (default) | Lexend Deca | body, buttons, inputs |\n| `font-secondary` | Manrope | small UI text: pills, badges, table numbers, axis ticks, captions |\n| `font-mono` | Ubuntu Mono | addresses and tx hashes only, rarely |\n\n### Layout\n\n- Shell: the shared translucent header and existing floating dock live in `app/layout.tsx`. `<main>` provides the shared top offset described above and existing bottom padding (`--shell-bottom`), with `overflow-x-clip` so sticky content works; pages start directly with content.\n- The dock is mobile and tablet navigation only (hidden from 1024 px, where the header nav takes over). Keep primary actions clear of it below 1024 px.\n- Containers (`@/components/layout/page`): `PageWide` (1200px, header gutters) for grids and tables; `PageNarrow` (`size=\"sm\"` 575px for trade box and forms, `size=\"md\"` 720px for lists and detail). Everything is centered.\n- Headings: `PageHeading` (centered h1, 3xl to 5xl) for section pages; `HeroHeading` + `Accent` (one accent word) for the home hero. Every page hero is centered on the page, above any two-column grid (the market page puts its question, its countdown and the timeline in a full-width row, then the grid). Titles of panels in a column sit inside the panel (`h2 text-xl` in the panel's padding); `SectionHeading` is for centered section titles in a single column.\n- Spacing: generous. Panels `p-5 sm:p-6`, grids `gap-5`, sections `space-y-10` or more. Large type.\n\n### Radii and shapes\n\n- `rounded-3xl` (24px): panels, cards, stacked trade card, dialogs. `rounded-4xl` (32px) for a big hero panel.\n- `rounded-full`: every button, pill, segmented control, input, badge, the round arrow between stacked sections.\n- `rounded-2xl`: menu popovers, list rows inside dialogs, chart tooltip.\n\n### Components\n\nLayout and wallet:\n\n| Import | What |\n|---|---|\n| `@/components/layout/page` | `PageWide`, `PageNarrow`, `PageHeading`, `HeroHeading`, `Accent`, `SectionHeading` |\n| `@/components/layout/panel` | `Panel` (rounded-3xl bordered surface; `highlight` for the orchid wash, `flush` for no padding), `EmptyState` (one line + action) |\n| `@/components/layout/logo` | `Logo` (the \"Phinary\" wordmark, no mark) |\n| `@/components/wallet/*` | `ConnectButton`, `BalancePill`, `WalletDialog`, `WrongNetworkBanner` (already in the shell) |\n| `@/config/brand` | `BRAND_NAME`, `DISPLAY_TIMEZONE` (UTC, matches token names), `CHAIN` |\n\nPrimitives (`@/components/ui/*`, shadcn, themed): `button` (variants `default` orchid, `outline` (surface-2), `secondary`, `ghost` (surface), `up`, `down`, `destructive`, all opaque; sizes `xs sm default lg xl`; `xl` = 56px full-width CTA), `card`, `tabs`, `input`, `badge`, `dialog`, `sheet`, `tooltip`, `separator`, `table`, `skeleton`, `dropdown-menu`, `toggle-group`, `progress`, `slider`, `scroll-area`, `sonner` (`toast` from `sonner`), `chart`.\n\n`@/components/ui/liquid-metal-button`: `LiquidMetalButton` (`label`, `fullWidth`, `disabled`, `onClick`, `type`, `href`). The Trade CTA in the trade box only; every other primary action is `<Button size=\"xl\">`. The shader draws only the rim; the rim backing and the inner surface are flat opaque colours, and disabled swaps both for a muted opaque fill and hides the shader.\n\nMarket (`@/components/market`):\n\n| Component | Props |\n|---|---|\n| `MarketQuestion` | `strike`, `expiry`, `as`, `accentStrike`: \"ETH > $2,684.53 at 00:48?\" |\n| `PhaseBadge` | `phase`: opaque phase pill for table cells only (e.g. an invalid outcome in the feed). Never on, above or beside a heading |\n| `Countdown` | `to` (unix s): live `m:ss`, client-only |\n| `ProbabilityBar` | `up` (0..1), `labels` |\n| `SideMark` | `side`: plain inline \"\u25b2 UP\" / \"\u25bc DOWN\" text in the side colour, the side indicator wherever a logo would go |\n| `PriceTag` | `side`, `price?`: \"\u25b2 UP 63\u00a2\", or just \"\u25b2 UP\" without a price. The one UP / DOWN pill everywhere (tables, feed, portfolio) |\n| `Chance` | `value`, `className` (number size): big \"48% \u25b2 UP\" |\n| `Money` | `value`, `dimCents`: $1,234 with small muted cents for hero numbers |\n| `Profit` | `value`: signed USD, foreground / coral / muted when flat |\n| `AssetChip` | `asset` (`{kind:\"usdc\"}`, `{kind:\"shares\"}`, `{kind:\"outcome\", side}`), `title`: the token pill of stacked cards; plain ticker text with no logo; outcome chips lead with a \u25b2 / \u25bc. `Balance` (wallet icon + amount) sits beside it |\n| `SwapStack` | `top`, `bottom`, `onFlip?` (arrow becomes a spinning button), `flipLabel`: the atomic.cash stacked card, focus ring on the card when its input has focus |\n| `SwapOutput` | `chip`, `value` (string or null for the grey 0), `htmlFor`, `label`: the \"You receive\" half |\n| `Sparkline` | `data` (0..1), `domain`, `color`: a line, no fill |\n| `ProbabilityChart` | `points` (`usePriceHistory`), `domain` (`[openTime, cutoff]` to show the full life), `height`: a line, no area fill |\n| `MarketCard` | `market`, `onBuy?` (defaults to linking `/market/[id]?side=up`). Question first, no phase pill. Live: Buy UP / DOWN and the countdown in the footer row; closed, averaging, settling: countdown row; resolved: winner and a \"Settled\" average row |\n| `AmountInput` | `value` (string), `onChange`, `label`, `adornment`, `quick` (default 1/5/10), `max`: 48px input + pills; the pill matching the value is filled orchid |\n| `SegmentedPills` | `options` (`activeClassName` per option, e.g. `bg-up text-white`), `value`, `onChange`, `size` `xs`/`sm`/`md`, `fullWidth`. Radio group with arrow keys and a focus ring |\n\nAlso exported: `PHASE_DOT` (status dot classes per phase) from `phase-badge`. Trade (`@/components/trade`): `TradeCard` (swaps to an outcome card with Claim once resolved), `useClaims` (`claimOne`, `claimAll`, switches network first; the only claim hook).\n\n### atomic.cash patterns to reuse\n\n- **Stacked trade card**: always `SwapStack` + `SwapOutput` + `AssetChip`, never a hand-rolled copy. One card, not a card inside a card: selectors (pills, outcome buttons) above it, the summary line and CTA below it.\n- **Settings row under a card**: `mt-3 flex justify-between px-1 text-xs text-muted-foreground` with `SegmentedPills size=\"xs\"`.\n- **Full-width CTA** under the card: `mt-3`, 56px, rounded-full.\n- **Stat tiles**: `Panel`, centered, `font-heading text-2xl` value with the `text-xs text-muted-foreground` label under it (never above: that reads as a kicker), in `grid gap-5 md:grid-cols-3`.\n- **Tables**: shadcn `Table` inside `<Panel flush>`; numbers right-aligned in `font-secondary num`; on mobile switch to stacked rows (`rounded-2xl border bg-surface-2 p-3`) with CSS breakpoints (`hidden lg:block` / `lg:hidden`), not JS media queries.\n- **Tabs**: `SegmentedPills size=\"sm\"` above the content, not underlined tabs.\n- **Empty / connect states**: `EmptyState` (flat orchid-tinted surface) with one line and one pill button.\n- **Disabled CTAs**: the label stays readable; the surface switches to an opaque muted fill (`LiquidMetalButton` uses its muted rim and surface, the default `Button` goes `bg-primary-disabled`), never reduced opacity.\n- **Error panels**: `rounded-3xl border border-down bg-down-soft text-down text-sm` centered one-liner.\n\n### Data\n\nPages read data only through `@/lib/data`: `useMarkets(tab?)` (rolling 90-minute window), `useMarket(id)`, `useLiveMarketId(exclude?)`, `useQuote(id)`, `usePriceHistory(id)`, `useMarketTrades(id)`, `useEthPrice()`, `usePortfolio()`, `useActivity(limit?)`, `useLeaderboard(limit?)`, `useVault()`, `useWallet()` (state + `connect`, `disconnect`, `switchNetwork`, `requestTestFunds`, `buy`, `sell`, `claim`, `vaultDeposit`, `vaultWithdraw`). Each returns `{ data, isLoading }` (`useWallet` returns state + actions + `isLoading`). `data` is `undefined` on the server and during hydration: render `Skeleton`s, never clock-dependent values. `useNow()` gives the ticking clock.\n\nHelpers: `@/lib/format` (`formatUsd`, `formatCents`, `formatPercent`, `formatCountdown`, `formatTime`, `shortAddress`, `tokenName`, `tokenTicker`, `formatTokens`, `formatAgo`), `@/lib/phase` (`phaseOf`, `PHASE_LABEL`, `DEADLINE_LABEL`, `tabOf`, `nextDeadline`, `isTradable`, `isResolved`, `payoutPerToken`), `@/lib/trade` (`previewBuy`, `previewSell`), `@/lib/pricing` (Black-Scholes port, `midAt` for what-if). Types in `@/lib/types`.\n\nMock start states: `?wallet=disconnected`, `?wallet=wrong-network`, `?wallet=empty`."
+    }
+  }
 }

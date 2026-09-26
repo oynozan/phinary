@@ -1,5 +1,5 @@
 ---
-name: Phinary Markets and shared header
+name: Phinary Markets, Market Detail and shared header
 description: Compact near-black financial interface with violet atmosphere.
 colors:
   background: "#080b12"
@@ -16,6 +16,44 @@ colors:
   live: "#20dfa0"
   header: "rgb(9 12 20 / 94%)"
   featured: "rgb(12 16 25 / 88%)"
+  detail-panel: "rgb(11 16 25 / 94%)"
+  detail-recess: "#0a0f18"
+  detail-input: "#080d15"
+  detail-control: "#101522"
+  detail-control-border: "#303546"
+  detail-input-border: "#384055"
+  detail-focus: "#db9bff"
+  detail-hover-border: "#b986dd"
+  detail-link-hover: "#e1b1ff"
+  detail-selection: "#7634a0"
+  detail-active: "#6821b4"
+  detail-active-border: "#ac37ef"
+  detail-up-selected: "#38104e"
+  detail-up-selected-border: "#c149f2"
+  detail-down-selected: "#361e23"
+  detail-quick: "#0b111c"
+  detail-quick-selected: "#2d173e"
+  detail-disabled-text: "#aeb6c9"
+  detail-disabled-selected: "#2c1b3d"
+  detail-disabled-selected-border: "#604277"
+  detail-disabled-selected-text: "#e6d9f2"
+  detail-primary-start: "#a50cdf"
+  detail-primary-end: "#6f18f5"
+  detail-primary-border: "#a63ce5"
+  detail-primary-hover: "#8222ce"
+  detail-primary-disabled: "#252034"
+  detail-primary-disabled-border: "#4a365d"
+  detail-primary-disabled-text: "#c6b8d9"
+  detail-status: "#111622"
+  detail-status-border: "#394051"
+  detail-live-surface: "#09231d"
+  detail-live-border: "#17694f"
+  detail-model-border: "#642691"
+  detail-empty-text: "#d7daE6"
+  detail-tooltip-border: "#444058"
+  detail-divider: "#202635"
+  detail-link-underline: "#626a80"
+  detail-scrollbar: "#43445a"
 typography:
   display:
     fontFamily: "Manrope, sans-serif"
@@ -34,17 +72,98 @@ typography:
   label:
     fontFamily: "Manrope, sans-serif"
     fontSize: "11px"
+  detail-heading:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "clamp(25px, 2.5vw, 36px)"
+    fontWeight: 800
+    lineHeight: 1.2
+    letterSpacing: "-0.025em"
+  detail-heading-mobile:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "27px"
+    fontWeight: 800
+    lineHeight: 1.2
+    letterSpacing: "-0.025em"
+  detail-section:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "17px"
+    fontWeight: 800
+    lineHeight: 1.3
+    letterSpacing: "-0.025em"
+  detail-trade-title:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "24px"
+    fontWeight: 800
+    lineHeight: 1.3
+    letterSpacing: "-0.025em"
+  detail-body:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.5
+  detail-label:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "11px"
+    fontWeight: 400
+    lineHeight: 1.5
+  detail-control:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.5
+  detail-empty:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.5
+  detail-pricing:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "15px"
+    fontWeight: 700
+    lineHeight: 1.35
+  detail-quote:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "16px"
+    fontWeight: 700
+    lineHeight: 1.5
+  detail-metric:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "17px"
+    fontWeight: 700
+    lineHeight: 1.35
+  detail-action:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "18px"
+    fontWeight: 700
+    lineHeight: 1.5
+  detail-model-output:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "22px"
+    fontWeight: 700
+    lineHeight: 1.35
+  detail-amount:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "24px"
+    fontWeight: 400
+    lineHeight: 1.5
 rounded:
   card: "12px"
   control: "8px"
   filter: "7px"
   control-group: "9px"
+  detail-panel: "10px"
+  detail-segment: "5px"
+  detail-tooltip: "6px"
+  detail-status: "24px"
 spacing:
   compact: "12px"
   card-mobile: "16px"
   card: "20px"
   gutter-tablet: "28px"
   gutter-desktop: "48px"
+  detail-grid-row: "12px"
+  detail-grid-column: "24px"
+  detail-panel-inline: "18px"
 components:
   featured-card:
     backgroundColor: "{colors.featured}"
@@ -60,44 +179,68 @@ components:
     rounded: "{rounded.control}"
     height: "40px"
     width: "215px"
+  detail-panel:
+    backgroundColor: "{colors.detail-panel}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.detail-panel}"
+  detail-primary-disabled:
+    backgroundColor: "{colors.detail-primary-disabled}"
+    textColor: "{colors.detail-primary-disabled-text}"
+    rounded: "{rounded.control}"
+    padding: "10px 16px"
+  detail-amount:
+    backgroundColor: "{colors.detail-input}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.control}"
+    height: "48px"
 ---
 
 # Design System: Phinary
 
 ## Overview
 
-This refresh applies to the Markets route and shared header only. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface brief is `.impeccable/markets.md`; product and data constraints remain in `PRODUCT.md`.
+This refresh applies to Markets, Market Detail (`/market/[id]`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; product and data constraints remain in `PRODUCT.md`.
 
 ## Colors
 
-Violet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css` and the shared-header rules in `src/app/globals.css`.
+Violet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css`, `src/app/market/[id]/_components/market-detail.css` and the shared-header rules in `src/app/globals.css`. The `detail-*` primitives are intentional local tonal states for inputs, selectors, status, focus and disabled actions; they do not replace legacy global tokens. Violet gradients mark the primary purchase action, coral identifies DOWN selection, and green is reserved for positive/live/success states.
 
 ## Typography
 
-Markets and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
+Markets, Market Detail and header use Manrope, with inherited tabular numerals. The header uses a cyan/violet Phi mark and a 23px Manrope Phinary wordmark (20px on mobile), following the user's updated reference. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
+
+Market Detail adds a compact hierarchy: responsive question, section heading, trade title, metric value, model output, amount and action roles. The exact observed sizes are in the `detail-*` typography tokens. Labels, notes and table cells use the label role; controls and secondary values use the control role. Question headings use tighter tracking and wrap to fit; their mobile role applies below 640px. These are intentional terminal-density steps, not new global heading defaults.
 
 ## Layout
 
 Shared header height is 52px on every route. The shell supplies 76px top padding, reduced to 68px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.
 
-Markets and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.
+Markets, Market Detail and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.
+
+Market Detail uses an approximately 65/35 desktop split: `minmax(0, 1.95fr) minmax(340px, 1fr)`, with 12px row and 24px column gaps. Below 1280px the ratio becomes 1.75:1 and the column gap 16px. The trade panel sticks at the shared shell offset. Below 1024px it returns to normal flow in a container capped at 780px, ordered overview, chart, trade, position, pricing, then settlement rules, recent trades and onchain information. Charts reserve 235px height, reduced to 220px below 640px. The lower desktop pair uses 1.4:1 columns and stacks below 1024px.
 
 ## Elevation & Depth
 
-Thin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets honors reduced motion.
+Thin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets and Market Detail honor reduced motion. Detail uses the same static orbital asset at 0.45 opacity behind its upper 380px, translucent panels and fine separators. Detail controls transition colors/borders over 150ms and shift 1px on press; reduced motion removes transitions and the press transform. No new panel shadows are introduced.
 
 ## Shapes
 
 Cards and table containers use the card radius. Search, select and featured actions use the control radius. Filter buttons use the smaller filter radius; filter groups, row actions and header wallet controls use the control-group radius. Status labels and ETH symbols are rounded independently.
 
+Detail panels use their own smaller panel radius; its segment buttons, chart tooltips and status capsule use the corresponding detail radius tokens. Trade controls retain the shared control radius, and quick amounts retain the filter radius.
+
 ## Components
 
 The header keeps a Phi mark and wordmark, luminous active underline and existing wallet behavior. Connected wallet controls show a blue USDC icon and wallet/address/chevron in compact 34px bordered controls; disconnected wallets show Connect wallet. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.
 
+Market Detail includes a question/date/status header, overview metrics, chart mode and range controls, position rows, pricing inputs/output, settlement rules and text-only onchain links. Its rectangular trade card has Buy/Sell controls, explicit UP/DOWN side selection, a USDC amount, quick amounts, a quote summary and a full-width primary action. Its chart controls retain visible selected and disabled states when history is unavailable. The primary action uses the scoped gradient, then an opaque muted fill when disabled. Focus is a 2px violet outline with a 3px offset; amount focus also highlights its border. Transaction steps appear only after an action starts. Data availability and action support are defined in PRODUCT.md and the surface brief.
+
 ## Do's and Don'ts
 
-- Do preserve the scoped Markets palette, compact density and visible keyboard focus.
+- Do preserve the scoped Markets and Market Detail palette, compact density and visible keyboard focus.
 - Do keep the shared header offset consistent across every route.
+- Do keep Detail controls and tonal extensions scoped to `.market-detail-page`, with route-conditioned body background/noise handling only.
+- Do use text and UP/DOWN triangles for detail hierarchy; avoid decorative icons.
 - Don't apply this refresh to other route bodies without a separate decision.
 - Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.
 

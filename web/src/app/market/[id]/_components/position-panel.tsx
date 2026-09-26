@@ -1,107 +1,36 @@
 "use client";
+import { formatUnits } from "viem";
+import { useTokenBalance } from "@/lib/onchain/balances";
+import { useWalletSession } from "@/lib/onchain/wallet";
+import { getConnectionConfig } from "@/lib/onchain/config";
+import { formatCents, formatTokens, formatUsd } from "@/lib/format";
+import { isResolved, payoutPerToken } from "@/lib/phase";
+import type { Market, Side } from "@/lib/types";
+import { DetailMetric, blockExplorer } from "./detail-presentation";
 
-import { AnimatePresence, motion } from "motion/react";
-
-import { Panel } from "@/components/layout/panel";
-import { Profit } from "@/components/market/money";
-import { SideMark } from "@/components/market/price-tag";
-import { useClaims } from "@/components/trade/use-claims";
-import { Button } from "@/components/ui/button";
-import { usePortfolio } from "@/lib/data";
-import { formatTokens, formatUsd } from "@/lib/format";
-import type { Market, Position, Side } from "@/lib/types";
-
-// Positions below this are rounding dust from partial sells
-const MIN_QTY = 0.005;
-
-function Metric({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="min-w-0">
-            <div className="num font-secondary text-base font-semibold">{children}</div>
-            <div className="mt-0.5 font-secondary text-xs text-muted-foreground">{label}</div>
-        </div>
-    );
-}
-
-function Row({
-    position,
-    tradable,
-    claiming,
-    onSell,
-    onClaim,
-}: {
-    position: Position;
-    tradable: boolean;
-    claiming: boolean;
-    onSell: () => void;
-    onClaim: () => void;
-}) {
-    const p = position;
-    return (
-        <div className="grid grid-cols-2 items-center gap-x-4 gap-y-4 px-5 py-4 sm:grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] sm:px-6">
-            <div className="min-w-0">
-                <div className="num font-heading text-xl leading-tight">{formatTokens(p.qty)}</div>
-                <SideMark side={p.side} className="text-xs" />
-            </div>
-            <div className="order-3 sm:order-none">
-                <Metric label="Value">{formatUsd(p.value)}</Metric>
-            </div>
-            <div className="order-4 sm:order-none">
-                <Metric label="Profit">
-                    <Profit value={p.pnl} />
-                </Metric>
-            </div>
-            <div className="order-2 flex justify-end sm:order-none">
-                {p.state === "open" && (
-                    <Button variant="outline" size="lg" disabled={!tradable} onClick={onSell}>
-                        Sell
-                    </Button>
-                )}
-                {p.state === "claimable" && (
-                    <Button size="lg" disabled={claiming} onClick={onClaim}>
-                        {claiming ? "Claiming" : "Claim"}
-                    </Button>
-                )}
-            </div>
-        </div>
-    );
-}
-
-/** Your tokens in this market with value at the bid, profit and Sell or Claim, hidden when you hold none */
-export function PositionPanel({ market, onSell }: { market: Market; onSell: (side: Side, qty: number) => void }) {
-    const portfolio = usePortfolio();
-    const claims = useClaims();
-    const positions = (portfolio.data?.positions ?? []).filter((p) => p.marketId === market.id && p.qty >= MIN_QTY);
-    const tradable = market.phase === "live" && !!market.quote?.tradable;
-
-    return (
-        <AnimatePresence initial={false}>
-            {positions.length > 0 && (
-                <motion.section
-                    key="position"
-                    aria-labelledby="position-heading"
-                    initial={{ y: 8 }}
-                    animate={{ y: 0 }}
-                    exit={{ y: 8 }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                >
-                    <Panel flush className="divide-y">
-                        <h2 id="position-heading" className="px-5 pt-5 pb-3 text-center text-xl sm:px-6">
-                            Position
-                        </h2>
-                        {positions.map((p) => (
-                            <Row
-                                key={p.side}
-                                position={p}
-                                tradable={tradable}
-                                claiming={claims.claiming === market.id}
-                                onSell={() => onSell(p.side, p.qty)}
-                                onClaim={() => void claims.claimOne(market.id)}
-                            />
-                        ))}
-                    </Panel>
-                </motion.section>
-            )}
-        </AnimatePresence>
-    );
+export function PositionPanel({ market, upBalance }: { market: Market; upBalance: ReturnType<typeof useTokenBalance> }) {
+    const wallet = useWalletSession();
+    const downBalance = useTokenBalance(market.down);
+    const resolved = isResolved(market.phase);
+    const rows = ([{ side: "up", query: upBalance }, { side: "down", query: downBalance }] as const);
+    const message = !wallet.address ? "Connect your wallet to see your position." : wallet.chainId !== getConnectionConfig().chainId ? "Switch to Unichain Sepolia to see your position." : null;
+    const row = (side: Side, balance: bigint) => {
+        const qty = Number(formatUnits(balance, 6));
+        const bid = market.quote?.[side === "up" ? "bidUp" : "bidDown"];
+        const payout = payoutPerToken(market.phase, side);
+        return <div className="detail-position-row" key={side}><dl>
+            <DetailMetric label="Side" className={side === "up" ? "detail-up" : "detail-down"}>{side === "up" ? "▲ UP" : "▼ DOWN"}</DetailMetric>
+            <DetailMetric label="Amount">{formatTokens(qty)} tokens</DetailMetric>
+            {resolved ? <><DetailMetric label="Result">{market.phase === "invalid" ? "50/50" : market.upWon ? "UP wins" : "DOWN wins"}</DetailMetric><DetailMetric label="Redeemable value">{payout === null ? "N/A" : formatUsd(qty * payout)}</DetailMetric></> : <>
+                <DetailMetric label="Avg cost">N/A</DetailMetric><DetailMetric label="Current bid">{bid == null ? "N/A" : formatCents(bid, 1)}</DetailMetric>
+                <DetailMetric label="Est. position value">{bid == null ? "N/A" : formatUsd(qty * bid)}</DetailMetric><DetailMetric label="Unrealized P&L">N/A</DetailMetric>
+            </>}
+        </dl><div className="detail-position-actions"><button type="button" disabled title={resolved ? "Claiming is not connected yet" : "Selling is not connected yet"}>{resolved ? "Claim" : "Sell"}</button><a href={`${blockExplorer}/token/${market[side]}`} target="_blank" rel="noreferrer">View token<span className="sr-only"> ({side.toUpperCase()}, opens in a new tab)</span></a></div></div>;
+    };
+    return <section className="detail-panel detail-position" aria-labelledby="position-heading"><h2 id="position-heading">Your Position</h2>
+        {message ? <p className="detail-empty">{message}</p> : <>
+            {rows.map(({ side, query }) => query.error ? <div className="detail-empty" key={side}><p>{side.toUpperCase()} balance unavailable.</p><button type="button" onClick={() => void query.refresh()}>Retry balance</button></div> : query.isLoading || query.data == null ? <p key={side} className="detail-empty">Loading {side.toUpperCase()} balance…</p> : query.data > 0n ? row(side, query.data) : null)}
+            {rows.every(({ query }) => !query.error && query.data === 0n) ? <p className="detail-empty">No tokens held in this market.</p> : <p className="detail-note">{resolved ? "Claiming is not connected yet." : "Cost basis and P&L are unavailable. Selling is not connected yet."}</p>}
+        </>}
+    </section>;
 }
