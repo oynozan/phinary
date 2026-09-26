@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toMarket } from "../src/lib/onchain/market-adapter.ts";
 import { phaseOf } from "../src/lib/phase.ts";
+import { buyPrice } from "../src/lib/trade.ts";
 import type { MarketInfo, HookQuote } from "@phinary/swap-sdk";
 
 const address = "0x1111111111111111111111111111111111111111" as const;
@@ -41,4 +42,15 @@ test("settled and invalid markets derive their result from status, not quote", (
     assert.equal(invalid.upChance, .5); assert.equal(invalid.phase, "invalid");
     assert.equal(phaseOf(invalid, 1000), "invalid");
     assert.throws(() => toMarket(1, {...info, status: 0}, 10, quote, 1070));
+});
+test("buy prices outside the tradable band are never offered", () => {
+    const decided: HookQuote = {
+        ...quote, midYes: 990_000_000_000_000_000n, askYes: 1_020_000_000_000_000_000n,
+        bidYes: 980_000_000_000_000_000n, askNo: 20_000_000_000_000_000n, bidNo: 0n,
+    };
+    const m = toMarket(1, info, 10, decided, 1020, { pMin: 0.02 });
+    assert.equal(buyPrice(m.quote!, "up"), null);
+    assert.equal(buyPrice(m.quote!, "down"), 0.02);
+    assert.equal(buyPrice(toMarket(1, info, 10, quote, 1020, { pMin: 0.02 }).quote!, "up"), 0.62);
+    assert.equal(buyPrice(toMarket(1, info, 10, decided, 1020).quote!, "up"), null, "no band read: still never above 100¢");
 });

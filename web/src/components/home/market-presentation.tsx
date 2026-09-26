@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Countdown } from "@/components/market/countdown";
 import { formatCents, formatDay, formatTime, formatPrice } from "@/lib/format";
+import { buyPrice } from "@/lib/trade";
 import {
   DEADLINE_LABEL,
   nextDeadline,
@@ -65,12 +66,9 @@ export function PriceLink({
   side: Side;
   featured?: boolean;
 }) {
-  const tradable = isTradable(market.phase) && !!market.quote?.tradable;
-  const price = market.quote
-    ? side === "up"
-      ? market.quote.askUp
-      : market.quote.askDown
-    : null;
+  const price = market.quote ? buyPrice(market.quote, side) : null;
+  const tradable =
+    isTradable(market.phase) && !!market.quote?.tradable && price !== null;
   const label = (
     <>
       {featured && <span>{side.toUpperCase()} </span>}

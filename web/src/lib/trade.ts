@@ -21,6 +21,12 @@ function sideBid(q: Quote, side: Side) {
     return side === "up" ? q.bidUp : q.bidDown;
 }
 
+/** The side's ask when a buy there can execute, null when it would leave the [pMin, 1 - pMin] band */
+export function buyPrice(q: Quote, side: Side): number | null {
+    const ask = sideAsk(q, side);
+    return ask >= q.pMin && ask <= 1 - q.pMin ? ask : null;
+}
+
 export function sideMid(q: Quote, side: Side) {
     return side === "up" ? q.midUp : 1 - q.midUp;
 }

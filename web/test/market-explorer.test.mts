@@ -146,7 +146,7 @@ test("preview price links preserve side selection; unavailable quotes cannot be 
     await import("../src/components/home/market-presentation.tsx");
   const quoted = {
     ...base,
-    quote: { tradable: true, askUp: 0.41, askDown: 0.63 },
+    quote: { tradable: true, askUp: 0.41, askDown: 0.63, pMin: 0.02 },
   } as Market;
   for (const side of ["up", "down"] as const) {
     const html = renderToStaticMarkup(

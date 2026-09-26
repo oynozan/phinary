@@ -3,6 +3,7 @@ import { Countdown } from "@/components/market/countdown";
 import { getConnectionConfig } from "@/lib/onchain/config";
 import { questionOf, underlyingOf } from "@/lib/markets/explorer";
 import { formatCents, formatPercent, formatPrice, formatTimeSeconds } from "@/lib/format";
+import { buyPrice } from "@/lib/trade";
 import { isResolved, payoutPerToken } from "@/lib/phase";
 import { CHAIN } from "@/config/brand";
 import type { Market } from "@/lib/types";
@@ -24,8 +25,8 @@ export function Overview({ market }: { market: Market }) {
     const q = market.quote;
     const resolved = isResolved(market.phase);
     const difference = q ? q.spot - market.strike : null;
-    const up = resolved ? payoutPerToken(market.phase, "up") : q?.askUp;
-    const down = resolved ? payoutPerToken(market.phase, "down") : q?.askDown;
+    const up = resolved ? payoutPerToken(market.phase, "up") : q ? buyPrice(q, "up") : null;
+    const down = resolved ? payoutPerToken(market.phase, "down") : q ? buyPrice(q, "down") : null;
     return <dl className="detail-panel detail-overview" aria-label="Market overview">
         <DetailMetric label={resolved ? "Settlement average" : "Spot"}>
             {resolved ? market.settlementPrice === null ? "N/A" : formatPrice(market.settlementPrice) : q ? formatPrice(q.spot) : "N/A"}
