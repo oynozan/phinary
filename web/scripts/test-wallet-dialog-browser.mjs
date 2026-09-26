@@ -33,12 +33,12 @@ try {
         const bounds = await dialog.boundingBox();
         assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
         assert.equal(await dialog.locator('.wallet-option img').count(), 1);
-        await page.screenshot({ path: `${evidence}/${width}.png` });
+        await page.screenshot({ animations: 'disabled', path: `${evidence}/${width}.png` });
         await dialog.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
         await dialog.getByText('Confirm in MetaMask', { exact: true }).waitFor();
         assert.equal(await dialog.getByRole('button', { name: 'Connect Another wallet' }).isDisabled(), true);
         assert.equal(await page.evaluate(() => window.walletRequests), 1);
-        await page.screenshot({ path: `${evidence}/${width}-pending.png` });
+        await page.screenshot({ animations: 'disabled', path: `${evidence}/${width}-pending.png` });
         await page.evaluate(() => window.rejectWallet());
         await page.getByText('Connection cancelled', { exact: true }).waitFor();
         await page.waitForFunction(() => !document.querySelector('.wallet-option').disabled);
@@ -52,7 +52,7 @@ try {
     await empty.locator('.header-wallet').click();
     await empty.getByText('No browser wallet detected').waitFor();
     assert.equal(await empty.getByRole('link', { name: 'Get MetaMask' }).getAttribute('href'), 'https://metamask.io/');
-    await empty.screenshot({ path: `${evidence}/empty.png` });
+    await empty.screenshot({ animations: 'disabled', path: `${evidence}/empty.png` });
     assert.deepEqual(errors, []);
     console.log('PASS no-extension state and no uncaught browser errors');
 } finally { await browser.close(); }
