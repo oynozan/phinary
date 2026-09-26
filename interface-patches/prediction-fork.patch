@@ -487,6 +487,31 @@ index 0000000..76b346b
 +After the gatekeeper deployment, re-vendor with `node packages/swap-sdk/scripts/vendor-interface.mjs` from the main repo
 +root so `deployment.generated.ts` carries `marketGatekeeper`, `marketSchedulers` and `underlyings`. Until then the fork
 +runs the live single-scheduler deployment as one "ETH 2-minute" track, classified by symbol.
+diff --git a/apps/web/.env b/apps/web/.env
+index 7444d4c..01807ea 100644
+--- a/apps/web/.env
++++ b/apps/web/.env
+@@ -17,3 +17,6 @@ TRADING_API_KEY="trading_api_key"
+ UNISWAP_API_KEY="uniswap_api_key"
+ UNISWAP_GATEWAY_DNS="https://interface.gateway.uniswap.org/v2"
+ WALLET_CONNECT_PROJECT_ID="walletconnect_project_id"
++
++# Prediction markets: RPCs for chain 1301, primary first (set the real list in .env.override)
++PREDICTION_RPC_URLS=
+diff --git a/apps/web/public/csp.json b/apps/web/public/csp.json
+index a1e8351..6fd3706 100644
+--- a/apps/web/public/csp.json
++++ b/apps/web/public/csp.json
+@@ -40,6 +40,9 @@
+     "https://*.coingecko.com/",
+     "https://*.coinmarketcap.com/",
+     "https://*.drpc.org/",
++    "https://sepolia.unichain.org",
++    "https://unichain-sepolia-rpc.publicnode.com",
++    "https://1301.rpc.thirdweb.com",
+     "https://*.googleapis.com",
+     "https://*.infura.io",
+     "https://*.metamask.io",
 diff --git a/apps/web/src/app/WebUniswapContext.tsx b/apps/web/src/app/WebUniswapContext.tsx
 index 6f8695c..018d80c 100644
 --- a/apps/web/src/app/WebUniswapContext.tsx
@@ -9526,26 +9551,36 @@ index 9cf0f70..53d873f 100644
  // Default maximum amount of combinations wallet<>chainId per check delegation request
  const DEFAULT_CHECK_VALIDATIONS_BATCH_THRESHOLD = 140
 diff --git a/packages/uniswap/src/features/chains/evm/info/unichain.ts b/packages/uniswap/src/features/chains/evm/info/unichain.ts
-index 434e88a..00004c6 100644
+index 434e88a..d07d34b 100644
 --- a/packages/uniswap/src/features/chains/evm/info/unichain.ts
 +++ b/packages/uniswap/src/features/chains/evm/info/unichain.ts
-@@ -122,16 +122,17 @@ export const UNICHAIN_SEPOLIA_CHAIN_INFO = {
+@@ -14,6 +14,7 @@ import { GqlChainId, NetworkLayer, RPCType, UniverseChainInfo } from 'uniswap/sr
+ import { ElementName } from 'uniswap/src/features/telemetry/constants'
+ import { buildUSDC } from 'uniswap/src/features/tokens/stablecoin'
+ import { unichainSepolia } from 'wagmi/chains'
++import { PREDICTION_PUBLIC_RPC_URLS, PREDICTION_RPC_URLS } from 'uniswap/src/features/predictionMarkets/rpcUrls'
+ 
+ const tokens = buildChainTokens({
+   stables: {
+@@ -122,16 +123,17 @@ export const UNICHAIN_SEPOLIA_CHAIN_INFO = {
    networkLayer: NetworkLayer.L2,
    blockTimeMs: 1000,
    pendingTransactionsRetryOptions: undefined,
-+  // Prediction markets demo: every RPC type uses the cookieless public endpoint instead of UniRPC/QuickNode.
++  // Prediction markets demo: cookieless RPCs instead of UniRPC/QuickNode. Public and Default reach wallets and
++  // connectors, so they only list unkeyed public endpoints; the app's own reads use the configured list.
    rpcUrls: {
      [RPCType.Public]: {
 -      http: [getUniRpcEndpointUrl(UniverseChainId.UnichainSepolia)],
-+      http: ['https://unichain-sepolia.drpc.org'],
++      http: PREDICTION_PUBLIC_RPC_URLS,
      },
-     // Default feeds wallet-connector rpc maps (cookieless). Unkeyed, CSP-allowed public endpoint.
+-    // Default feeds wallet-connector rpc maps (cookieless). Unkeyed, CSP-allowed public endpoint.
      [RPCType.Default]: {
-       http: ['https://unichain-sepolia.drpc.org'],
+-      http: ['https://unichain-sepolia.drpc.org'],
++      http: PREDICTION_PUBLIC_RPC_URLS,
      },
      [RPCType.Interface]: {
 -      http: [getQuicknodeEndpointUrl(UniverseChainId.UnichainSepolia)],
-+      http: ['https://unichain-sepolia.drpc.org'],
++      http: PREDICTION_RPC_URLS,
      },
    },
    tokens: testnetTokens,
@@ -10654,10 +10689,10 @@ index 0000000..a82d404
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/config.ts b/packages/uniswap/src/features/predictionMarkets/config.ts
 new file mode 100644
-index 0000000..260e488
+index 0000000..20874b1
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/config.ts
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,130 @@
 +import { UniverseChainId } from '@universe/chains'
 +import { PREDICTION_DEPLOYMENT_JSON } from 'uniswap/src/features/predictionMarkets/deployment.generated'
 +import {
@@ -10671,8 +10706,7 @@ index 0000000..260e488
 +/** Prediction markets live only on Unichain Sepolia, against Uniswap v4 "Stack A" and UniversalRouter 2.0. */
 +export const PREDICTION_CHAIN_ID = UniverseChainId.UnichainSepolia
 +
-+/** Public RPC used for chain 1301 everywhere in the fork; already allowed by the app CSP (`https://*.drpc.org/`). */
-+export const PREDICTION_RPC_URL = 'https://unichain-sepolia.drpc.org'
++export { PREDICTION_PUBLIC_RPC_URLS, PREDICTION_RPC_URLS } from 'uniswap/src/features/predictionMarkets/rpcUrls'
 +
 +export const PREDICTION_QUOTE_POLL_MS = 1_000
 +export const PREDICTION_REGISTRY_POLL_MS = 5_000
@@ -12855,19 +12889,24 @@ index 0000000..de56b01
 +}
 diff --git a/packages/uniswap/src/features/predictionMarkets/rpc.ts b/packages/uniswap/src/features/predictionMarkets/rpc.ts
 new file mode 100644
-index 0000000..41596c3
+index 0000000..315e936
 --- /dev/null
 +++ b/packages/uniswap/src/features/predictionMarkets/rpc.ts
-@@ -0,0 +1,16 @@
-+import { PREDICTION_RPC_URL } from 'uniswap/src/features/predictionMarkets/config'
-+import { type Client, createPublicClient, http } from 'viem'
+@@ -0,0 +1,21 @@
++import { PREDICTION_RPC_URLS } from 'uniswap/src/features/predictionMarkets/rpcUrls'
++import { type Client, createPublicClient, fallback, http } from 'viem'
 +import { unichainSepolia } from 'viem/chains'
 +
 +let client: Client | undefined
 +
 +/** Cookieless JSON-RPC client for chain 1301; independent of the app's session-gated UniRPC transport. */
 +export function getPredictionPublicClient(): Client {
-+  client ??= createPublicClient({ chain: unichainSepolia, transport: http(PREDICTION_RPC_URL, { retryCount: 1 }) })
++  // Each request goes to the first RPC that answers, so a rate-limited primary falls through to the next.
++  const transports = PREDICTION_RPC_URLS.map((url) => http(url, { retryCount: 1 }))
++  client ??= createPublicClient({
++    chain: unichainSepolia,
++    transport: transports.length === 1 && transports[0] ? transports[0] : fallback(transports),
++  })
 +  return client
 +}
 +
@@ -12875,6 +12914,63 @@ index 0000000..41596c3
 +export function setPredictionPublicClient(next: Client | undefined): void {
 +  client = next
 +}
+diff --git a/packages/uniswap/src/features/predictionMarkets/rpcUrls.test.ts b/packages/uniswap/src/features/predictionMarkets/rpcUrls.test.ts
+new file mode 100644
+index 0000000..bfc6054
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/rpcUrls.test.ts
+@@ -0,0 +1,23 @@
++import {
++  PREDICTION_PUBLIC_RPC_URLS,
++  parsePredictionRpcUrls,
++} from 'uniswap/src/features/predictionMarkets/rpcUrls'
++
++describe('parsePredictionRpcUrls', () => {
++  it('keeps the configured order, primary first', () => {
++    expect(parsePredictionRpcUrls(' https://a.example/v2/k , https://b.example,')).toEqual([
++      'https://a.example/v2/k',
++      'https://b.example',
++    ])
++  })
++
++  it('falls back to the public list when nothing usable is configured', () => {
++    expect(parsePredictionRpcUrls(undefined)).toBe(PREDICTION_PUBLIC_RPC_URLS)
++    expect(parsePredictionRpcUrls('')).toBe(PREDICTION_PUBLIC_RPC_URLS)
++    expect(parsePredictionRpcUrls('wss://a.example')).toBe(PREDICTION_PUBLIC_RPC_URLS)
++  })
++
++  it('never lists a keyed provider among the public RPCs', () => {
++    expect(PREDICTION_PUBLIC_RPC_URLS.some((url) => url.includes('alchemy'))).toBe(false)
++  })
++})
+diff --git a/packages/uniswap/src/features/predictionMarkets/rpcUrls.ts b/packages/uniswap/src/features/predictionMarkets/rpcUrls.ts
+new file mode 100644
+index 0000000..65e0b7d
+--- /dev/null
++++ b/packages/uniswap/src/features/predictionMarkets/rpcUrls.ts
+@@ -0,0 +1,22 @@
++/** Public RPCs for chain 1301 in fallback order, all allowed by the app CSP. Wallets and connectors only get these. */
++export const PREDICTION_PUBLIC_RPC_URLS = [
++  'https://unichain-sepolia-rpc.publicnode.com',
++  'https://sepolia.unichain.org',
++  'https://1301.rpc.thirdweb.com',
++  'https://unichain-sepolia.drpc.org',
++]
++
++/** A comma-separated RPC list, primary first; without a usable URL it falls back to the public list. */
++export function parsePredictionRpcUrls(value: string | undefined): string[] {
++  const urls = (value ?? '')
++    .split(',')
++    .map((url) => url.trim())
++    .filter((url) => /^https?:\/\//.test(url))
++  return urls.length > 0 ? urls : PREDICTION_PUBLIC_RPC_URLS
++}
++
++/**
++ * RPCs the fork reads chain 1301 through, like the dashboard's NEXT_PUBLIC_PHINARY_RPC_URL. Set PREDICTION_RPC_URLS in
++ * apps/web/.env.override (git-ignored), so a keyed provider URL never enters the patch.
++ */
++export const PREDICTION_RPC_URLS = parsePredictionRpcUrls(process.env.PREDICTION_RPC_URLS)
 diff --git a/packages/uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated.ts b/packages/uniswap/src/features/predictionMarkets/sdk/abi/hookErrors.generated.ts
 new file mode 100644
 index 0000000..5609b95
