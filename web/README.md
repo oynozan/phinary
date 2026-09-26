@@ -14,6 +14,30 @@ The old `?wallet=` mock overrides are disabled in this worktree.
 
 See [DESIGN.md](DESIGN.md) for the design system.
 
+## Wallet connection (Privy)
+
+The shared wallet dialog hands off external-wallet connections to Privy. The app
+uses `useWallets()` and `getEthereumProvider()` to feed the existing viem trading,
+balance, Portfolio and Vault flows. Embedded wallets and authentication signatures
+are not requested by this connection flow.
+
+`NEXT_PUBLIC_PRIVY_APP_ID` and `NEXT_PUBLIC_PRIVY_CLIENT_ID` override the public
+Phinary identifiers. Configure allowed web origins for the app/client in the Privy
+dashboard when deploying. Never put a Privy App secret in a `NEXT_PUBLIC_` variable
+or in the web app; this integration does not use one.
+
+The first dialog keeps Phinary branding. Privy's next step owns wallet selection,
+connection approval and mobile/extension handling. `ox@0.8.9` satisfies Privy's
+optional `permissionless` peer; viem keeps its own `ox@0.14.20`. Do not flatten these
+with `--force` or `--legacy-peer-deps`.
+
+The app client currently allows `http://localhost:3113` for local review;
+`127.0.0.1` is a different origin and must be added separately if needed.
+
+Run `node scripts/test-wallet-dialog-browser.mjs` against the review server to
+exercise the real Privy SDK with a simulated EIP-6963 provider. This does not prove
+that a real user's extension, mobile wallet or production origin is configured.
+
 ## Phase 0: on-chain connection foundation
 
 Work on `feat/web-onchain` in a separate worktree. Keep the original mock app on

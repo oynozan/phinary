@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowUpRight, ChevronRight, LoaderCircle, Wallet } from "lucide-react";
+import { ChevronRight, LoaderCircle, Wallet } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { connectWallet, useWalletSession } from "@/lib/onchain/wallet";
 import "./wallet-dialog.css";
@@ -13,6 +13,7 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     const [selected, setSelected] = useState<string | null>(null);
     const [connectionError, setConnectionError] = useState<string | null>(null);
     const connecting = wallet.status === "connecting";
+    const options = wallet.options.length ? wallet.options : [{ id: "io.metamask", name: "MetaMask" }];
     return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="wallet-dialog" onOpenAutoFocus={() => {
         setConnectionError(null);
         opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -33,16 +34,11 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             <DialogTitle>Connect to Phinary</DialogTitle>
             <DialogDescription>Choose a wallet to continue.</DialogDescription>
         </div>
-        {wallet.options.length === 0 ? <div className="wallet-dialog-empty">
-            <Wallet size={28} aria-hidden="true" />
-            <p>No browser wallet detected</p>
-            <span>Enable your wallet extension, then reload this page.</span>
-            <a href="https://metamask.io/" target="_blank" rel="noopener noreferrer">Get MetaMask <ArrowUpRight size={16} aria-hidden="true" /></a>
-        </div> : <div className="wallet-dialog-options">
-            {wallet.options.map((option) => {
+        <div className="wallet-dialog-options">
+            {options.map((option) => {
                 const metamask = option.id === "io.metamask" || option.name.toLowerCase() === "metamask";
                 const pending = connecting && selected === option.id;
-                return <button type="button" className="wallet-option" key={option.id} disabled={connecting} aria-label={`Connect ${option.name}`} aria-busy={pending} onClick={async () => {
+                return <button type="button" className="wallet-option" key={option.id} disabled={connecting || !wallet.connectionReady} aria-label={`Connect ${option.name}`} aria-busy={pending} onClick={async () => {
                     setConnectionError(null);
                     setSelected(option.id);
                     try { await connectWallet(option.id); onOpenChange(false); }
@@ -57,8 +53,8 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     {pending ? <LoaderCircle size={20} className="wallet-option-spinner" aria-hidden="true" /> : <ChevronRight size={20} aria-hidden="true" />}
                 </button>;
             })}
-        </div>}
+        </div>
         {connectionError && <p className="wallet-dialog-error" role="alert">{connectionError}</p>}
-        <p className="wallet-dialog-note" role="status">{connecting ? 'Approve the connection in your wallet.' : 'Connecting does not submit a transaction.'}</p>
+        <p className="wallet-dialog-note" role="status">{!wallet.connectionReady ? 'Preparing wallet connection…' : 'Connecting does not submit a transaction.'}</p>
     </DialogContent></Dialog>;
 }
