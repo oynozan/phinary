@@ -39,3 +39,27 @@ test("polling stops after the last subscriber leaves", async () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
     assert.equal(calls, 1);
 });
+
+test("retained snapshots stay stale throughout retry and recover only on success", async () => {
+    let fail = false;
+    let finish: (() => void) | undefined;
+    const resource = createResource(async () => {
+        if (fail) throw new Error("private RPC URL");
+        if (finish) await new Promise<void>(resolve => { finish = resolve; });
+        return 42;
+    }, 5000, true);
+    await resource.refresh();
+    fail = true;
+    await resource.refresh();
+    assert.equal(resource.getSnapshot().data, 42);
+    assert.ok(resource.getSnapshot().error);
+    fail = false;
+    finish = () => {};
+    const retry = resource.refresh();
+    assert.equal(resource.getSnapshot().data, 42);
+    assert.ok(resource.getSnapshot().error, "retry must not re-enable trading with cached prices");
+    finish();
+    await retry;
+    assert.equal(resource.getSnapshot().error, undefined);
+    assert.equal(resource.getSnapshot().data, 42);
+});

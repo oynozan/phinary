@@ -11,3 +11,10 @@ export function QueryError({ id }: { id?: number }) {
         </div>
     );
 }
+
+export function MarketRefreshNotice({ id }: { id?: number }) {
+    return <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
+        <p>Updates interrupted. Showing the last loaded data; trading is paused until updates recover.</p>
+        <Button variant="outline" onClick={() => retryMarkets(id)}>Retry</Button>
+    </div>;
+}

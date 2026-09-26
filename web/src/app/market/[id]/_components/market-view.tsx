@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { QueryError } from "@/components/market/query-error";
+import { MarketRefreshNotice, QueryError } from "@/components/market/query-error";
 import { emptyForm, TradeCard, type TradeForm } from "@/components/trade";
 import { BRAND_NAME } from "@/config/brand";
 import { useMarket } from "@/lib/data";
@@ -18,7 +18,7 @@ import { TradesPanel } from "./trades-panel";
 import { detailQuestion, OnchainInfo, Overview, PricingExplanation } from "./detail-presentation";
 import "./market-detail.css";
 
-function MarketContent({ market, initialSide }: { market: Market; initialSide: Side }) {
+function MarketContent({ market, initialSide, stale }: { market: Market; initialSide: Side; stale: boolean }) {
     const [form, setForm] = useState<TradeForm>(() => emptyForm(initialSide));
     const upBalance = useTokenBalance(market.up);
     const title = `${detailQuestion(market)} · ${BRAND_NAME}`;
@@ -41,7 +41,7 @@ function MarketContent({ market, initialSide }: { market: Market; initialSide: S
         <div className="detail-grid">
             <div className="detail-overview-slot"><Overview market={market} /></div>
             <div className="detail-chart-slot"><ChartPanel market={market} /></div>
-            <div className="detail-trade-slot"><TradeCard market={market} form={form} onFormChange={setForm} holdings={upBalance} />{isResolved(market.phase) && <SettlementCompanion />}</div>
+            <div className="detail-trade-slot"><TradeCard stale={stale} market={market} form={form} onFormChange={setForm} holdings={upBalance} />{isResolved(market.phase) && <SettlementCompanion />}</div>
             <div className="detail-position-slot"><PositionPanel market={market} upBalance={upBalance} onSell={side => { setForm({ side, mode: "sell", amount: "", max: false }); document.getElementById("trade-amount")?.focus(); }} /></div>
             <div className="detail-pricing-slot"><PricingExplanation market={market} /></div>
         </div>
@@ -52,6 +52,6 @@ function MarketContent({ market, initialSide }: { market: Market; initialSide: S
 export function MarketView({ id, initialSide }: { id: number; initialSide: Side }) {
     const market = useMarket(id);
     return <div className="market-detail-page"><div className="detail-container">
-        {market.error ? <section className="detail-panel detail-error"><Link href="/">Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href="/">Back to Markets</Link></section> : <MarketContent key={id} market={market.data} initialSide={initialSide} />}
+        {market.error && market.data === undefined ? <section className="detail-panel detail-error"><Link href="/">Back to Markets</Link><QueryError id={id} /></section> : market.isLoading ? <MarketSkeleton /> : !market.data ? <section className="detail-panel detail-error"><h1>Market not found</h1><Link href="/">Back to Markets</Link></section> : <><div>{market.error && <MarketRefreshNotice id={id} />}</div><MarketContent key={id} market={market.data} initialSide={initialSide} stale={!!market.error} /></>}
     </div></div>;
 }

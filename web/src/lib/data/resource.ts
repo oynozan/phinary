@@ -1,7 +1,7 @@
 import type { Query } from "../types.ts";
 
 /** Shared polling resource: one request at a time, no polling without subscribers. */
-export function createResource<T>(fetcher: () => Promise<T>, interval = 5000) {
+export function createResource<T>(fetcher: () => Promise<T>, interval = 5000, keepPreviousData = false) {
     const initial: Query<T> = { data: undefined, isLoading: true };
     let state = initial;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -11,14 +11,14 @@ export function createResource<T>(fetcher: () => Promise<T>, interval = 5000) {
     const refresh = () => {
         if (pending) return pending;
         clearTimeout(timer);
-        state = { ...state, isLoading: state.data === undefined, error: undefined };
+        state = { ...state, isLoading: state.data === undefined, error: keepPreviousData ? state.error : undefined };
         emit();
         pending = (async () => {
             try {
                 state = { data: await fetcher(), isLoading: false };
             } catch {
-                // Never present cached prices as live after a failed request, or expose credential-bearing RPC errors.
-                state = { data: undefined, isLoading: false, error: new Error("Could not update market data. Please retry.") };
+                // Retained data must remain marked stale until a successful response. Never expose RPC credentials.
+                state = { data: keepPreviousData ? state.data : undefined, isLoading: false, error: new Error("Could not update market data. Please retry.") };
             } finally {
                 pending = undefined;
                 emit();

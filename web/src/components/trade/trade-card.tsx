@@ -21,8 +21,8 @@ import type { TradeForm } from "./types";
 export const TRADE_INPUT_ID = "trade-amount";
 const explorer = "https://sepolia.uniscan.xyz/tx/";
 
-export function TradeCard({ market, form, onFormChange, className, holdings }: {
-    market: Market; form: TradeForm; onFormChange: React.Dispatch<React.SetStateAction<TradeForm>>; className?: string; holdings: ReturnType<typeof useTokenBalance>;
+export function TradeCard({ market, form, onFormChange, className, holdings, stale = false }: {
+    market: Market; stale?: boolean; form: TradeForm; onFormChange: React.Dispatch<React.SetStateAction<TradeForm>>; className?: string; holdings: ReturnType<typeof useTokenBalance>;
 }) {
     const wallet = useWalletSession();
     const transaction = useTransaction();
@@ -39,7 +39,7 @@ export function TradeCard({ market, form, onFormChange, className, holdings }: {
     const inputBalance = form.mode === "buy" ? wallet.usdc : selectedHoldings.data ?? null;
     const inputLabel = form.mode === "buy" ? "USDC" : form.side.toUpperCase();
     const outputLabel = form.mode === "buy" ? form.side.toUpperCase() : "USDC";
-    const live = detailCanBuy(market, now);
+    const live = !stale && detailCanBuy(market, now);
     const locked = transaction.busy || Boolean(transaction.pending);
     const quoteQuery = useBuyQuote(market.id, form.amount, slippage, wallet.address, supported && live && !locked && !wrongNetwork, form.side, form.mode);
     const quote = locked ? reviewed : quoteQuery.quote;
@@ -70,7 +70,7 @@ export function TradeCard({ market, form, onFormChange, className, holdings }: {
         <div className="detail-trade-heading"><div><h2>{resolved ? "Settlement" : "Trade"}</h2><p>{resolved ? DETAIL_PHASE[market.phase] : "Buy tokens in this market"}</p></div>
             {!resolved && <div className="detail-segments" role="group" aria-label="Trade mode"><button type="button" aria-pressed={form.mode === "buy"} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, mode: "buy", amount: "", max: false }))}>Buy</button><button type="button" aria-pressed={form.mode === "sell"} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, mode: "sell", amount: "", max: false }))}>Sell</button></div>}
         </div>
-        {resolved ? <><dl className="detail-quote-summary"><div><dt>UP payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "up") ?? 0)}</dd></div><div><dt>DOWN payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "down") ?? 0)}</dd></div></dl><p className="detail-note">Redeem your winning tokens, or both sides of an invalid market.</p><button type="button" className="detail-primary" disabled={locked || wallet.status !== "connected" || wrongNetwork || ((market.phase === "invalid" ? (holdings.data ?? 0n) + (downHoldings.data ?? 0n) : market.upWon ? holdings.data ?? 0n : downHoldings.data ?? 0n) < (market.phase === "invalid" ? 2n : 1n))} onClick={() => { void claimMarket(market.id).catch(() => {}); }}>Claim</button></> : <>
+        {resolved ? <><dl className="detail-quote-summary"><div><dt>UP payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "up") ?? 0)}</dd></div><div><dt>DOWN payout / token</dt><dd>{formatUsd(payoutPerToken(market.phase, "down") ?? 0)}</dd></div></dl><p className="detail-note">Redeem your winning tokens, or both sides of an invalid market.</p><button type="button" className="detail-primary" disabled={stale || locked || wallet.status !== "connected" || wrongNetwork || ((market.phase === "invalid" ? (holdings.data ?? 0n) + (downHoldings.data ?? 0n) : market.upWon ? holdings.data ?? 0n : downHoldings.data ?? 0n) < (market.phase === "invalid" ? 2n : 1n))} onClick={() => { void claimMarket(market.id).catch(() => {}); }}>Claim</button></> : <>
             <fieldset className="detail-side-field"><legend>Select side</legend><div className="detail-sides">{(["up", "down"] as const).map((side) => <button type="button" key={side} className={`detail-${side}`} aria-pressed={form.side === side} disabled={locked} onClick={() => onFormChange((old) => ({ ...old, side, mode: "buy", amount: "", max: false }))}><strong>{side === "up" ? "▲ UP" : "▼ DOWN"}</strong><span>{market.quote ? formatCents(side === "up" ? market.quote.askUp : market.quote.askDown) : "N/A"}</span></button>)}</div></fieldset>
             <p className="detail-note">{form.mode === "buy" ? "Buy outcome tokens with USDC." : "Sell outcome tokens for USDC."}</p>
             <div className="detail-amount-label"><label htmlFor={TRADE_INPUT_ID}>Amount</label><span>Balance: {wallet.status !== "connected" || wrongNetwork || inputBalance === null ? "N/A" : `${formatTokens(Number(formatUnits(inputBalance!, 6)))} ${inputLabel}`}</span></div>

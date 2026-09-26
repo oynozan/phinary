@@ -1,6 +1,6 @@
 "use client";
 import { LockKeyhole, Droplets, Zap } from "lucide-react";
-import { QueryError } from "@/components/market/query-error";
+import { MarketRefreshNotice, QueryError } from "@/components/market/query-error";
 import { MARKET_LIMIT } from "@/lib/onchain/read-markets";
 import { getConnectionConfig } from "@/lib/onchain/config";
 import { useEthPrice, useMarkets } from "@/lib/data";
@@ -47,7 +47,7 @@ export function MarketsHome() {
               </div>
             </div>
           </div>
-          {error ? (
+          {error && !markets ? (
             <div className="featured-market">
               <QueryError />
             </div>
@@ -55,7 +55,7 @@ export function MarketsHome() {
             <FeaturedMarket
               market={markets ? pickFeatured(markets) : undefined}
               registry={registry}
-              ethSpot={eth.data?.price}
+              ethSpot={eth.error ? undefined : eth.data?.price}
             />
           )}
         </div>
@@ -69,11 +69,12 @@ export function MarketsHome() {
             Unichain Sepolia · Latest {MARKET_LIMIT} markets
           </span>
         </div>
+        {error && markets && <MarketRefreshNotice />}
         <MarketBrowser
           markets={markets}
           registry={registry}
-          ethSpot={eth.data?.price}
-          error={!!error}
+          ethSpot={eth.error ? undefined : eth.data?.price}
+          error={!!error && !markets}
         />
       </div>
     </div>
