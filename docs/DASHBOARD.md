@@ -31,11 +31,11 @@ The contracts already work without any platform: an UP or DOWN position is a Uni
 | Decision | Choice | Why |
 |---|---|---|
 | Purpose | Hackathon, advanced, built in phases | Your choice |
-| Relationship to the Uniswap fork | Dashboard main; fork only as proof | Your choice. The fork only runs on `localhost` (Uniswap's gateway rule), so it cannot be the public face. The real app.uniswap.org cannot route our tokens either: Uniswap Labs' routing servers skip hook-priced, zero-liquidity pools unless they allowlist the hook ([00-SUMMARY.md:235](research/00-SUMMARY.md#L235)). |
+| Relationship to the Uniswap fork | Dashboard main; fork only as proof | Your choice. The fork only runs on `localhost` (Uniswap's gateway rule), so it cannot be the public face. The real app.uniswap.org cannot route our tokens either: Uniswap Labs' routing servers skip hook-priced, zero-liquidity pools unless they allowlist the hook ([00-SUMMARY.md:235](research/00-SUMMARY.md#L235)). Verified on 2026-09-26 (§12). |
 | Stack | Next.js (App Router) + wagmi + RainbowKit + Tailwind; Ponder indexer | Your choice over "grow `app/`". The design below makes sure trading never depends on the indexer. |
 | Hosting | Vercel for `web/`; Railway (or similar) for Ponder + Postgres; one-command local fallback | Your choice |
 | Faucet | Server drip of Circle test USDC plus a little ETH, rate-limited | The deployed hook uses **Circle's test USDC** (`0x31d0…768F`) as collateral, which we cannot mint. |
-| Labels and token names | UP / DOWN in the UI. Every token keeps the plain ticker `ETHUP` / `ETHDOWN`. The target and deadline go in the token name (`ETH above $2,684.00 at 14:31 UTC, 26 Sep`) and in a generated logo ("▲ 2,684 · 14:31"). | Your choice (option A of 2026-09-26). MetaMask's "Add to wallet" rejects symbols longer than 11 characters ([MetaMask/core `TokensController.ts:1044`](https://github.com/MetaMask/core/blob/main/packages/assets-controllers/src/TokensController.ts)), so target and deadline cannot both fit in the symbol. The name and the icon carry them instead, and the token address stays the real identity. |
+| Labels and token names | UP / DOWN in the UI. Tickers are `ETHUP` / `ETHDOWN`. Token names use the compact `ETH > PRICE DATE` form: `ETH > $2684.00 26 Sep 14:31`, meaning the strike, then the deadline's date and time in UTC. Both tokens of a market share the name. The ticker and a generated logo ("▲ 2,684 · 14:31") tell UP and DOWN apart. | Your choice (2026-09-26): `ETHUP` / `ETHDOWN` tickers, with names in the compact style of the current keeper names (`YES ETH>2684.93 22:17:00`). MetaMask's "Add to wallet" rejects symbols longer than 11 characters ([MetaMask/core `TokensController.ts:1044`](https://github.com/MetaMask/core/blob/main/packages/assets-controllers/src/TokensController.ts)), so target and deadline cannot both fit in the symbol. The name and the icon carry them instead, and the token address stays the real identity. |
 | Shared code | Reuse `packages/swap-sdk` (quotes, UniversalRouter encoding, revert decoding). Port the tested logic from `app/src` (market phases, formatting, trade steps). | This code is already tested against a local stack. |
 | Visual direction | Set with the Impeccable design skill before building the phase 1 UI | Keeps the look deliberate rather than generic |
 
@@ -122,7 +122,7 @@ The phases come from `app/src/market.ts`. The "closing" phase is split in two so
 | Settled | **Resolved UP** / **Resolved DOWN** | Winners claim $1.00 per token |
 | Invalid | Invalid, 50/50 | Both sides claim $0.50 |
 
-Demo markets last 60 s: about 48 s live, a short closed gap, then a 10 s window. The home page therefore turns over every minute.
+Demo markets last 2 minutes and a new one opens every minute. Each has about 105 s live, a 2 s closed gap, then a 10 s window. Markets overlap, so one is always live, and one resolves every minute.
 
 ### `/` Markets home
 - **Hero:** the market that is live now, with a big UP percentage, a countdown bar, and **Buy UP** / **Buy DOWN** buttons (prices are the asks, e.g. "UP 63¢", "DOWN 39¢").
@@ -294,11 +294,11 @@ Both halves read addresses from `deployments/unichain-sepolia.json`. After a con
 | Phase | Scope | Gate |
 |---|---|---|
 | **0 Setup** | `web/` and `indexer/` scaffolds, shared config, swap-sdk import, local one-command start, hosting skeleton, visual direction (Impeccable) | The hosted page loads live markets from RPC and the indexer shows synced |
-| **1 Core** | Home, market page, portfolio with claims, onboarding with the drip. Bot: `ETHUP` / `ETHDOWN` symbols and descriptive names (§12). | On the **public link**: drip → buy UP → sell → claim a winner, with the portfolio correct |
+| **1 Core** | Home, market page, portfolio with claims, onboarding with the drip. Bot: `ETHUP` / `ETHDOWN` tickers and `ETH > PRICE DATE` names (§12). | On the **public link**: drip → buy UP → sell → claim a winner, with the portfolio correct |
 | **2 Platformless proofs** | Receipts, token drawer (add to wallet, send, Open in Uniswap) | Demo step works: a token bought in the dashboard is sold in the Uniswap fork |
 | **3 Price transparency** | Why-this-price panel with what-if, ETH chart with window and running average, resolution proof | Parity test passes; a judge can see why the price moved |
 | **4 Social and LP** | Activity feed, leaderboard, vault page | Deposit and withdraw work; the leaderboard matches Ponder's tables |
-| Deferred | Strike ladder, presenter mode, batched Claim all | — |
+| Deferred | Strike ladder, presenter mode, batched Claim all | - |
 
 Each phase is shippable on its own. If time runs out after any phase, the demo still works.
 
@@ -309,15 +309,24 @@ Each phase is shippable on its own. If time runs out after any phase, the demo s
 - **Time.** Next.js + Ponder is the heaviest of the three options discussed. The phases limit the damage, and `app/` remains a working swap page if the new dashboard is not ready.
 - **Test USDC supply.** Circle's faucet hands out small amounts, so the drip wallet should be funded early and topped up before the demo.
 - **Indexer backfill and RPC limits.** Start the hosted indexer well before the demo, and use a keyed RPC.
-- **The bot needs a small change for UP/DOWN token names.**
+- **The bot needs a small change for UP/DOWN token names.** *(Done 2026-09-26: `bot/src/market.ts`, `bot/src/config.ts`, `script/CreateMarket.s.sol`; live from market #147 or so after the keeper restart.)*
   - Why: [bot/src/market.ts:179-182](../bot/src/market.ts#L179-L182) passes the literal `"YES"` / `"NO"` as `{side}` into the name and symbol templates. One template serves both tokens, so the environment-variable templates alone cannot produce UP/DOWN.
   - Change:
     - pass `"UP"` / `"DOWN"` as the side, and update the `renderTemplate` type and its test;
     - add a `{ticker}` placeholder (`MARKET_TICKER=ETH`, set explicitly because the demo token's own symbol is `dWETH`);
     - add a `{date}` placeholder (`26 Sep`, in `MARKET_TIMEZONE`, which defaults to UTC).
-  - Templates: `MARKET_SYMBOL_TEMPLATE={ticker}{side}` gives `ETHUP` / `ETHDOWN` (7 characters at most). `MARKET_NAME_TEMPLATE={ticker} above ${strike} at {hhmm} UTC, {date}` gives `ETH above $2,684.00 at 14:31 UTC, 26 Sep`.
+  - Templates:
+    - `MARKET_SYMBOL_TEMPLATE={ticker}{side}` gives `ETHUP` / `ETHDOWN` (7 characters at most).
+    - `MARKET_NAME_TEMPLATE={ticker} > ${strike} {date} {hhmm}` gives `ETH > $2684.00 26 Sep 14:31`. `{strike}` renders two decimals with no thousands separator. The name template has no `{side}`, so both tokens of a market get the same name.
   - Also update [CreateMarket.s.sol:78-81](../script/CreateMarket.s.sol#L78-L81), which hardcodes `"YES-"`, to the same scheme.
-  - Existing tokens keep their names. With 1-minute markets, every live market has the new names within a minute of restarting the bot.
+  - Existing tokens keep their names. Markets last 2 minutes and a new one opens every minute, so every live market has the new names within two minutes of restarting the bot.
   - The dashboard shows UP/DOWN either way. The change is for wallets, the explorer and the Uniswap fork.
-- **The official Uniswap app will not route our tokens.** On app.uniswap.org (testnet mode), pasting an UP token should give "No routes found", because routing needs Uniswap Labs' allowlist. This is not tested with our own tokens yet; it can be checked once the demo deployment is final.
+- **The official Uniswap app does not route our tokens (verified 2026-09-26).**
+  - How: app.uniswap.org in testnet mode on Unichain Sepolia, in headless Chrome with no wallet, asked to swap 1 USDC for the UP token of a live market.
+  - Result: its Trading API answered every request with 404 `NoRouteFoundError: No route with sufficient liquidity was found for this pair`. That covered the app's own requests (V4, V4+V3+V2, the default routing) and the same quote replayed with `V4_HOOKS_ONLY`. The Buy box stayed at 0.
+  - Control, at the same moments: Uniswap's own V4Quoter quoted the same trade on-chain every time (11 of 11; 1 USDC → 1.46–1.88 UP).
+  - Setup check: the same session and page quoted ETH → USDC normally (0.001 ETH → 30.04 USDC through a v3 pool).
+  - Coverage: two independent live markets (131 and 135). A third market (134) was excluded because its UP price was 1–2¢, below the tradable band, so it could not quote on-chain either.
+  - Conclusion: the pools work, and Uniswap's router does not consider them. That fits the allowlist rule for zero-liquidity, hook-priced pools (the API does not say why).
+  - Evidence: [research/interface-fork/official-app-check/](research/interface-fork/official-app-check/), which holds the probe script, the raw results and two screenshots.
 - **Open:** which host for Ponder (Railway, Render or Fly); the exact drip amounts; whether the Uniswap fork deep-link format for chain 1301 needs a query flag (to be checked in phase 2).
