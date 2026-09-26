@@ -4,7 +4,7 @@ import { accountStats, market, position, trade } from 'ponder:schema'
 import type { Address } from 'viem'
 
 import { loadIndexerDeployment } from './deployment.ts'
-import { buy, sell, splitDebit, type Bucket } from './lib/accounting.ts'
+import { allocateDebit, buy, sell, type Bucket } from './lib/accounting.ts'
 import { attributeTrade } from './lib/attribution.ts'
 
 const deployment = loadIndexerDeployment(process.env)
@@ -76,13 +76,17 @@ ponder.on('PredictionHook:Trade', async ({ event, context }) => {
   if (isBuy) {
     tradeBucket = { ...tradeBucket, ...buy(tradeBucket, qty, usdcAmount) }
   } else {
-    const { fromTrade, fromReceived } = splitDebit(tradeBucket, receivedBucket, qty)
-    // Split the sale proceeds proportionally to the quantity debited from each bucket, floor on
-    // the trade part so the two parts always sum back to `usdcAmount` exactly.
-    const usdcOutTrade = qty > 0n ? (usdcAmount * fromTrade) / qty : 0n
-    const usdcOutReceived = usdcAmount - usdcOutTrade
-    tradeBucket = { ...tradeBucket, ...sell(tradeBucket, fromTrade, usdcOutTrade) }
-    receivedBucket = { ...receivedBucket, ...sell(receivedBucket, fromReceived, usdcOutReceived) }
+    const { fromTrade, fromReceived, excess, usdcTrade, usdcReceived } = allocateDebit(tradeBucket, receivedBucket, qty, usdcAmount)
+    if (excess > 0n) {
+      console.warn('trades: sell exceeds known positions, dropping unknown-origin excess', {
+        txHash: event.transaction.hash,
+        account: acct,
+        marketId,
+        excess,
+      })
+    }
+    tradeBucket = { ...tradeBucket, ...sell(tradeBucket, fromTrade, usdcTrade) }
+    receivedBucket = { ...receivedBucket, ...sell(receivedBucket, fromReceived, usdcReceived) }
   }
   const realizedDelta = tradeBucket.realized - realizedBefore
 

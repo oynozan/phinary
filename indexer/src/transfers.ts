@@ -4,7 +4,7 @@ import { accountStats, market, position, transfer } from 'ponder:schema'
 import type { Address } from 'viem'
 
 import { loadIndexerDeployment } from './deployment.ts'
-import { payoutFor, sell, splitDebit, transferIn, transferOut, type Bucket } from './lib/accounting.ts'
+import { allocateDebit, payoutFor, sell, transferIn, transferOut, type Bucket } from './lib/accounting.ts'
 import { classifyTransfer } from './lib/attribution.ts'
 
 const deployment = loadIndexerDeployment(process.env)
@@ -71,14 +71,23 @@ async function handleTransfer({ event, context }: { event: TransferEvent; contex
     let tradeBucket = await loadPosition(context, from, marketRow.id, side, 'trade')
     let receivedBucket = await loadPosition(context, from, marketRow.id, side, 'received')
 
-    const { fromTrade, fromReceived } = splitDebit(tradeBucket, receivedBucket, amount)
     const isWinner = side === 'UP' ? marketRow.upWon === true : marketRow.upWon === false
     const status = marketRow.status === 'invalid' ? ('invalid' as const) : ('settled' as const)
     const payoutTotal = payoutFor(status, isWinner, amount)
-    // Same proportional split as a Trade sell (accounting.ts §Trade rules), so the two parts sum
-    // back to `payoutTotal` exactly.
-    const payoutTrade = amount > 0n ? (payoutTotal * fromTrade) / amount : 0n
-    const payoutReceived = payoutTotal - payoutTrade
+    const { fromTrade, fromReceived, excess, usdcTrade: payoutTrade, usdcReceived: payoutReceived } = allocateDebit(
+      tradeBucket,
+      receivedBucket,
+      amount,
+      payoutTotal,
+    )
+    if (excess > 0n) {
+      console.warn('transfers: redeem exceeds known positions, dropping unknown-origin excess', {
+        txHash: event.transaction.hash,
+        account: from,
+        marketId: marketRow.id,
+        excess,
+      })
+    }
 
     const realizedBefore = tradeBucket.realized
     tradeBucket = { ...tradeBucket, ...sell(tradeBucket, fromTrade, payoutTrade) }
@@ -119,7 +128,15 @@ async function handleTransfer({ event, context }: { event: TransferEvent; contex
   // bucket gets the whole amount at zero added cost.
   let senderTrade = await loadPosition(context, from, marketRow.id, side, 'trade')
   let senderReceived = await loadPosition(context, from, marketRow.id, side, 'received')
-  const { fromTrade, fromReceived } = splitDebit(senderTrade, senderReceived, amount)
+  const { fromTrade, fromReceived, excess } = allocateDebit(senderTrade, senderReceived, amount, 0n)
+  if (excess > 0n) {
+    console.warn('transfers: peer transfer exceeds known positions, dropping unknown-origin excess', {
+      txHash: event.transaction.hash,
+      account: from,
+      marketId: marketRow.id,
+      excess,
+    })
+  }
   senderTrade = { ...senderTrade, ...transferOut(senderTrade, fromTrade) }
   senderReceived = { ...senderReceived, ...transferOut(senderReceived, fromReceived) }
   await savePosition(context, senderTrade)

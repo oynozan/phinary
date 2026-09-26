@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { EMPTY, buy, sell, transferOut, transferIn, splitDebit, payoutFor } from '../src/lib/accounting.ts'
+import { EMPTY, allocateDebit, buy, sell, transferOut, transferIn, splitDebit, payoutFor } from '../src/lib/accounting.ts'
 
 const U = 1_000_000n
 
@@ -41,5 +41,47 @@ describe('accounting', () => {
 
   test('sell throws when receiving USDC without selling tokens', () => {
     expect(() => sell(EMPTY, 0n, 1n)).toThrow()
+  })
+
+  describe('allocateDebit', () => {
+    test('normal case: all from the trade bucket', () => {
+      expect(allocateDebit({ ...EMPTY, qty: 10n }, { ...EMPTY, qty: 5n }, 4n, 400n)).toEqual({
+        fromTrade: 4n,
+        fromReceived: 0n,
+        excess: 0n,
+        usdcTrade: 400n,
+        usdcReceived: 0n,
+      })
+    })
+
+    test('trade+received split with exact proceeds', () => {
+      expect(allocateDebit({ ...EMPTY, qty: 3n }, { ...EMPTY, qty: 5n }, 4n, 400n)).toEqual({
+        fromTrade: 3n,
+        fromReceived: 1n,
+        excess: 0n,
+        usdcTrade: 300n,
+        usdcReceived: 100n,
+      })
+    })
+
+    test('over-debit: excess is dropped and proceeds split pro rata', () => {
+      expect(allocateDebit({ ...EMPTY, qty: 3n }, { ...EMPTY, qty: 1n }, 6n, 600n)).toEqual({
+        fromTrade: 3n,
+        fromReceived: 1n,
+        excess: 2n,
+        usdcTrade: 300n,
+        usdcReceived: 100n,
+      })
+    })
+
+    test('zero-qty debit', () => {
+      expect(allocateDebit(EMPTY, EMPTY, 0n, 0n)).toEqual({
+        fromTrade: 0n,
+        fromReceived: 0n,
+        excess: 0n,
+        usdcTrade: 0n,
+        usdcReceived: 0n,
+      })
+    })
   })
 })

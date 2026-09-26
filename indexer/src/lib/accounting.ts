@@ -109,6 +109,41 @@ export function splitDebit(
 }
 
 /**
+ * Split a debit across the trade and received buckets, never more than each bucket actually holds.
+ * Any remainder after both buckets are drained is `excess`: tokens of unknown origin (e.g. credited
+ * outside the two tracked buckets) that callers must drop rather than force through `sell`/
+ * `transferOut`, which throw on an over-debit.
+ *
+ * `usdc` (the sale proceeds, or a redeem's payout) is split proportionally to `qty` across
+ * (fromTrade, fromReceived, excess), floored, with the excess's share silently dropped. `usdcTrade`
+ * and `usdcReceived` still sum exactly to each other's shared total: `usdcReceived` is what's left of
+ * the non-excess proceeds after `usdcTrade`, not an independent floor, so no unit is lost to double
+ * rounding between the two known buckets.
+ */
+export function allocateDebit(
+  trade: Bucket,
+  received: Bucket,
+  qty: bigint,
+  usdc: bigint,
+): { fromTrade: bigint; fromReceived: bigint; excess: bigint; usdcTrade: bigint; usdcReceived: bigint } {
+  if (qty === 0n) {
+    return { fromTrade: 0n, fromReceived: 0n, excess: 0n, usdcTrade: 0n, usdcReceived: 0n }
+  }
+
+  const fromTrade = trade.qty < qty ? trade.qty : qty
+  const remaining = qty - fromTrade
+  const fromReceived = received.qty < remaining ? received.qty : remaining
+  const excess = remaining - fromReceived
+
+  const nonExcessQty = fromTrade + fromReceived
+  const nonExcessUsdc = (usdc * nonExcessQty) / qty
+  const usdcTrade = (usdc * fromTrade) / qty
+  const usdcReceived = nonExcessUsdc - usdcTrade
+
+  return { fromTrade, fromReceived, excess, usdcTrade, usdcReceived }
+}
+
+/**
  * Calculate payout based on settlement status.
  * - settled + winner: qty
  * - settled + loser: 0n
