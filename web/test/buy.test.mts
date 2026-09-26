@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseUsdc, validateReview, describeBuyError, type BuyQuote } from "../src/lib/onchain/buy.ts";
+import { parseUsdc, validateReview, describeBuyError, resolveSlippageBps, MAX_SLIPPAGE_BPS, type BuyQuote } from "../src/lib/onchain/buy.ts";
 import { isRejected, assertWalletNetwork } from "../src/lib/onchain/wallet-core.ts";
 import type { createChainClient } from "../src/lib/onchain/client.ts";
 
@@ -19,6 +19,16 @@ test("review rejects cutoff, stale quotes, invalid minOut and silent tolerance c
     assert.throws(() => validateReview({ ...quote(), quotedAt: Date.now() - 31000 }, 50));
     assert.throws(() => validateReview({ ...quote(), minimumOut: 1n }, 50));
     assert.throws(() => validateReview({ ...quote(), slippageBps: 500 }, 50));
+});
+test("auto slippage sizes the tolerance to the time left, within the review bound", () => {
+    const even = { mode: "buy" as const, amountIn: 1_000_000n, amountOut: 2_000_000n };
+    assert.equal(resolveSlippageBps(100, { ...even, secondsToWindow: 60 }), 100);
+    assert.equal(resolveSlippageBps("auto", { ...even, secondsToWindow: 7 * 86_400 }), 100);
+    // A 50c token a minute before the window can move about 0.23 in two standard deviations of a 5 s confirmation.
+    assert.equal(resolveSlippageBps("auto", { ...even, secondsToWindow: 60 }), 3160);
+    assert.equal(resolveSlippageBps("auto", { mode: "buy", amountIn: 50_000n, amountOut: 1_000_000n, secondsToWindow: 1 }), MAX_SLIPPAGE_BPS);
+    validateReview({ ...quote(), slippageBps: 3160, minimumOut: 1_368_000n }, 50);
+    assert.throws(() => validateReview({ ...quote(), slippageBps: MAX_SLIPPAGE_BPS + 1, minimumOut: 199_800n }, 50), /slippage/);
 });
 test("nested wallet rejections are cancellation, not success", () => {
     assert.equal(isRejected({ cause: { code: 4001 } }), true);

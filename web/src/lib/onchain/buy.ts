@@ -2,7 +2,7 @@ import { submittedNonce } from "./recover-receipt.ts";
 import type { createChainClient } from "./client.ts";
 type ChainClient = ReturnType<typeof createChainClient>;
 import {
-    buildPermitSingle, buildSwap, erc20ApproveTx, estimateSwapGas, gasWithHeadroom,
+    autoSlippageBps, buildPermitSingle, buildSwap, erc20ApproveTx, estimateSwapGas, gasWithHeadroom,
     hookErrorsAbi, minOutWithSlippage, permitTypedData, predictionHookAbi,
     quoteExactIn, readAllowances, zeroForOneFor, PredictionSwapError, type PoolKey,
 } from "@phinary/swap-sdk";
@@ -23,16 +23,27 @@ export interface BuyQuote {
     slippageBps: number; cutoff: number; quotedAt: number; blockTime: number;
     token: Address; poolKey: PoolKey;
 }
+/** Basis points, or "auto" to size the tolerance to the market like the Uniswap fork and the backup app. */
+export type Slippage = number | "auto";
+export const MAX_SLIPPAGE_BPS = 9_000;
+const CONFIRM_SECONDS = 5;
+/** Auto: how far this market's price can move between the quote and the block (wallet confirmation plus a block). */
+export function resolveSlippageBps(slippage: Slippage, p: { mode: "buy" | "sell"; amountIn: bigint; amountOut: bigint; secondsToWindow: number }): number {
+    if (slippage !== "auto") return slippage;
+    return autoSlippageBps({ exactIn: true, isBuy: p.mode === "buy", amountIn: p.amountIn, amountOut: p.amountOut,
+        secondsToWindow: p.secondsToWindow, confirmSeconds: CONFIRM_SECONDS, maxBps: MAX_SLIPPAGE_BPS });
+}
+const validSlippage = (bps: number) => Number.isInteger(bps) && bps >= 0 && bps <= MAX_SLIPPAGE_BPS;
 export function validateReview(q: BuyQuote, now: number) {
-    if (!Number.isInteger(q.slippageBps) || q.slippageBps < 0 || q.slippageBps > 1000) throw new Error("Invalid slippage tolerance");
+    if (!validSlippage(q.slippageBps)) throw new Error("Invalid slippage tolerance");
     if (q.amountIn <= 0n || q.minimumOut <= 0n || q.minimumOut !== minOutWithSlippage(q.amountOut, q.slippageBps)) throw new Error("Invalid quote");
     if (now >= q.cutoff) throw new Error("Trading has closed for this market");
     if (Date.now() - q.quotedAt > 30_000) throw new Error("Quote expired. Review a fresh quote.");
 }
-export async function fetchBuyQuote(client: ChainClient, marketId: number, amount: bigint, slippageBps: number, account?: Address,
+export async function fetchBuyQuote(client: ChainClient, marketId: number, amount: bigint, slippage: Slippage, account?: Address,
     config = getConnectionConfig(), side: "up" | "down" = "up", mode: "buy" | "sell" = "buy"): Promise<BuyQuote> {
     if (!Number.isSafeInteger(marketId) || marketId < 1) throw new Error("Invalid market");
-    if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 1000) throw new Error("Invalid slippage tolerance");
+    if (slippage !== "auto" && !validSlippage(slippage)) throw new Error("Invalid slippage tolerance");
     const [chainId, head] = await Promise.all([client.getChainId(), client.getBlock()]);
     if (chainId !== config.chainId) throw new Error("RPC is on the wrong network");
     const [info, keys, usdc] = await Promise.all([
@@ -52,6 +63,8 @@ export async function fetchBuyQuote(client: ChainClient, marketId: number, amoun
         poolKey, zeroForOne: zeroForOneFor(poolKey, input), amount,
         account, quoter: config.v4Quoter, extraErrors: hookErrorsAbi,
     });
+    const slippageBps = resolveSlippageBps(slippage, { mode, amountIn: amount, amountOut: quote.amountOut,
+        secondsToWindow: Number(info.expiry) - info.window - Number(head.timestamp) });
     return { account, side, mode, marketId, amountIn: amount, amountOut: quote.amountOut, minimumOut: minOutWithSlippage(quote.amountOut, slippageBps),
         slippageBps, cutoff, quotedAt: Date.now(), blockTime: Number(head.timestamp), token, poolKey };
 }
@@ -111,7 +124,8 @@ export async function executeUpBuy(q: BuyQuote, ctx: BuyContext) {
         } catch { throw new PendingReceiptError(); }
         onPending(null);
         if (replaced) throw new Error("Transaction was cancelled or replaced. Review your wallet before retrying.");
-        if (receipt.status !== "success") throw new Error("Transaction reverted. Refresh the quote before retrying.");
+        if (receipt.status !== "success") throw new Error(kind === "swap" ? "Swap reverted on chain: the price moved past your slippage limit or trading closed. Try again." :
+            "Transaction reverted. Refresh the quote before retrying.");
         return receipt;
     };
     const now = await fresh();
