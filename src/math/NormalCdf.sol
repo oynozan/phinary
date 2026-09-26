@@ -6,7 +6,7 @@ import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 /// @title NormalCdf
 /// @notice Standard normal CDF and PDF in WAD fixed point.
 /// @dev Hart (1968) / West (2005) rational approximation with 36-decimal Horner accumulators ("HartX36").
-///      Monotonicity of the tail on [0, inf) is certified in formal/hart36 (docs/research/gaps/formal-verification-integer-proofs.md).
+///      Monotonicity of the tail on [0, inf) is certified in formal/hart36 (docs/md/research/gaps/formal-verification-integer-proofs.md).
 ///      Measured max abs error vs mpmath 4.23e-17. Symmetric by construction: cdf(x) + cdf(-x) == 1e18.
 ///      The upper tail is e(z) * R(z) with e = expWad(-z^2/2) and R = num/den (or 1/(f*sqrt(2pi)) past SPLIT); both
 ///      factors are non-increasing in z, which `band` uses to keep Phi +/- k*phi monotone with a single rounding.

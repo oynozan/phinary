@@ -1,0 +1,29 @@
+{
+  "name": "phinary-docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "env -u AI_AGENT -u CLAUDECODE -u CLAUDE_CODE next dev -p 3200",
+    "build": "next build",
+    "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
+    "start": "next start -p 3200"
+  },
+  "dependencies": {
+    "next": "16.3.6",
+    "nextra": "4.6.1",
+    "nextra-theme-docs": "4.6.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
+    "pagefind": "^1.5.2",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "zod": "4.3.6"
+  }
+}

@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 /// @title QuoteMath
-/// @notice Exact-integer amount solvers for a linear-impact quote curve (docs/SPEC.md §3.3).
+/// @notice Exact-integer amount solvers for a linear-impact quote curve (docs/md/SPEC.md §3.3).
 /// @dev Units: amounts in 1e-6 token units (USDC and outcome tokens both have 6 decimals); prices WAD per whole
 ///      token; `lam` = WAD marginal-price change per whole token (1e6 units) of flow; `i0` = signed flow already
 ///      executed this epoch (1e-6 units) in the pool's mirrored coordinate.

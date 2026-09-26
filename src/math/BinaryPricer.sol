@@ -8,7 +8,7 @@ import {StudentTCdf} from "./StudentTCdf.sol";
 
 /// @title BinaryPricer
 /// @notice Black-Scholes price of a cash-or-nothing binary settled on a discrete geometric TWAP over the final
-///         `window` seconds (r = 0). European N(d2) is the window -> 0 limit. See docs/SPEC.md §3.3.
+///         `window` seconds (r = 0). European N(d2) is the window -> 0 limit. See docs/md/SPEC.md §3.3.
 /// @dev x = ln(S/K) WAD; varE36 = per-second variance * 1e36; tau, window in seconds; n = samples in the window
 ///      (0 = continuous averaging). With Delta = window/n:
 ///        mu = x - var/2 * (tau - w + (n-1)*Delta/2)

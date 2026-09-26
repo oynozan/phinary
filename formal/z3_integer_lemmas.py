@@ -3,7 +3,7 @@ factored spread band. Each `prove` asserts the negation of the goal and expects 
 defining inequalities and isqrt by s^2 <= X < (s+1)^2. These are the MATH statements; the Solidity refinement is the
 bit-exact vector suite (test/math/QuoteMath.t.sol) plus checked arithmetic (overflow reverts).
 
-Origin: docs/research/gaps/formal-verification-scripts/py/z3_integer_lemmas.py (Lemma S, A, Theorem N, E1, E2),
+Origin: docs/md/research/gaps/formal-verification-scripts/py/z3_integer_lemmas.py (Lemma S, A, Theorem N, E1, E2),
 extended with E1 at integer amounts through the NO mirror, E2 in the sell-first order, Theorem N for sell exact-out,
 the composition step of the factored band and the T4(g) per-epoch extraction bound. For the band, e(z) >= 0 and
 R(z) = n/d are non-increasing in z (formal/hart36); with C = KAPPA_SCALE and K = kappa*C the band evaluates

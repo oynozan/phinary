@@ -10,7 +10,7 @@ index 0000000..6c1b52a
 +form quote and trade the YES/NO outcome tokens of our PredictionHook markets on Unichain Sepolia (chain 1301). Every other
 +token and chain still goes through Uniswap's hosted Trading API unchanged.
 +
-+The approach is "Strategy B" from `../docs/research/interface-fork/RECOMMENDATION.md`: the `TradingApiClient` singleton is
++The approach is "Strategy B" from `../docs/md/research/interface-fork/RECOMMENDATION.md`: the `TradingApiClient` singleton is
 +wrapped, and requests for a USDC <-> YES/NO pair on 1301 are answered in the page. Quotes come from the official V4Quoter
 +(`eth_call`); the transaction is `UniversalRouter 2.0.execute([PERMIT2_PERMIT,] V4_SWAP[swap, SETTLE_ALL, TAKE_ALL])`,
 +built locally.
@@ -12931,7 +12931,7 @@ index 0000000..9ec6fee
 +/** Unichain Sepolia. */
 +export const UNICHAIN_SEPOLIA_CHAIN_ID = 1301
 +
-+/** Uniswap v4 "Stack A" on chain 1301 (docs/research/interface-fork/unichain-sepolia.md). Never mix with Stack B. */
++/** Uniswap v4 "Stack A" on chain 1301 (docs/md/research/interface-fork/unichain-sepolia.md). Never mix with Stack B. */
 +export interface ChainContracts {
 +  chainId: number
 +  poolManager: Address

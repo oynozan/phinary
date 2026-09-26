@@ -16,7 +16,7 @@ import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 import {IUnderlyingOracle} from "../interfaces/IUnderlyingOracle.sol";
 
 /// @title UnderlyingOracleHook
-/// @notice Oracle-only v4 hook on one ETH/USDC pool (flags AFTER_INITIALIZE | BEFORE_SWAP). See docs/SPEC.md §2.
+/// @notice Oracle-only v4 hook on one ETH/USDC pool (flags AFTER_INITIALIZE | BEFORE_SWAP). See docs/md/SPEC.md §2.
 /// @dev On the first swap of each block.timestamp, beforeSwap records the pre-swap (start-of-block) sqrtPrice and tick,
 ///      a v3-semantics observation {time, tickCumulative} and the TWAP-return variance accumulator on an H-second grid.
 ///      Reads in a block with no write yet use slot0 (virtual-write rule): every swap runs beforeSwap first, so slot0

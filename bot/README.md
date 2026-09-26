@@ -22,7 +22,7 @@ cp config/unichain-sepolia.example.json ../deployments/unichain-sepolia.json   #
 ```
 
 `../deployments/unichain-sepolia.json` (override with `DEPLOYMENTS_FILE`) holds the addresses. The example file has the
-chain-1301 constants from `docs/SPEC.md` §4 and zero placeholders for our contracts. Keys, flat or under `"contracts"`:
+chain-1301 constants from `docs/md/SPEC.md` §4 and zero placeholders for our contracts. Keys, flat or under `"contracts"`:
 
 | Key | Used by | Notes |
 |---|---|---|

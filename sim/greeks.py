@@ -1,7 +1,7 @@
 """T1 numeric check: closed-form Greeks of the settlement-matched binary P = Phi(d) against 50-digit finite
 differences, their limits, and the on-chain delta (pdf / sqrtV from the integer spec) against the closed form.
 
-Model (docs/SPEC.md §3.3, r = 0), with tD(tau), tV(tau) the effective drift and variance times of the window:
+Model (docs/md/SPEC.md §3.3, r = 0), with tD(tau), tV(tau) the effective drift and variance times of the window:
     d = (x - s^2 tD / 2) / (s sqrt(tV)),   P = Phi(d)
     dP/dx       = phi(d) / (s sqrt(tV))                        (delta in log-spot; dP/dS = that / S)
     d2P/dx2     = -d phi(d) / (s^2 tV)

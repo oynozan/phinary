@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 
 /// @title IPredictionHook
-/// @notice External API of the Black-Scholes-priced binary prediction-market hook (see docs/SPEC.md).
+/// @notice External API of the Black-Scholes-priced binary prediction-market hook (see docs/md/SPEC.md).
 interface IPredictionHook {
     enum Status {
         None,

@@ -33,7 +33,7 @@ interface IOracleHookView {
 ///         a PriceSteerer seeding full-range liquidity, and the MarketScheduler with the PredictionHook it owns
 ///         (flags 0x2AA8, no keeper).
 /// @dev forge script script/Deploy.s.sol --rpc-url <rpc> --broadcast. Every parameter has an env override, see
-///      docs/RUNBOOK.md and SchedulerPair. A run without --broadcast writes <NETWORK>.dry-run.json instead.
+///      docs/md/RUNBOOK.md and SchedulerPair. A run without --broadcast writes <NETWORK>.dry-run.json instead.
 ///      KEEPER_ADDRESS only names the keeper bot's account in the file, the hook grants it no role.
 contract Deploy is SchedulerPair {
     uint160 internal constant ORACLE_FLAGS = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);

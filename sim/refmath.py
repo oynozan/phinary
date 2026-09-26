@@ -1,7 +1,7 @@
 """Real-number reference (mpmath, 50 significant digits) for the pricing math, plus DEFINITIONAL integer references for
 the QuoteMath solvers (search-based, independent of the closed forms in sim/evm.py).
 
-Conventions (docs/SPEC.md §0, §3.3): x = ln(S/K) as a WAD integer, varE36 = per-second variance * 1e36, tau/window in
+Conventions (docs/md/SPEC.md §0, §3.3): x = ln(S/K) as a WAD integer, varE36 = per-second variance * 1e36, tau/window in
 seconds, n = samples in the settlement window (0 = continuous). All inputs are exact integers; the reference evaluates
 the model exactly at those integers, so the measured error is purely the on-chain arithmetic.
 """

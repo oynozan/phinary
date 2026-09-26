@@ -36,7 +36,8 @@ Every address is in `deployments/unichain-sepolia.json`.
 | `app/` | The backup swap page |
 | `interface-patches/` | The Uniswap web app fork, as a patch |
 | `sim/`, `formal/` | Reference math, test vectors, z3 lemmas and monotonicity certificates |
-| `docs/` | Plan, spec, runbook, dashboard spec and research |
+| `docs/` | The Phinary docs site (Nextra) |
+| `docs/md/` | Plan, spec, runbook, dashboard spec and research |
 
 ## Quick start
 
@@ -45,6 +46,7 @@ make build && make test     # contracts and tests
 make local-env              # local fork of Unichain Sepolia with everything deployed and the bots running
 make rehearse               # scripted buy, sell, settle and redeem on that fork
 cd web && npm install && npm run dev   # dashboard at http://localhost:3100
+cd docs && npm install && npm run dev  # docs site at http://localhost:3200
 ```
 
-The live demo and deployment are covered in [docs/RUNBOOK.md](docs/RUNBOOK.md), the design in [docs/PLAN.md](docs/PLAN.md) and [docs/SPEC.md](docs/SPEC.md), and the dashboard in [docs/DASHBOARD.md](docs/DASHBOARD.md).
+The live demo and deployment are covered in [docs/md/RUNBOOK.md](docs/md/RUNBOOK.md), the design in [docs/md/PLAN.md](docs/md/PLAN.md) and [docs/md/SPEC.md](docs/md/SPEC.md), and the dashboard in [docs/md/DASHBOARD.md](docs/md/DASHBOARD.md).

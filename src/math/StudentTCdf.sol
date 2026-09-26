@@ -8,7 +8,7 @@ import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 /// @dev F(d) = T_5(d * sqrt(5/3)) has unit variance and takes the same d as Black-Scholes. Closed form with y = d^2 + 3:
 ///        F = 1/2 + [atan(d/sqrt3) + sqrt3 * d * (y + 2) / y^2] / pi,   f = 24 * sqrt3 / (pi * y^3)
 ///      Computed as 1/2 +/- g(|d|), so cdf5(d) + cdf5(-d) == 1e18 exactly. Intermediates at 1e36.
-///      Port of docs/research/gaps/kernel-sufficiency-scripts/solidity/src/StudentTCdf.sol; max abs error vs mpmath ~1e-18.
+///      Port of docs/md/research/gaps/kernel-sufficiency-scripts/solidity/src/StudentTCdf.sol; max abs error vs mpmath ~1e-18.
 library StudentTCdf {
     uint256 internal constant WAD = 1e18;
     uint256 internal constant E36 = 1e36;
