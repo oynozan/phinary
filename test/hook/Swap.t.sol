@@ -6,6 +6,7 @@ import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IHookEvents} from "@openzeppelin/uniswap-hooks/interfaces/IHookEvents.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
+import {QuoterRevert} from "v4-periphery/src/libraries/QuoterRevert.sol";
 
 /// @notice The 8 swap cases through PoolSwapTest and V4Router, checked against the spec formulas and V4Quoter
 abstract contract SwapCases is HookFixture {
@@ -366,6 +367,39 @@ abstract contract SwapCases is HookFixture {
         _checkInvariants();
     }
 
+    /// @dev False when the hook refuses the sell because it lies beyond the impact curve or the band this epoch (by design);
+    ///      any other failure is re-raised
+    function _sellExecutable(PoolKey memory k, bool exactIn, uint256 amt) internal returns (bool) {
+        IV4Quoter.QuoteExactSingleParams memory qp = IV4Quoter.QuoteExactSingleParams({
+            poolKey: k,
+            zeroForOne: _swapParams(k, false, exactIn, amt).zeroForOne,
+            exactAmount: uint128(amt),
+            hookData: ""
+        });
+        bytes memory err;
+        if (exactIn) {
+            try quoter.quoteExactInputSingle(qp) returns (uint256, uint256) {
+                return true;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        } else {
+            try quoter.quoteExactOutputSingle(qp) returns (uint256, uint256) {
+                return true;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        }
+        bytes4[3] memory byDesign = [QuoteMath.Unreachable.selector, QuoteMath.Band.selector, PredictionHook.OutOfBand.selector];
+        for (uint256 j; j < 3; ++j) {
+            bytes memory refusal = abi.encodeWithSelector(QuoterRevert.UnexpectedRevertBytes.selector, _wrapped(byDesign[j]));
+            if (keccak256(err) == keccak256(refusal)) return false;
+        }
+        assembly ("memory-safe") {
+            revert(add(err, 0x20), mload(err))
+        }
+    }
+
     function test_completeSetSell_returnsAtMostQ_fuzz(
         uint256 amt,
         int256 dx,
@@ -380,6 +414,7 @@ abstract contract SwapCases is HookFixture {
         vm.warp(block.timestamp + 1);
         _preFlow(dx, pre, preYes);
         amt = firstExactIn ? bound(amt, E6, 5_000 * E6) : bound(amt, E6, 600 * E6);
+        vm.assume(_sellExecutable(yesFirst ? kYes : kNo, firstExactIn, amt));
         (uint256 c1, uint256 q) = _leg(via, yesFirst, false, firstExactIn, amt);
         (uint256 c2, uint256 q2) = _leg(via >> 1, !yesFirst, false, true, q);
         assertEq(q2, q);
