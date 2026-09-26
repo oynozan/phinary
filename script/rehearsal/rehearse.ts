@@ -46,6 +46,7 @@ import {
   estimateSwapGas,
   gasWithHeadroom,
   findPredictionRoute,
+  isPlaceholderAddress,
   listMarkets,
   type Market,
   minOutWithSlippage,
@@ -84,10 +85,7 @@ const oracleAbi = parseAbi([
   'function cumulativeAt(uint32 t) view returns (int56)',
   'function decimalsShift() view returns (int16)',
 ])
-const hookExtraAbi = parseAbi([
-  'function settleThresholdOf(uint256 marketId) view returns (int256)',
-  'function keeper() view returns (address)',
-])
+const hookExtraAbi = parseAbi(['function settleThresholdOf(uint256 marketId) view returns (int256)'])
 const erc6909Abi = parseAbi(['function balanceOf(address owner, uint256 id) view returns (uint256)'])
 
 if (!existsSync(DEPLOYMENT_FILE)) {
@@ -393,7 +391,13 @@ async function main(): Promise<void> {
     throw new Error(`${rpc} is ${version}, not anvil: the rehearsal funds actors with anvil cheats and runs only on the local fork`)
   }
   assert.equal(await pub.getChainId(), 1301, 'the local fork must keep chain id 1301')
-  const keeper = await pub.readContract({ address: hook, abi: hookExtraAbi, functionName: 'keeper' })
+  // The hook has no keeper role (an ownerless MarketScheduler owns it, and open()/settle() are permissionless), so
+  // "the keeper bot" is identified by the account script/local-env.sh started it with, not by an on-chain role.
+  const keeperRaw = rawDeployment['keeper']
+  if (typeof keeperRaw !== 'string' || isPlaceholderAddress(keeperRaw)) {
+    throw new Error(`${DEPLOYMENT_FILE} has no "keeper" address: start the local environment first (make local-env)`)
+  }
+  const keeper = getAddress(keeperRaw)
 
   section('Setup')
   say('script', `deployment ${DEPLOYMENT_FILE}`)

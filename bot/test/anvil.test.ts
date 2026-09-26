@@ -18,12 +18,12 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { predictionHookAbi } from "../src/abi.ts";
+import { marketSchedulerAbi, predictionHookAbi } from "../src/abi.ts";
 import { makeClients, readSlot0, type Clients } from "../src/chain.ts";
-import { loadMarketTemplate, loadMirrorConfig } from "../src/config.ts";
-import { hookOperator, invalidAfterFor, Keeper, keeperTick } from "../src/keeper.ts";
+import { loadMirrorConfig } from "../src/config.ts";
+import { invalidAfterFor, isAlreadyOpened, Keeper, keeperTick } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
-import { buildMarketParams, varE36FromAnnualVol } from "../src/market.ts";
+import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
 import { mirrorTick, setupMirror, steerGasLimit } from "../src/mirror.ts";
 import { orientationFor, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
@@ -71,6 +71,8 @@ const ARTIFACTS = {
   hook: ["MockPredictionHook.sol", "MockPredictionHook"],
   oracle: ["MockUnderlyingOracle.sol", "MockUnderlyingOracle"],
   sobHook: ["MockSobHook.sol", "MockSobHook"],
+  /** The real Task 3 scheduler; MockPredictionHook stands in for the PredictionHook it owns. */
+  scheduler: ["MarketScheduler.sol", "MarketScheduler"],
 } as const;
 
 /** Anvil's predeployed CREATE2 factory (input: salt ++ initcode). */
@@ -225,17 +227,30 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.ok(lines.some((l) => l.includes("] steered ")));
   });
 
-  await t.test("keeper: create, settle, sweep, invalid fallback, budget guard", async () => {
-    const template = loadMarketTemplate({});
+  await t.test("keeper: create, settle, sweep and invalid fallback through the Task 3 scheduler pair", async () => {
+    const QUOTE = { h0Wad: 2n * 10n ** 16n, gammaSWad: 5n * 10n ** 13n, lambdaWad: 10n ** 15n, qEpochMax: 100_000000n, pMinWad: 2n * 10n ** 16n };
+    // period=1 so slot === block.timestamp: expiry stays "now + tenor" like the old fixed-openTime market did.
+    const CONFIG = { period: 1, tenor: 60, window: 10, cutoffBuffer: 2, nSamples: 10, quote: QUOTE, maxBudget: 10_000000n, minBudget: 1_000000n, ticker: "ETH" };
     const oracle = await deploy(c, a.oracle, []);
     const lnSpot = lnWad(price("2701.347"));
     await send(c, oracle, a.oracle.abi, "set", [lnSpot, varE36FromAnnualVol("0.6"), true]);
-    const hook = await deploy(c, a.hook, ["0x31d0220469e10c4E71834a79b1f276d740d3768F", 100_000000n]);
+
+    // MarketScheduler's constructor takes the hook's address, and the mock hook's constructor takes the scheduler's
+    // address as owner: the scheduler is predicted from the deployer's next nonce, the hook is deployed with that as
+    // owner, then the scheduler is deployed and lands at the predicted address. Task 3's SchedulerPair.sol does the
+    // same dance with a CREATE2-mined hook (for its address flags); MockPredictionHook needs no flags, so a plain
+    // CREATE (the next nonce) is enough here.
+    const nonce = await c.publicClient.getTransactionCount({ address: me });
+    const predicted = getContractAddress({ from: me, nonce: BigInt(nonce) + 1n });
+    const hook = await deploy(c, a.hook, [predicted, "0x31d0220469e10c4E71834a79b1f276d740d3768F", 100_000000n]);
+    const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
+    assert.equal(scheduler, predicted, "scheduler landed at the predicted nonce address");
+    assert.equal(await read<Address>(c, hook, a.hook.abi, "owner"), scheduler, "hook owner is the scheduler");
+
     const keeper = new Keeper({
       clients: c,
       hook,
-      oracle,
-      template,
+      scheduler,
       periodSec: 60,
       alignToPeriod: false,
       scanBack: 50,
@@ -248,8 +263,40 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const now = (await c.publicClient.getBlock()).timestamp;
     const id = await keeper.createMarket(now);
     assert.equal(id, 0n);
-    const stored = await read<unknown>(c, hook, a.hook.abi, "marketParams", [0n]);
-    assert.deepEqual(stored, buildMarketParams(oracle, lnSpot, now, template).params, "struct round-trips through Solidity");
+    const cents = strikeCentsFromLnSpot(lnSpot);
+    const stored = await read<{
+      oracle: Address;
+      lnStrikeWad: bigint;
+      openTime: bigint;
+      expiry: bigint;
+      window: number;
+      cutoffBuffer: number;
+      nSamples: number;
+      budget: bigint;
+      quote: typeof QUOTE;
+      sigmaMode: number;
+      fixedVarE36: bigint;
+      kernel: number;
+      yesName: string;
+      yesSymbol: string;
+      noName: string;
+      noSymbol: string;
+    }>(c, hook, a.hook.abi, "marketParams", [0n]);
+    assert.equal(stored.oracle, oracle);
+    assert.equal(stored.lnStrikeWad, lnStrikeWadFromCents(cents), "strike is the scheduler's own MarketNames rounding");
+    assert.equal(stored.openTime, now);
+    assert.equal(stored.expiry, now + 60n);
+    assert.equal(stored.window, 10);
+    assert.equal(stored.cutoffBuffer, 2);
+    assert.equal(stored.nSamples, 10);
+    assert.equal(stored.budget, 10_000000n, "min(maxBudget=10, vaultIdle/2=50)");
+    assert.deepEqual(stored.quote, QUOTE);
+    assert.equal(stored.sigmaMode, 0);
+    assert.equal(stored.fixedVarE36, 0n);
+    assert.equal(stored.kernel, 0);
+    assert.equal(stored.yesSymbol, "ETHUP");
+    assert.equal(stored.noSymbol, "ETHDOWN");
+    assert.ok(stored.yesName.startsWith(`ETH > $${formatRational({ num: cents, den: 100n }, 2)}`), stored.yesName);
     const info0 = await read<{ expiry: bigint; status: number }>(c, hook, predictionHookAbi as Abi, "marketInfo", [0n]);
     assert.equal(info0.expiry, now + 60n);
     assert.equal(keeper.tracked.has(0n), true);
@@ -284,22 +331,60 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(invalid.bucket, 0n);
     assert.equal(await read<bigint>(c, hook, a.hook.abi, "vaultIdle"), 93_000000n);
 
-    assert.equal(await hookOperator(c.publicClient, hook), me, "owner when no keeper is set");
     assert.equal(await invalidAfterFor(c.publicClient, hook, 0), 31, "GRACE + 1");
     assert.equal(await invalidAfterFor(c.publicClient, hook, 100), 100);
+
+    // open() is permissionless (no owner/keeper role, unlike the old createMarket): a dry run with no key and no
+    // explicit sender still simulates successfully.
     const keyless = makeClients({ rpcUrl: url, chainId: 31337 });
-    const dry = new Keeper({ ...keeper.opts, clients: keyless, dryRun: true, sender: me });
-    assert.equal(await dry.createMarket((await c.publicClient.getBlock()).timestamp), 2n, "dry run simulates as the owner");
-    const stranger = new Keeper({ ...keeper.opts, clients: keyless, dryRun: true, sender: "0x000000000000000000000000000000000000dEaD" });
-    await assert.rejects(stranger.createMarket((await c.publicClient.getBlock()).timestamp), /reverted/, "simulates as `sender`");
+    const dry = new Keeper({ ...keeper.opts, clients: keyless, dryRun: true });
+    assert.equal(await dry.createMarket((await c.publicClient.getBlock()).timestamp), 2n, "no auth check: any account can simulate open()");
     assert.equal(await read<bigint>(c, hook, a.hook.abi, "marketCount"), 2n, "dry runs send nothing");
+  });
 
-    const greedy = new Keeper({ ...keeper.opts, template: { ...template, budget: 1_000_000000n } });
-    assert.equal(await greedy.createMarket((await c.publicClient.getBlock()).timestamp), undefined);
-    assert.ok(lines.some((l) => l.includes("vault idle below market budget")));
-
-    await greedy.refresh();
-    assert.equal(greedy.tracked.size, 0);
-    assert.deepEqual([...greedy.done].sort(), [0n, 1n]);
+  await t.test("createMarket: InsufficientIdle propagates and is not mistaken for AlreadyOpened", async () => {
+    const oracle = await deploy(c, a.oracle, []);
+    await send(c, oracle, a.oracle.abi, "set", [lnWad(price("2700")), varE36FromAnnualVol("0.6"), true]);
+    const nonce = await c.publicClient.getTransactionCount({ address: me });
+    const predicted = getContractAddress({ from: me, nonce: BigInt(nonce) + 1n });
+    const hook = await deploy(c, a.hook, [predicted, "0x31d0220469e10c4E71834a79b1f276d740d3768F", 1_000000n]);
+    const CONFIG = {
+      period: 60,
+      tenor: 120,
+      window: 10,
+      cutoffBuffer: 2,
+      nSamples: 10,
+      quote: { h0Wad: 2n * 10n ** 16n, gammaSWad: 5n * 10n ** 13n, lambdaWad: 10n ** 15n, qEpochMax: 100_000000n, pMinWad: 2n * 10n ** 16n },
+      maxBudget: 10_000000n,
+      minBudget: 5_000000n, // half of the 1 USDC vault (0.5) can never afford this
+      ticker: "ETH",
+    };
+    const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
+    assert.equal(scheduler, predicted);
+    const keeper = new Keeper({
+      clients: c,
+      hook,
+      scheduler,
+      periodSec: 60,
+      alignToPeriod: false,
+      scanBack: 50,
+      invalidAfterSec: 3601,
+      dryRun: true,
+      txTimeoutMs: 10_000,
+      log,
+    });
+    let submitted = false;
+    const now = (await c.publicClient.getBlock()).timestamp;
+    let threw: unknown;
+    try {
+      await keeper.createMarket(now, () => (submitted = true));
+      assert.fail("expected InsufficientIdle");
+    } catch (e) {
+      threw = e;
+    }
+    assert.match(String(threw), /InsufficientIdle/);
+    assert.equal(isAlreadyOpened(threw), false, "InsufficientIdle is not AlreadyOpened");
+    assert.equal(submitted, false, "onSubmitted is not called for a real failure");
+    assert.equal(await read<boolean>(c, scheduler, a.scheduler.abi, "canOpen"), false, "canOpen agrees");
   });
 });

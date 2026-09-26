@@ -45,6 +45,7 @@ const ADDRESS_KEYS = [
   "stateView",
   "usdc",
   "predictionHook",
+  "marketScheduler",
   "underlyingOracle",
   "priceSteerer",
   "demoWeth",
@@ -61,6 +62,7 @@ const ADDRESS_ENV: Record<AddressKey, string> = {
   stateView: "STATE_VIEW",
   usdc: "USDC",
   predictionHook: "PREDICTION_HOOK",
+  marketScheduler: "MARKET_SCHEDULER",
   underlyingOracle: "UNDERLYING_ORACLE",
   priceSteerer: "PRICE_STEERER",
   demoWeth: "DEMO_WETH",
@@ -286,7 +288,6 @@ export interface KeeperConfig extends CommonConfig {
   settle: boolean;
   scanBack: number;
   invalidAfterSec: number;
-  template: MarketTemplate;
 }
 
 export function loadMarketTemplate(env: Env): MarketTemplate {
@@ -333,6 +334,5 @@ export function loadKeeperConfig(env: Env = process.env): KeeperConfig {
     settle: envBool(env, "KEEPER_SETTLE", true),
     scanBack: envInt(env, "KEEPER_SCAN_BACK", 50, 1),
     invalidAfterSec: envInt(env, "KEEPER_INVALID_AFTER_SEC", 3601, 0),
-    template: loadMarketTemplate(env),
   };
 }

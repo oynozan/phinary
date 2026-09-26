@@ -18,6 +18,20 @@ export const predictionHookAbi = parseAbi([
   "event Swept(uint256 indexed marketId, uint256 amount)",
 ]);
 
+/** Subset of src/interfaces/IMarketScheduler.sol used by the keeper: it opens markets by calling `open()`. */
+export const marketSchedulerAbi = parseAbi([
+  "function open() returns (uint256 marketId)",
+  "function canOpen() view returns (bool)",
+  "function nextOpenTime() view returns (uint256)",
+  "function lastSlot() view returns (uint256)",
+  "function hook() view returns (address)",
+  "function oracle() view returns (address)",
+  "error AlreadyOpened(uint256 slot)",
+  "error InsufficientIdle(uint256 budget, uint256 minBudget)",
+  "error InvalidConfig()",
+  "event MarketOpened(uint256 indexed marketId, uint256 indexed slot, address indexed caller, uint256 budget, uint256 strikeCents)",
+]);
+
 /** PredictionHook views outside the frozen interface (owner/keeper roles, the settleInvalid grace period). */
 export const predictionHookAdminAbi = parseAbi([
   "function owner() view returns (address)",

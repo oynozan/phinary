@@ -12,6 +12,10 @@ export type IndexerDeployment = {
   poolManager: Address
   deployBlock: number
   snapshotStartBlock: number
+  /** The ownerless MarketScheduler that owns `hook`, if the file has been migrated to one (Task 2/3). */
+  marketScheduler?: Address
+  /** Prior `hook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
+  legacyPredictionHooks: Address[]
 }
 
 type DeploymentFile = {
@@ -21,6 +25,8 @@ type DeploymentFile = {
   underlyingOracle: Address
   poolManager: Address
   deployBlock: number
+  marketScheduler?: Address
+  legacyPredictionHooks?: Address[]
 }
 
 // `import.meta.dirname` is undefined under Ponder's own esbuild-based config bundler (it evaluates
@@ -54,5 +60,7 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
     poolManager: file.poolManager,
     deployBlock,
     snapshotStartBlock,
+    marketScheduler: file.marketScheduler,
+    legacyPredictionHooks: file.legacyPredictionHooks ?? [],
   }
 }
