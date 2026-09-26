@@ -1,4 +1,21 @@
-import { onchainTable } from 'ponder'
+import { index, onchainTable } from 'ponder'
+
+// One row per MarketScheduler, filled from `config()` the first time it opens a market
+export const track = onchainTable('track', (t) => ({
+  id: t.hex().primaryKey(),
+  gatekeeper: t.hex().notNull(),
+  oracle: t.hex().notNull(),
+  ticker: t.text().notNull(),
+  asset: t.text().notNull(),
+  label: t.text().notNull(),
+  period: t.integer().notNull(),
+  tenor: t.integer().notNull(),
+  window: t.integer().notNull(),
+  cutoffBuffer: t.integer().notNull(),
+  nSamples: t.integer().notNull(),
+  maxBudget: t.bigint().notNull(),
+  minBudget: t.bigint().notNull(),
+}))
 
 export const market = onchainTable('market', (t) => ({
   id: t.bigint().primaryKey(),
@@ -18,6 +35,19 @@ export const market = onchainTable('market', (t) => ({
   volumeUsdc: t.bigint().notNull(),
   tradeCount: t.integer().notNull(),
   createdAt: t.integer().notNull(),
+  oracle: t.hex(),
+  asset: t.text(),
+  scheduler: t.hex(),
+  ticker: t.text(),
+  slot: t.bigint(),
+  budget: t.bigint(),
+  strikeCents: t.bigint(),
+  openedBy: t.hex(),
+  period: t.integer(),
+  tenor: t.integer(),
+}), (table) => ({
+  schedulerIdx: index().on(table.scheduler),
+  expiryIdx: index().on(table.expiry),
 }))
 
 export const trade = onchainTable('trade', (t) => ({
@@ -66,6 +96,7 @@ export const priceSnapshot = onchainTable('price_snapshot', (t) => ({
   midUp: t.bigint().notNull(),
   askUp: t.bigint().notNull(),
   bidUp: t.bigint().notNull(),
+  // ln spot of the market's own underlying oracle, ETH or SOL
   ethLnWad: t.bigint().notNull(),
   varE36: t.bigint().notNull(),
   tau: t.bigint().notNull(),

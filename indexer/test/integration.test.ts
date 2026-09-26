@@ -136,14 +136,15 @@ describe.skipIf(!INDEXER_URL)('indexer integration', () => {
         throw lastErr
       }
 
-      /** The newest market with at least 25s of trading left; waits for the keeper's next one otherwise. */
+      /** The newest 1m-track market with at least 25s of trading left; waits for the keeper's next one otherwise. */
       async function pickMarket(): Promise<Market> {
         const deadline = Date.now() + 90_000
         for (;;) {
           const now = Number((await pub.getBlock()).timestamp)
-          const markets = await listMarkets(pub, { hook: deployment.hook, limit: 5 })
+          const markets = await listMarkets(pub, { hook: deployment.hook, limit: 8 })
           const candidate = markets
             .filter((m) => m.status === 'Trading' && m.quote?.tradable)
+            .filter((m) => Number(m.info.expiry - m.info.openTime) <= 120)
             .filter((m) => Number(m.cutoff) - now >= 25)
             .sort((a, b) => Number(b.id - a.id))[0]
           if (candidate) {

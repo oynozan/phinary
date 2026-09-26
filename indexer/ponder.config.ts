@@ -1,7 +1,7 @@
 import { createConfig, factory } from 'ponder'
 import { parseAbiItem } from 'viem'
 
-import { erc20Abi, predictionHookAbi } from '../packages/swap-sdk/src/abi/index.ts'
+import { erc20Abi, marketSchedulerAbi, predictionHookAbi } from '../packages/swap-sdk/src/abi/index.ts'
 import { loadIndexerDeployment } from './src/deployment.ts'
 
 const deployment = loadIndexerDeployment(process.env)
@@ -12,11 +12,27 @@ const marketCreatedEvent = parseAbiItem(
   'event MarketCreated(uint256 indexed marketId, address yes, address no, bytes32 yesPoolId, bytes32 noPoolId, int256 lnStrikeWad, uint64 expiry)',
 )
 
+const marketScheduler = {
+  abi: marketSchedulerAbi,
+  chain: 'unichainSepolia' as const,
+  address: deployment.marketSchedulers,
+  startBlock: deployment.deployBlock,
+}
+
+// Ponder rejects an empty address list, so a file without tracks has no MarketScheduler source
+const schedulerSources = (deployment.marketSchedulers.length > 0 ? { MarketScheduler: marketScheduler } : {}) as {
+  MarketScheduler: typeof marketScheduler
+}
+
 export default createConfig({
+  // A long-running instance gets its own PGlite directory so `ponder dev` never opens it
+  ...(process.env.PONDER_PGLITE_DIR ? { database: { kind: 'pglite' as const, directory: process.env.PONDER_PGLITE_DIR } } : {}),
   chains: {
     unichainSepolia: {
       id: deployment.chainId,
       rpc: deployment.rpcUrls,
+      // drpc's free plan rejects eth_getLogs spans over 100 blocks with an error Ponder cannot parse
+      ethGetLogsBlockRange: Number(process.env.PONDER_GETLOGS_BLOCK_RANGE ?? 100),
     },
   },
   contracts: {
@@ -47,6 +63,7 @@ export default createConfig({
       }),
       startBlock: deployment.deployBlock,
     },
+    ...schedulerSources,
   },
   blocks: {
     PriceSnapshot: {

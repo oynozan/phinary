@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Address } from 'viem'
+import { type Address, isAddress } from 'viem'
 
 export type IndexerNetwork = 'unichain-sepolia' | 'local'
+
+export type IndexerUnderlying = { symbol: string; oracle: Address }
 
 export type IndexerDeployment = {
   chainId: number
@@ -12,12 +14,19 @@ export type IndexerDeployment = {
   hook: Address
   oracle: Address
   poolManager: Address
+  multicall3: Address
   deployBlock: number
   snapshotStartBlock: number
-  /** The ownerless MarketScheduler that owns `hook`, if the file has been migrated to one (Task 2/3). */
-  marketScheduler?: Address
-  /** Prior `hook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
+  /** The MarketGatekeeper that owns `hook`, if the file has been migrated to tracks */
+  marketGatekeeper?: Address
+  /** One MarketScheduler per track, in gatekeeper order. Empty for a file with none. */
+  marketSchedulers: Address[]
+  /** Schedulers of prior hooks, oldest first, never indexed */
+  legacyMarketSchedulers: Address[]
+  /** Prior `hook` addresses, oldest first. Empty for a file with none. */
   legacyPredictionHooks: Address[]
+  /** Price sources by asset symbol, the flat ETH oracle when the file has no `underlyings` list */
+  underlyings: IndexerUnderlying[]
 }
 
 type DeploymentFile = {
@@ -26,10 +35,16 @@ type DeploymentFile = {
   predictionHook: Address
   underlyingOracle: Address
   poolManager: Address
+  multicall3?: Address
   deployBlock: number
-  marketScheduler?: Address
-  legacyPredictionHooks?: Address[]
+  marketGatekeeper?: Address
+  marketSchedulers?: unknown
+  legacyMarketSchedulers?: unknown
+  legacyPredictionHooks?: unknown
+  underlyings?: unknown
 }
+
+const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as Address
 
 // `import.meta.dirname` is undefined under Ponder's own esbuild-based config bundler (it evaluates
 // ponder.config.ts outside a plain Node ESM loader), so it can't be used here. Ponder always runs
@@ -38,6 +53,21 @@ const repoRoot = path.resolve(process.cwd(), '..')
 
 function resolveNetwork(env: Record<string, string | undefined>): IndexerNetwork {
   return env.PONDER_NETWORK === 'local' ? 'local' : 'unichain-sepolia'
+}
+
+function addressList(value: unknown): Address[] {
+  return Array.isArray(value) ? value.filter((a): a is Address => typeof a === 'string' && isAddress(a)) : []
+}
+
+function underlyingList(value: unknown, fallbackOracle: Address): IndexerUnderlying[] {
+  const entries = Array.isArray(value)
+    ? value.flatMap((u) =>
+        u && typeof u === 'object' && typeof u.symbol === 'string' && typeof u.oracle === 'string' && isAddress(u.oracle)
+          ? [{ symbol: u.symbol as string, oracle: u.oracle as Address }]
+          : [],
+      )
+    : []
+  return entries.length > 0 ? entries : [{ symbol: 'ETH', oracle: fallbackOracle }]
 }
 
 /**
@@ -56,14 +86,9 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
     throw new Error('PONDER_RPC_URL_1301 must be one or more comma-separated http(s) URLs')
   }
   const deployBlock = file.deployBlock
-  // This Hook was deployed after the deployment run's first block. Keep event
-  // indexing at deployBlock, but start state reads after the contracts were initialized.
-  const snapshotFloor = network === 'unichain-sepolia' &&
-    file.predictionHook.toLowerCase() === '0xe6780bbeaee4183ffd8ebe0d2862ded221b96aa8'
-    ? Math.max(deployBlock, 63569470) : deployBlock
-  const snapshotStartBlock = env.SNAPSHOT_START_BLOCK ? Number(env.SNAPSHOT_START_BLOCK) : snapshotFloor
-  if (!Number.isSafeInteger(snapshotStartBlock) || snapshotStartBlock < snapshotFloor) {
-    throw new Error(`SNAPSHOT_START_BLOCK must be an integer >= ${snapshotFloor}`)
+  const snapshotStartBlock = env.SNAPSHOT_START_BLOCK ? Number(env.SNAPSHOT_START_BLOCK) : deployBlock
+  if (!Number.isSafeInteger(snapshotStartBlock) || snapshotStartBlock < deployBlock) {
+    throw new Error(`SNAPSHOT_START_BLOCK must be an integer >= ${deployBlock}`)
   }
 
   return {
@@ -73,9 +98,13 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
     hook: file.predictionHook,
     oracle: file.underlyingOracle,
     poolManager: file.poolManager,
+    multicall3: file.multicall3 && isAddress(file.multicall3) ? file.multicall3 : MULTICALL3,
     deployBlock,
     snapshotStartBlock,
-    marketScheduler: file.marketScheduler,
-    legacyPredictionHooks: file.legacyPredictionHooks ?? [],
+    marketGatekeeper: file.marketGatekeeper,
+    marketSchedulers: addressList(file.marketSchedulers),
+    legacyMarketSchedulers: addressList(file.legacyMarketSchedulers),
+    legacyPredictionHooks: addressList(file.legacyPredictionHooks),
+    underlyings: underlyingList(file.underlyings, file.underlyingOracle),
   }
 }

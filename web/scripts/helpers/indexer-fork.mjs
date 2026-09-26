@@ -21,7 +21,7 @@ export async function startIndexerFixture(f) {
         processHandle.kill('SIGTERM'); await done;
     }
     function start() {
-        const env = { ...process.env, PONDER_NETWORK: 'unichain-sepolia', PONDER_RPC_URL_1301: f.rpcUrl, SNAPSHOT_START_BLOCK: '63569470' };
+        const env = { ...process.env, PONDER_NETWORK: 'unichain-sepolia', PONDER_RPC_URL_1301: f.rpcUrl };
         delete env.DATABASE_URL; delete env.DATABASE_PRIVATE_URL;
         processHandle = spawn(process.execPath, ['node_modules/ponder/dist/esm/bin/ponder.js', 'dev', '--port', '42071', '--disable-ui'], {
             cwd, env, stdio: ['ignore', 'pipe', 'pipe'],
