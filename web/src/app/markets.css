@@ -64,10 +64,10 @@ body:has(.markets-page)::before {
   content: "";
   position: absolute;
   z-index: -1;
-  top: -26px;
+  top: calc(-1 * var(--shell-top));
   left: -48px;
   width: 72%;
-  height: calc(100% + 30px);
+  height: calc(100% + var(--shell-top) + 4px);
   background: url("/markets/orbit.webp") center right / cover no-repeat;
   pointer-events: none;
   mask-image: linear-gradient(to bottom, black 75%, transparent);

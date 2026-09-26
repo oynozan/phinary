@@ -14,7 +14,7 @@ colors:
   up: "#d773ff"
   down: "#ff736a"
   live: "#20dfa0"
-  header: "rgb(9 12 20 / 94%)"
+  header: "transparent"
   featured: "rgb(12 16 25 / 88%)"
   detail-panel: "rgb(11 16 25 / 94%)"
   detail-recess: "#0a0f18"
@@ -221,7 +221,7 @@ Market Detail uses an approximately 65/35 desktop split: `minmax(0, 1.95fr) minm
 
 ## Elevation & Depth
 
-Thin borders and tonal surfaces establish depth. The header uses an opaque near-black ground with a subdued static orbital image; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets and Market Detail honor reduced motion. Detail uses the same static orbital asset at 0.45 opacity behind its upper 380px, translucent panels and fine separators. Detail controls transition colors/borders over 150ms and shift 1px on press; reduced motion removes transitions and the press transform. No new panel shadows are introduced.
+Thin borders and tonal surfaces establish depth. The header has a transparent background and no artwork of its own. The page artwork extends beneath the fixed header, so the same background remains continuous across it; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets and Market Detail honor reduced motion. Detail uses the same static orbital asset at 0.45 opacity behind its upper 380px, translucent panels and fine separators. Detail controls transition colors/borders over 150ms and shift 1px on press; reduced motion removes transitions and the press transform. No new panel shadows are introduced.
 
 ## Shapes
 

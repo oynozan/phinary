@@ -255,8 +255,7 @@
 
 /* Compact shared header, matching the approved reference. */
 :root { --header-h: 52px; --shell-top: 76px; }
-.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: #080b13; border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
-.app-header::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: url("/markets/orbit.webp") 56% 23% / 1050px auto no-repeat; opacity: .45; mask-image: linear-gradient(to right, transparent 30%, black 47%, black 66%, transparent 80%); }
+.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: transparent; border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
 .app-header-inner { width: 100%; height: 100%; max-width: 1536px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 56px; justify-content: space-between; }
 .header-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
 .header-brand-mark { flex-shrink: 0; }
@@ -275,6 +274,6 @@
 .app-header .header-menu { border-radius: 8px; background: #121722; color: #c5cce0; }
 .app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 3px; }
 @media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 38px; } .app-header-nav { gap: 26px; } }
-@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 24px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } .app-header::before { opacity: .25; } }
+@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 24px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
 
 @media (max-width: 380px) { .app-header .header-wallet { font-size: 10px; padding: 0 8px; gap: 6px; } .app-header .wallet-chevron { display: none; } .app-header .wallet-address { max-width: 70px; overflow: hidden; text-overflow: ellipsis; } }
