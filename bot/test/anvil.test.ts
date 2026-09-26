@@ -18,7 +18,7 @@ import {
 import { marketSchedulerAbi, predictionHookAbi } from "../src/abi.ts";
 import { makeClients, readSlot0, type Clients } from "../src/chain.ts";
 import { loadMirrorConfig } from "../src/config.ts";
-import { invalidAfterFor, isAlreadyOpened, Keeper, keeperTick } from "../src/keeper.ts";
+import { invalidAfterFor, isAlreadyOpened, Keeper, keeperGasLimit, keeperTick, schedulerPeriodFor } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
 import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
@@ -188,6 +188,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
     assert.equal(scheduler, predicted, "scheduler landed at the predicted nonce address");
     assert.equal(await read<Address>(c, hook, a.hook.abi, "owner"), scheduler, "hook owner is the scheduler");
+    assert.equal(await schedulerPeriodFor(c.publicClient, scheduler, 60), 1, "the keeper reads the scheduler's own period");
 
     const keeper = new Keeper({
       clients: c,
@@ -205,6 +206,19 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const now = (await c.publicClient.getBlock()).timestamp;
     const id = await keeper.createMarket(now);
     assert.equal(id, 0n);
+    // `now` is read before open()'s transaction, which can land a block later, so openTime is derived from the
+    // block that actually mined the MarketOpened event rather than from that pre-read clock.
+    const [openedLog] = await c.publicClient.getContractEvents({
+      address: scheduler,
+      abi: marketSchedulerAbi,
+      eventName: "MarketOpened",
+      args: { marketId: id },
+      fromBlock: 0n,
+    });
+    const openBlock = await c.publicClient.getBlock({ blockNumber: openedLog!.blockNumber });
+    const openTx = await c.publicClient.getTransaction({ hash: openedLog!.transactionHash });
+    const openReceipt = await c.publicClient.getTransactionReceipt({ hash: openedLog!.transactionHash });
+    assert.ok(openTx.gas >= keeperGasLimit(openReceipt.gasUsed), "open() gas is padded");
     const cents = strikeCentsFromLnSpot(lnSpot);
     const stored = await read<{
       oracle: Address;
@@ -226,8 +240,9 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     }>(c, hook, a.hook.abi, "marketParams", [0n]);
     assert.equal(stored.oracle, oracle);
     assert.equal(stored.lnStrikeWad, lnStrikeWadFromCents(cents), "strike is the scheduler's own MarketNames rounding");
-    assert.equal(stored.openTime, now);
-    assert.equal(stored.expiry, now + 60n);
+    assert.equal(stored.openTime, openBlock.timestamp, "openTime is the block that mined open()'s transaction");
+    // period=1 so slot === openTime; expiry = slot * period + tenor.
+    assert.equal(stored.expiry, stored.openTime + 60n);
     assert.equal(stored.window, 10);
     assert.equal(stored.cutoffBuffer, 2);
     assert.equal(stored.nSamples, 10);
@@ -240,7 +255,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(stored.noSymbol, "ETHDOWN");
     assert.ok(stored.yesName.startsWith(`ETH > $${formatRational({ num: cents, den: 100n }, 2)}`), stored.yesName);
     const info0 = await read<{ expiry: bigint; status: number }>(c, hook, predictionHookAbi as Abi, "marketInfo", [0n]);
-    assert.equal(info0.expiry, now + 60n);
+    assert.equal(info0.expiry, stored.openTime + 60n);
     assert.equal(keeper.tracked.has(0n), true);
 
     await keeper.settleAndSweep(now);
@@ -328,5 +343,12 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(isAlreadyOpened(threw), false, "InsufficientIdle is not AlreadyOpened");
     assert.equal(submitted, false, "onSubmitted is not called for a real failure");
     assert.equal(await read<boolean>(c, scheduler, a.scheduler.abi, "canOpen"), false, "canOpen agrees");
+
+    const before = lines.length;
+    await keeperTick(keeper, { create: true, settle: false });
+    await keeperTick(keeper, { create: true, settle: false });
+    const refusals = lines.slice(before).filter((l) => l.includes("open() refused"));
+    assert.equal(refusals.length, 1, "keeperTick warns once for the slot instead of failing every poll");
+    assert.match(refusals[0]!, /WARN .*InsufficientIdle\(500000, 5000000\)/);
   });
 });

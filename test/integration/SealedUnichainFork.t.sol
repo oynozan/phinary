@@ -12,6 +12,7 @@ import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 import {SealedPoolOracle} from "../../src/oracle/SealedPoolOracle.sol";
+import {ISealedPoolOracle} from "../../src/interfaces/ISealedPoolOracle.sol";
 
 /// @dev The subset of the deployed StateView lens this test checks the oracle against
 interface IStateView {
@@ -146,5 +147,54 @@ contract SealedUnichainForkTest is Test {
         vm.warp(block.timestamp + 1);
         assertFalse(oracle.poke(), "a swap inside the run must break the seal");
         assertEq(oracle.frontier(), frontierBefore, "frontier holds while the run is broken");
+    }
+
+    /// @notice With no poke after a real swap, the spot stays E_K for maxStaleBlocks blocks and then reverts
+    ///         StaleSpot, until a later idle run re-seals and the spot tracks the pool's new price.
+    function test_afterASwapTheSpotHoldsEkThenGoesStaleUntilAnIdleRunReseals() public {
+        oracle.poke();
+        _rollTo(block.number + 3);
+        assertTrue(oracle.poke(), "starts the oracle on an idle run");
+        uint256 k = oracle.frontier();
+        int256 ek = oracle.lnSpotSoBWad();
+
+        vm.deal(address(this), 30 ether);
+        swapRouter.swap{value: 25 ether}(
+            key,
+            SwapParams({
+                zeroForOne: true,
+                amountSpecified: -25 ether,
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        (uint160 spAfter,,,) = STATE_VIEW.getSlot0(DEEP_POOL_ID);
+        int256 moved = _lnUsdPerEth(spAfter);
+        assertGt(ek > moved ? ek - moved : moved - ek, LN_TOL, "the swap must move the spot");
+
+        uint256 staleAt = k + 2 + oracle.maxStaleBlocks();
+        for (uint256 n = k + 1; n < staleAt; ++n) {
+            _rollTo(n);
+            assertEq(oracle.lnSpotSoBWad(), ek, "E_K holds up to maxStaleBlocks after the frontier's next block");
+        }
+        _rollTo(staleAt);
+        vm.expectRevert(abi.encodeWithSelector(ISealedPoolOracle.StaleSpot.selector, k, staleAt));
+        oracle.lnSpotSoBWad();
+
+        assertFalse(oracle.poke(), "the first poke after the swap only snapshots the moved pool");
+        _rollTo(staleAt + 2);
+        assertTrue(oracle.poke(), "an idle run re-seals");
+        assertEq(oracle.frontier(), k, "the run is queued behind the unproven gap");
+        assertEq(oracle.queueLength(), 1);
+        assertApproxEqAbs(oracle.lnSpotSoBWad(), moved, uint256(LN_TOL), "the spot tracks the pool again");
+        _rollTo(staleAt + 3);
+        assertApproxEqAbs(oracle.lnSpotSoBWad(), moved, uint256(LN_TOL), "and holds through the sealed view");
+    }
+
+    /// @dev Rolls to block n at the oracle's own block time, as poke requires
+    function _rollTo(uint256 n) internal {
+        vm.roll(n);
+        vm.warp(oracle.anchorTimestamp() + (n - oracle.anchorBlock()) * oracle.blockTime());
     }
 }

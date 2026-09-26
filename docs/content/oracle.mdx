@@ -1,0 +1,175 @@
+---
+title: Oracle
+description: UnderlyingOracleHook, the v4 hook that gives PredictionHook its price, variance and settlement data.
+---
+
+# Oracle
+
+<Source path="src/oracle/UnderlyingOracleHook.sol" /> is a second v4 hook, attached to one ETH/USDC pool. It is the only thing `PredictionHook` reads from outside itself, through this interface:
+
+<Source path="src/interfaces/IUnderlyingOracle.sol" lines="9-31" />
+
+```solidity showLineNumbers{9}
+interface IUnderlyingOracle {
+    error ObservationUnavailable(uint32 t);
+
+    /// @notice ln(USD per ETH) at the start of the current block, WAD, derived from sqrtPriceX96 (no tick flooring).
+    function lnSpotSoBWad() external view returns (int256);
+
+    /// @notice Normalised start-of-block tick and the timestamp of the last oracle write.
+    function sobTick() external view returns (int24 normTick, uint32 lastWriteTime);
+
+    /// @notice Normalised sum(tick * dt) at time `t` (t <= block.timestamp), v3 `observe` semantics.
+    ///         Reverts ObservationUnavailable if `t` is older than the retained history.
+    function cumulativeAt(uint32 t) external view returns (int56 normCum);
+
+    /// @notice Per-second variance at 1e36 scale from the TWAP-return realised-variance estimator, after policy
+    ///         (x3/2, winsorisation, clamps). `warm` is false while the fallback variance is being returned.
+    function varianceE36() external view returns (uint256 varPerSecE36, bool warm);
+
+    /// @notice Decimal shift so that human price = 1.0001^normTick * 10^decimalsShift.
+    function decimalsShift() external view returns (int16);
+
+    /// @notice Timestamp of the oldest retained observation.
+    function oldestObservationTime() external view returns (uint32);
+}
+```
+
+## An oracle, but not an external one
+
+Anything that tells a contract a price is an oracle, and a market that settles on "ETH above the strike at expiry" needs one. Phinary's oracle is a Uniswap pool, so there is no third party in the price path.
+
+| | External oracle (Chainlink, Pyth) | Phinary |
+|---|---|---|
+| Price source | Operators watch exchanges off-chain and post prices on-chain | Trades in a Uniswap v4 ETH/USDC pool on the same chain |
+| Who you trust | The operators, and the admin who can change or pause a feed | No one; moving the price means paying to move the pool |
+| Updates | Separate transactions from the operators | None; the hook reads the pool in the same call |
+| How it fails | Operators stop, lag or misreport; the feed is paused | Someone pays to move the pool during the averaging window |
+
+On Unichain Sepolia the oracle's ownership is renounced, so its variance bounds are fixed and no key can change it. The accurate claim is "no external oracle", not "oracle-free".
+
+## Start-of-block price
+
+<Source path="src/oracle/UnderlyingOracleHook.sol" lines="202-221" />
+
+```solidity showLineNumbers{202}
+function _beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata)
+    internal
+    override
+    returns (bytes4, BeforeSwapDelta, uint24)
+{
+    Sob memory s = _sob;
+    uint32 t = uint32(block.timestamp);
+    if (s.time != t) _write(s, t, key.toId());
+    return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+}
+
+/* IUnderlyingOracle */
+
+function lnSpotSoBWad() external view returns (int256) {
+    Sob memory s = _boundSob();
+    uint160 sp = s.sqrtPriceX96;
+    if (s.time != uint32(block.timestamp)) (sp,,,) = poolManager.getSlot0(poolId);
+    int256 lnRaw = 2 * (F.lnWad(int256(uint256(sp))) + LN_WAD_TO_Q96);
+    return int256(s.sign) * lnRaw + int256(_feed.decimalsShift) * LN10_WAD;
+}
+```
+
+On the **first swap of each timestamp**, `beforeSwap` records the pool's pre-swap `slot0`, which is the start-of-block state, and appends an observation `{time, tickCumulative}` just like v3's `Oracle.sol`. A read in a block with no write yet uses `slot0` directly, which is still the start-of-block state because every swap runs `beforeSwap` first.
+
+**Nothing traded earlier in the current block can move the price the hook quotes or settles against.** `lnSpotSoBWad` reads the price from `sqrtPriceX96` without tick rounding.
+
+## Tick cumulatives
+
+<Source path="src/oracle/UnderlyingOracleHook.sol" lines="229-253" />
+
+```solidity showLineNumbers{229}
+function cumulativeAt(uint32 t) external view returns (int56) {
+    if (t > block.timestamp) revert FutureTime(t);
+    Sob memory s = _boundSob();
+    Observation memory hi = _obs[s.index];
+    if (t >= hi.time) {
+        if (t == hi.time) return hi.tickCumulative;
+        // No write since hi.time, so slot0's tick has prevailed over (hi.time, now]
+        return int56(int256(hi.tickCumulative) + _liveTick(s.sign) * int256(uint256(t - hi.time)));
+    }
+    uint256 card = cardinality;
+    uint256 oldest = s.count < card ? 0 : (uint256(s.index) + 1) % card;
+    Observation memory lo = _obs[oldest];
+    if (t < lo.time) revert ObservationUnavailable(t);
+    uint256 l;
+    uint256 r = uint256(s.count) - 1;
+    while (r - l > 1) {
+        uint256 m = (l + r) >> 1;
+        Observation memory o = _obs[(oldest + m) % card];
+        if (o.time <= t) (l, lo) = (m, o);
+        else (r, hi) = (m, o);
+    }
+    if (t == lo.time) return lo.tickCumulative;
+    int256 perSec = (int256(hi.tickCumulative) - lo.tickCumulative) / int256(uint256(hi.time - lo.time));
+    return int56(int256(lo.tickCumulative) + perSec * int256(uint256(t - lo.time)));
+}
+```
+
+`cumulativeAt(t)` has v3 `observe` semantics: a binary search over the observation ring with linear interpolation, and extrapolation with the live tick after the last write. The demo ring keeps 14,400 observations. A time older than the ring reverts `ObservationUnavailable`, which is the condition that lets a market settle `Invalid`.
+
+## Normalised ticks
+
+<Source path="src/oracle/UnderlyingOracleHook.sol" lines="405-408" />
+
+```solidity showLineNumbers{405}
+/// @dev floor(sign * L_raw) from rawTick = floor(L_raw); off by one only when L_raw is an exact integer
+function _norm(int8 sign, int24 rawTick) internal pure returns (int256) {
+    return sign > 0 ? int256(rawTick) : -int256(rawTick) - 1;
+}
+```
+
+Ticks are normalised so that "ETH up" is always "tick up", whichever token is `currency0`, with floor semantics in both orientations. The human price is `1.0001^normTick × 10^decimalsShift`.
+
+## Realised variance
+
+<Source path="src/oracle/UnderlyingOracleHook.sol" lines="278-282" />
+
+```solidity showLineNumbers{278}
+uint256 hh = uint256(h);
+varPerSecE36 = F.fullMulDiv(3 * (wEnd - wStart), LN_TICK_SQ_E36, 2 * hh * hh * hh * n);
+if (varPerSecE36 < varMinE36) varPerSecE36 = varMinE36;
+else if (varPerSecE36 > varMaxE36) varPerSecE36 = varMaxE36;
+warm = true;
+```
+
+Volatility is the realised variance of 10 s average-price returns over the last 30 minutes (180 windows). It is scaled by 3/2 because averaging damps variance, each window's move is winsorised, and the result is clamped. Until 30 windows exist it returns a fallback of 60% a year.
+
+## Settlement rule
+
+<Source path="src/hook/StrikeMath.sol" lines="11-19" />
+
+```solidity showLineNumbers{11}
+/// @notice Strike as a normalised oracle tick in WAD, (lnStrikeWad - decimalsShift * ln10) / ln(1.0001)
+function strikeTickWad(int256 lnStrikeWad, int16 decimalsShift) internal pure returns (int256) {
+    return (lnStrikeWad * 1e18 - int256(decimalsShift) * LN10_E36) * 1e18 / LN_1_0001_E36;
+}
+
+/// @notice YES iff D * 1e18 > threshold with D = cum(T) - cum(T - window), a tie resolves NO
+function threshold(int256 lnStrikeWad, int16 decimalsShift, uint32 window) internal pure returns (int256) {
+    return int256(uint256(window)) * (strikeTickWad(lnStrikeWad, decimalsShift) - 0.5e18);
+}
+```
+
+`PredictionHook.createMarket` turns the strike into a fractional tick once and stores `window · (strikeTick − 0.5)`. At settlement, YES wins if the window's tick sum `D` beats it. The oracle stores whole ticks rounded down, so an average reads half a tick low on average; the `− 0.5` removes that bias. A tie resolves NO.
+
+**Example.** On the demo pool (WETH 18 decimals, USDC 6, `decimalsShift = 12`) a strike of 2,684.53 USD is tick −197,367.47. With a 10 s window, YES needs an average tick above −197,367.97.
+
+## Testnet price
+
+The Unichain Sepolia ETH/USDC pool has no arbitrageurs. The mirror bot (<Source path="bot/src/mirror.ts" />) keeps it near the real ETH price through `PriceSteerer` (<Source path="src/demo/PriceSteerer.sol" />). It reads Coinbase, then Kraken, then Binance.US, but the contracts never see those exchanges: they only read the pool. On mainnet, arbitrage does this job and the mirror is not needed.
+
+## Mainnet: SealedPoolOracle
+
+Unichain's deep ETH/USDC pool (about $8M of in-range liquidity) has no hook, and a hook cannot be added to an existing pool. For mainnet, [`SealedPoolOracle`](https://github.com/oynozan/phinary/blob/main/src/oracle/SealedPoolOracle.sol) implements the same `IUnderlyingOracle` over that pool without a hook:
+
+- **Seal.** Every price-moving swap with liquidity in range raises the pool's fee-growth counters. If the price and both counters are unchanged between a snapshot taken in an earlier block and a later read, no swap happened in between, so the pool held that price at the block boundaries. Snapshots sitting exactly on a tick price never seal.
+- **Proof.** For blocks a seal cannot cover, anyone submits a Merkle-Patricia proof of the pool's `slot0` against Unichain's own block hash (`BLOCKHASH`, the EIP-2935 history contract, or a stored header chain).
+- **Bot.** A permissionless bot pokes every block and proves every gap. It cannot choose a price; if it stops, quotes halt and settlement waits for proofs.
+
+It is tested against the real pool on a Unichain mainnet fork and end to end on Anvil, and it is not deployed yet. Running it needs an RPC that serves historical `eth_getProof`.

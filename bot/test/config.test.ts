@@ -6,11 +6,9 @@ import { test } from "node:test";
 import { getAddress, zeroAddress } from "viem";
 import {
   BOT_DIR,
-  envUnits,
   loadDeployments,
   loadEnvFiles,
   loadKeeperConfig,
-  loadMarketTemplate,
   loadMirrorConfig,
   parseDeployments,
   readPrivateKey,
@@ -80,33 +78,6 @@ test("private keys are validated without echoing them", () => {
     assert.match(String(e), /A is not a 32-byte hex private key/);
     assert.ok(!String(e).includes(secret));
   }
-});
-
-test("envUnits parses human decimals exactly", () => {
-  assert.equal(envUnits({ X: "0.00005" }, "X", "0", 18), 50000000000000n);
-  assert.equal(envUnits({}, "X", "10", 6), 10_000000n);
-  assert.throws(() => envUnits({ X: "0.0000001" }, "X", "0", 6), /more than 6 decimals/);
-  assert.throws(() => envUnits({ X: "-1" }, "X", "0", 6), /non-negative decimal/);
-});
-
-test("market template defaults are the 1-minute demo parameters", () => {
-  const t = loadMarketTemplate({});
-  assert.equal(t.tenorSec, 60);
-  assert.equal(t.windowSec, 10);
-  assert.equal(t.cutoffBufferSec, 2);
-  assert.equal(t.nSamples, 10);
-  assert.equal(t.quote.h0Wad, 2n * 10n ** 16n, "PLAN 10: h0 = 2 cents");
-  assert.equal(t.quote.gammaSWad, 5n * 10n ** 13n);
-  assert.equal(t.quote.pMinWad, 2n * 10n ** 16n);
-  assert.equal(t.sigmaMode, 0);
-  assert.equal(t.kernel, 0);
-  const custom = loadMarketTemplate({ MARKET_TENOR_SEC: "300", MARKET_WINDOW_SEC: "60", FIXED_VAR_E36: "123", SIGMA_MODE: "1" });
-  assert.equal(custom.tenorSec, 300);
-  assert.equal(custom.fixedVarE36, 123n);
-  assert.throws(() => loadMarketTemplate({ MARKET_WINDOW_SEC: "59" }), /shorter than the tenor/);
-  assert.throws(() => loadMarketTemplate({ SIGMA_MODE: "2" }), /SIGMA_MODE/);
-  assert.throws(() => loadMarketTemplate({ MARKET_WINDOW_SEC: "0" }), /MARKET_WINDOW_SEC/);
-  assert.throws(() => loadMarketTemplate({ KERNEL: "1" }), /UnsupportedKernel/);
 });
 
 test("bot configs need a key unless dry-running", () => {

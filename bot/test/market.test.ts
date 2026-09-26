@@ -3,47 +3,16 @@ import { test } from "node:test";
 import type { Address } from "viem";
 import { MarketStatus } from "../src/abi.ts";
 import {
-  buildMarketParams,
-  expiryFor,
-  formatClock,
-  formatDate,
   isSettleDue,
   lnStrikeWadFromCents,
-  renderTemplate,
   strikeCentsFromLnSpot,
   sweepableAmount,
-  validateTemplate,
   varE36FromAnnualVol,
   type MarketInfo,
-  type MarketTemplate,
 } from "../src/market.ts";
 import { lnWad } from "../src/math.ts";
 
 const ORACLE: Address = "0x00000000000000000000000000000000000000aa";
-
-const TEMPLATE: MarketTemplate = {
-  tenorSec: 60,
-  windowSec: 10,
-  cutoffBufferSec: 2,
-  nSamples: 10,
-  openDelaySec: 0,
-  expiryAlignSec: 0,
-  budget: 10_000000n,
-  quote: {
-    h0Wad: 2n * 10n ** 16n,
-    gammaSWad: 5n * 10n ** 13n,
-    lambdaWad: 10n ** 15n,
-    qEpochMax: 100_000000n,
-    pMinWad: 2n * 10n ** 16n,
-  },
-  sigmaMode: 0,
-  fixedVarE36: varE36FromAnnualVol("0.6"),
-  kernel: 0,
-  timeZone: "UTC",
-  ticker: "ETH",
-  nameTemplate: "{ticker} {cmp} ${strike} {date} {hhmm}",
-  symbolTemplate: "{ticker}{side}",
-};
 
 test("strike is the oracle price rounded half up to the cent", () => {
   assert.equal(strikeCentsFromLnSpot(lnWad({ num: 270135n, den: 100n })), 270135n);
@@ -63,94 +32,6 @@ test("lnStrikeWad is ln of the rounded strike", () => {
 
 test("fixed variance from annual vol matches SPEC 0 example", () => {
   assert.equal(varE36FromAnnualVol("0.6"), 11407711613050422085329682865n);
-});
-
-test("clock and templates", () => {
-  const t = 1790346660n;
-  assert.equal(formatClock(t, "UTC"), "14:31:00");
-  assert.equal(formatClock(t, "Asia/Tokyo"), "23:31:00");
-  assert.equal(formatDate(t, "UTC"), "25 Sep");
-  assert.equal(formatDate(1790380800n, "UTC"), "26 Sep");
-  assert.equal(formatDate(1790346660n + 10n * 3600n, "Asia/Tokyo"), "26 Sep");
-  assert.equal(formatDate(1791244800n, "UTC"), "6 Oct");
-  const v = { side: "UP" as const, cmp: ">", ticker: "ETH", strike: "2701.35", clock: "14:31:00", date: "25 Sep" };
-  assert.equal(renderTemplate("{ticker}{side}", v), "ETHUP");
-  assert.equal(renderTemplate("{ticker}{side}", { ...v, side: "DOWN" }), "ETHDOWN");
-  assert.equal(renderTemplate("{ticker} > ${strike} {date} {hhmm}", v), "ETH > $2701.35 25 Sep 14:31");
-  assert.equal(renderTemplate("{side}-{strike}-{hhmmss} {time}", { ...v, side: "DOWN" }), "DOWN-2701.35-143100 14:31:00");
-  assert.equal(renderTemplate("{ticker} {cmp} ${strike} {date} {hhmm}", v), "ETH > $2701.35 25 Sep 14:31");
-  assert.equal(
-    renderTemplate("{ticker} {cmp} ${strike} {date} {hhmm}", { ...v, side: "DOWN", cmp: "<" }),
-    "ETH < $2701.35 25 Sep 14:31",
-  );
-});
-
-test("expiry is open + tenor, optionally aligned up", () => {
-  assert.equal(expiryFor(1000n, { tenorSec: 60, expiryAlignSec: 0 }), 1060n);
-  assert.equal(expiryFor(1000n, { tenorSec: 60, expiryAlignSec: 60 }), 1080n);
-  assert.equal(expiryFor(1020n, { tenorSec: 60, expiryAlignSec: 60 }), 1080n);
-});
-
-test("buildMarketParams produces the 1-minute demo market", () => {
-  const now = 1790346600n;
-  const lnSpot = lnWad({ num: 270134712n, den: 100000n });
-  const { params, strike, strikeCents } = buildMarketParams(ORACLE, lnSpot, now, TEMPLATE);
-  assert.equal(strike, "2701.35");
-  assert.equal(strikeCents, 270135n);
-  assert.deepEqual(params, {
-    oracle: ORACLE,
-    lnStrikeWad: 7901506927034071490n,
-    openTime: now,
-    expiry: now + 60n,
-    window: 10,
-    cutoffBuffer: 2,
-    nSamples: 10,
-    budget: 10_000000n,
-    quote: {
-      h0Wad: 20000000000000000n,
-      gammaSWad: 50000000000000n,
-      lambdaWad: 1000000000000000n,
-      qEpochMax: 100_000000n,
-      pMinWad: 20000000000000000n,
-    },
-    sigmaMode: 0,
-    fixedVarE36: 0n,
-    kernel: 0,
-    yesName: "ETH > $2701.35 25 Sep 14:31",
-    yesSymbol: "ETHUP",
-    noName: "ETH < $2701.35 25 Sep 14:31",
-    noSymbol: "ETHDOWN",
-  });
-});
-
-test("fixed sigma mode passes the variance through", () => {
-  const { params } = buildMarketParams(ORACLE, 0n, 0n, { ...TEMPLATE, sigmaMode: 1 });
-  assert.equal(params.sigmaMode, 1);
-  assert.equal(params.fixedVarE36, 11407711613050422085329682865n);
-});
-
-test("template validation rejects unusable markets", () => {
-  const bad: Partial<MarketTemplate>[] = [
-    { tenorSec: 0 },
-    { windowSec: 0, nSamples: 0 },
-    { windowSec: 50, cutoffBufferSec: 10 },
-    { nSamples: 11 },
-    { budget: 0n },
-    { quote: { ...TEMPLATE.quote, pMinWad: 5n * 10n ** 17n } },
-    { quote: { ...TEMPLATE.quote, h0Wad: 1n << 64n } },
-    { quote: { ...TEMPLATE.quote, qEpochMax: 0n } },
-    { sigmaMode: 2 },
-    { sigmaMode: 1, fixedVarE36: 0n },
-    { kernel: 1 },
-    { kernel: 3 },
-    { timeZone: "Not/AZone" },
-    { ticker: "" },
-    { ticker: "ETH USD" },
-    { symbolTemplate: "{side}-{strike}-{hhmmss}" },
-    { symbolTemplate: "{ticker}{side}{hhmmss}" },
-  ];
-  for (const b of bad) assert.throws(() => validateTemplate({ ...TEMPLATE, ...b }), Error, JSON.stringify(b, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
-  validateTemplate(TEMPLATE);
 });
 
 const INFO: MarketInfo = {

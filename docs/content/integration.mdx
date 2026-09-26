@@ -1,0 +1,104 @@
+---
+title: Integration
+description: How wallets, routers, indexers and front ends talk to PredictionHook.
+---
+
+# Integration
+
+## Contracts
+
+| Contract | Role |
+|---|---|
+| <Source path="src/PredictionHook.sol" /> | Markets, swaps, settlement, redemption and the LP vault |
+| <Source path="src/oracle/UnderlyingOracleHook.sol" /> | Start-of-block price, tick cumulatives and realised variance of the ETH/USDC pool |
+| <Source path="src/MarketScheduler.sol" /> | Ownerless owner of the hook; opens one market per slot |
+| <Source path="src/OutcomeToken.sol" /> | The YES and NO ERC-20s (6 decimals), minted and burned only by the hook |
+| <Source path="src/math/BinaryPricer.sol" /> | Fair price and spread |
+| <Source path="src/math/QuoteMath.sol" /> | Exact fill amounts |
+
+Every address is in <Source path="deployments/unichain-sepolia.json" />.
+
+## Quoting
+
+<Source path="packages/swap-sdk/src/quote.ts" lines="37-49" />
+
+```ts showLineNumbers{37}
+const functionName = exactIn ? 'quoteExactInputSingle' : 'quoteExactOutputSingle'
+const data = encodeFunctionData({
+  abi: v4QuoterAbi,
+  functionName,
+  args: [
+    {
+      poolKey: req.poolKey,
+      zeroForOne: req.zeroForOne,
+      exactAmount: req.amount,
+      hookData: req.hookData ?? '0x',
+    },
+  ],
+})
+```
+
+A quote is a plain `V4Quoter.quoteExactInputSingle` or `quoteExactOutputSingle` call with the market's `PoolKey`. The quoter runs the same `beforeSwap` as a real swap, so a quote always matches the fill. Hook reverts come back wrapped, and `@phinary/swap-sdk` decodes them into readable errors (<Source path="packages/swap-sdk/src/errors.ts" />). For display prices without an amount, `PredictionHook.quote(id)` returns the mid, ask and bid of both sides.
+
+## Swapping
+
+<Source path="packages/swap-sdk/src/swap.ts" lines="102-126" />
+
+```ts showLineNumbers{102}
+/** V4_SWAP input: [SWAP_EXACT_IN_SINGLE | SWAP_EXACT_OUT_SINGLE, SETTLE_ALL, TAKE_ALL]. */
+export function encodeV4SingleSwap(p: Omit<BuildSwapParams, 'deadline' | 'permit' | 'router'>): Hex {
+  if (p.amount <= 0n || p.amount > MAX_UINT128 || p.limit < 0n || p.limit > MAX_UINT128) {
+    throw new Error('swap amounts must fit in uint128')
+  }
+  const tokenIn = inputCurrency(p.poolKey, p.zeroForOne)
+  const tokenOut = outputCurrency(p.poolKey, p.zeroForOne)
+  const hookData = p.hookData ?? '0x'
+  const exactIn = p.tradeType === 'EXACT_INPUT'
+  const swap = exactIn
+    ? encodeAbiParameters(EXACT_IN_SINGLE, [
+        { poolKey: p.poolKey, zeroForOne: p.zeroForOne, amountIn: p.amount, amountOutMinimum: p.limit, hookData },
+      ])
+    : encodeAbiParameters(EXACT_OUT_SINGLE, [
+        { poolKey: p.poolKey, zeroForOne: p.zeroForOne, amountOut: p.amount, amountInMaximum: p.limit, hookData },
+      ])
+  const settle = encodeAbiParameters(CURRENCY_AMOUNT, [tokenIn, exactIn ? p.amount : p.limit])
+  const take = encodeAbiParameters(CURRENCY_AMOUNT, [tokenOut, exactIn ? p.limit : p.amount])
+  const actions = concatHex([
+    toHex(exactIn ? Actions.SWAP_EXACT_IN_SINGLE : Actions.SWAP_EXACT_OUT_SINGLE, { size: 1 }),
+    toHex(Actions.SETTLE_ALL, { size: 1 }),
+    toHex(Actions.TAKE_ALL, { size: 1 }),
+  ])
+  return encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], [actions, [swap, settle, take]])
+}
+```
+
+A swap is UniversalRouter command `0x10` (`V4_SWAP`) with the actions `SWAP_EXACT_IN_SINGLE` or `SWAP_EXACT_OUT_SINGLE`, then `SETTLE_ALL` and `TAKE_ALL`. With `PERMIT2_PERMIT` in front the command is `0x0a10`.
+
+<Source path="src/OutcomeToken.sol" lines="6-10" />
+
+```solidity showLineNumbers{6}
+/// @title OutcomeToken
+/// @notice YES/NO token of one prediction market. 6 decimals (same unit as USDC). Only the hook mints and burns.
+/// @dev Solady ERC20 gives Permit2 an infinite allowance by default, so UniversalRouter swaps need only a Permit2
+///      signature, not an ERC20 approve transaction.
+contract OutcomeToken is ERC20 {
+```
+
+Outcome tokens are Solady ERC-20s that give Permit2 an infinite allowance, so selling YES or NO needs only a Permit2 signature, not an approve transaction.
+
+## Events
+
+| Event | When |
+|---|---|
+| `MarketCreated` | A market and its two pools exist |
+| `HookSwap` | Every swap, with the real amounts (OpenZeppelin's standard event for custom-accounting hooks) |
+| `Trade` | Every swap, with side, quantity, USDC and average price |
+| `MarketSettled` | Settlement, including `Invalid` |
+| `Redeemed`, `Swept` | Payouts and vault returns |
+| `Deposit`, `Withdraw` | Vault shares |
+
+The `sender` of a swap is the router. The Ponder indexer (<Source path="indexer/src/trades.ts" />) attributes each trade to the real account from the token transfers in the same transaction (<Source path="indexer/src/lib/attribution.ts" />).
+
+## Routing
+
+Uniswap's hosted routing skips hook-priced pools that hold no liquidity unless the hook is allowlisted. Phinary therefore quotes with V4Quoter directly, trades from its own dashboard (`web/`), and runs a fork of the Uniswap interface with these pools injected (`interface-patches/`).

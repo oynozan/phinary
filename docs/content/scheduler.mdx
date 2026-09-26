@@ -1,0 +1,123 @@
+---
+title: Scheduler
+description: MarketScheduler, the ownerless contract that owns PredictionHook and opens one market per slot.
+---
+
+# Scheduler
+
+<Source path="src/MarketScheduler.sol" /> is the `owner` of `PredictionHook`, which makes it the only account that can call `createMarket`. It has no admin and no setter; every parameter is fixed at construction.
+
+## `open`
+
+<Source path="src/MarketScheduler.sol" lines="63-102" />
+
+```solidity showLineNumbers{63}
+function open() external returns (uint256 marketId) {
+    uint256 slot = block.timestamp / _period;
+    if (slot <= lastSlot) revert AlreadyOpened(slot);
+    lastSlot = slot;
+
+    uint256 budget = _budget();
+    uint256 expiry = slot * _period + _tenor;
+    uint256 cents = MarketNames.strikeCents(IUnderlyingOracle(oracle).lnSpotSoBWad());
+    (string memory yesName, string memory noName, string memory yesSymbol, string memory noSymbol) =
+        MarketNames.names(_ticker(), cents, expiry);
+
+    marketId = hook.createMarket(
+        IPredictionHook.MarketParams({
+            oracle: oracle,
+            lnStrikeWad: MarketNames.lnStrikeWad(cents),
+            openTime: uint64(block.timestamp),
+            expiry: uint64(expiry),
+            window: _window,
+            cutoffBuffer: _cutoffBuffer,
+            nSamples: _nSamples,
+            budget: budget,
+            quote: IPredictionHook.QuoteParams({
+                h0Wad: _h0Wad,
+                gammaSWad: _gammaSWad,
+                lambdaWad: _lambdaWad,
+                qEpochMax: _qEpochMax,
+                pMinWad: _pMinWad
+            }),
+            sigmaMode: 0,
+            fixedVarE36: 0,
+            kernel: 0,
+            yesName: yesName,
+            yesSymbol: yesSymbol,
+            noName: noName,
+            noSymbol: noSymbol
+        })
+    );
+
+    emit MarketOpened(marketId, slot, msg.sender, budget, cents);
+}
+```
+
+- **One market per slot.** A slot is `period` seconds long. The first `open()` in a slot succeeds and later ones revert `AlreadyOpened`, so anyone can call it without creating extra markets.
+- **At-the-money strike.** The strike is the oracle's start-of-block price rounded to whole cents.
+- **Expiry on the grid.** `expiry = slot · period + tenor`, so every market ends on a round time.
+- **Names.** Tokens are named like `ETH > $2684.53 26 Sep 00:48` with symbols `ETHUP` and `ETHDOWN` (<Source path="src/lib/MarketNames.sol" />).
+
+## Budget
+
+<Source path="src/MarketScheduler.sol" lines="150-156" />
+
+```solidity showLineNumbers{150}
+/// @return budget `min(maxBudget, hook.vaultIdle() / 2)`; ok whether it clears `minBudget`. Non-reverting form
+///         of `_budget`, shared with `canOpen()` so the two never disagree.
+function _affordableBudget() internal view returns (uint256 budget, bool ok) {
+    uint256 half = hook.vaultIdle() / 2;
+    budget = half < _maxBudget ? half : _maxBudget;
+    ok = budget >= _minBudget;
+}
+```
+
+Each market gets `min(maxBudget, vaultIdle / 2)`, so one market never takes the whole vault. Below `minBudget`, `open()` reverts and `canOpen()` returns false.
+
+## Demo configuration
+
+<Source path="script/base/SchedulerPair.sol" lines="35-52" />
+
+```solidity showLineNumbers{35}
+/// @notice The spec's Unichain Sepolia demo values, the default for every config field
+function demoDefaults() public pure returns (IMarketScheduler.Config memory c) {
+    c.period = 60;
+    c.tenor = 120;
+    c.window = 10;
+    c.cutoffBuffer = 2;
+    c.nSamples = 10;
+    c.quote = IPredictionHook.QuoteParams({
+        h0Wad: 0.02e18,
+        gammaSWad: 0.00002e18,
+        lambdaWad: 0.001e18,
+        qEpochMax: 100e6,
+        pMinWad: 0.02e18
+    });
+    c.maxBudget = 10e6;
+    c.minBudget = 1e6;
+    c.ticker = "ETH";
+}
+```
+
+| Parameter | Value | Effect |
+|---|---|---|
+| `period` | 60 s | A new market every minute |
+| `tenor` | 120 s | Each market lasts two minutes, so two are always live |
+| `window` | 10 s | Settlement averages the last 10 s |
+| `cutoffBuffer` | 2 s | Trading stops 12 s before expiry |
+| `nSamples` | 10 | Samples in the window for the pricing formula |
+| `h0` | 0.02 | Base half-spread |
+| `gammaS` | 0.00002 | Volatility-scaled spread term |
+| `lambda` | 0.001 | Price impact per whole token of flow in one block |
+| `qEpochMax` | 100 tokens | Max net flow per block |
+| `pMin` | 0.02 | Tradable band 0.02 to 0.98 |
+| `maxBudget`, `minBudget` | 10, 1 USDC | Budget bounds per market |
+
+## Deployment
+
+The hook takes the scheduler as `owner` in its constructor, and the scheduler takes the hook. The deploy script predicts the scheduler's address from the deployer's nonce, mines the hook's CREATE2 salt for the permission bits with that owner, then deploys both (<Source path="script/DeployScheduler.s.sol" />).
+
+## Keeper bot
+
+`open()` needs a transaction every slot. The keeper bot (<Source path="bot/src/keeper.ts" />) sends it, then calls `settle` and `sweep` on the hook when each market is due. Every one of these calls is permissionless, so the bot has no special rights and anyone can replace it.

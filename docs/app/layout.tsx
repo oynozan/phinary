@@ -45,6 +45,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                     nextThemes={{ defaultTheme: "dark", forcedTheme: "dark" }}
                     feedback={{ content: null }}
                     editLink={null}
+                    sidebar={{ toggleButton: false }}
+                    copyPageButton={false}
                 >
                     {children}
                 </Layout>

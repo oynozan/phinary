@@ -3,12 +3,14 @@
 #
 #   1. anvil --fork-url $FORK_URL --block-time 1 --port $LOCAL_PORT (log and pid in deployments/.run/local/)
 #   2. gives the deployer and local keeper and mirror accounts ETH, and the deployer Circle USDC (FiatToken balance slot)
-#   3. forge script Deploy (at the live ETH price) and Fund ($FUND_USDC into the hook vault) -> deployments/local.json
-#   4. hands the PriceSteerer to the local mirror key, then starts the mirror and keeper bots through script/bots.sh
+#   3. forge script Deploy (at the live ETH price, with the MarketScheduler that owns the hook) and Fund ($FUND_USDC
+#      into the hook vault) -> deployments/local.json
+#   4. hands the PriceSteerer to the local mirror key, then starts the mirror and the keeper, which calls open()
 #
 # Stop everything with script/local-env-stop.sh. Nothing is sent to the real network: every transaction goes to anvil.
 # Settings: LOCAL_PORT (8545), FORK_URL, FORK_BLOCK, FUND_USDC (500), DEPLOYER_USDC (10000), ETH_PRICE_USD (live
-# Coinbase/Kraken price, else 2700), MARKET_BUDGET_USDC (100 here, 10 in the bot), START_BOTS (1).
+# Coinbase/Kraken price, else 2700), START_BOTS (1). The scheduler's SCHEDULER_*, MARKET_* and QUOTE_* settings pass
+# through to Deploy (docs/md/RUNBOOK.md section 3).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,7 +22,6 @@ FORK_URL="${FORK_URL:-https://sepolia.unichain.org}"
 RUN="$ROOT/deployments/.run/local"
 DEPLOYMENTS="$ROOT/deployments/local.json"
 FUND_USDC="${FUND_USDC:-500}"
-MARKET_BUDGET_USDC="${MARKET_BUDGET_USDC:-100}"
 USDC=0x31d0220469e10c4E71834a79b1f276d740d3768F
 # FiatToken v2.2 keeps balances in balanceAndBlacklistStates, storage slot 9
 USDC_BALANCE_SLOT=9
@@ -36,6 +37,10 @@ die() {
 env_value() {
   [[ -f "$ROOT/.env" ]] || return 0
   sed -n "s/^$1=//p" "$ROOT/.env" | tail -n 1 | tr -d '"'"'"
+}
+
+usdc() {
+  awk -v x="$1" 'BEGIN { printf "%.2f", x / 1e6 }'
 }
 
 usdc_units() {
@@ -139,6 +144,14 @@ log "funding the vault with $FUND_USDC USDC (log: $RUN/fund.log)"
 
 HOOK="$(json predictionHook)"
 IDLE="$(cast call "$HOOK" "vaultIdle()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
+SCHEDULER="$(json marketScheduler)"
+# config() is (period, tenor, window, cutoffBuffer, nSamples, (quote), maxBudget, minBudget, ticker)
+SCHEDULER_CONFIG="$(cast call "$SCHEDULER" \
+  "config()((uint32,uint32,uint32,uint32,uint32,(uint64,uint64,uint128,uint128,uint64),uint256,uint256,string))" \
+  --rpc-url "$RPC")" || die "MarketScheduler config() read failed"
+read -r PERIOD TENOR _ _ _ MAX_BUDGET MIN_BUDGET _ < <(
+  sed -E 's/ \[[^]]*\]//g; s/, \([^()]*\)//' <<<"$SCHEDULER_CONFIG" | tr -d '()"' | tr ',' ' '
+)
 
 # The mirror gets its own signer so deployer-signed scripts (make market-local) never race it for nonces
 STEERER="$(json priceSteerer)"
@@ -156,7 +169,7 @@ if [[ "${START_BOTS:-1}" == 1 ]]; then
   : >"$RUN/mirror.log"
   : >"$RUN/keeper.log"
   RPC_URL="$RPC" MIRROR_PRIVATE_KEY="$LOCAL_MIRROR_KEY" KEEPER_PRIVATE_KEY="$LOCAL_KEEPER_KEY" \
-    MARKET_BUDGET_USDC="$MARKET_BUDGET_USDC" "$ROOT/script/bots.sh" start local
+    "$ROOT/script/bots.sh" start local
 fi
 
 cat <<SUMMARY
@@ -164,16 +177,18 @@ cat <<SUMMARY
 Local environment is up
   RPC               $RPC (chain 1301, anvil pid $(cat "$RUN/anvil.pid"), 1 s blocks)
   deployments       $DEPLOYMENTS
-  PredictionHook    $HOOK (vault idle $(awk -v x="$IDLE" 'BEGIN { printf "%.2f", x / 1e6 }') USDC)
+  PredictionHook    $HOOK (vault idle $(usdc "$IDLE") USDC)
+  MarketScheduler   $SCHEDULER (owns the hook, no admin, open() is permissionless)
   UnderlyingOracle  $(json underlyingOracle)
   PriceSteerer      $(json priceSteerer)
   demo WETH, USDC   $(json demoWeth), $(json demoUsdc)
-  deployer          $DEPLOYER (hook and oracle owner, LP)
-  keeper            $KEEPER (local-only key)
+  deployer          $DEPLOYER (oracle owner, LP)
+  keeper            $KEEPER (local-only key, calls open(), settle and sweep)
   mirror            $MIRROR (local-only key, PriceSteerer owner)
   logs              $RUN/{anvil,deploy,fund,mirror,keeper}.log
 
-The keeper opens a 60 s market every wall-clock minute (budget $MARKET_BUDGET_USDC USDC).
+The keeper calls the scheduler's open() once per $PERIOD s slot of block time. Each market expires $TENOR s after its
+slot starts, with a budget of min($(usdc "$MAX_BUDGET") USDC, vault idle / 2), and open() refuses below $(usdc "$MIN_BUDGET") USDC.
   script/bots.sh status local     bot state and last log lines
   script/bots.sh logs local       follow the bot logs
   make rehearse                   scripted Alice/Bob demo through UniversalRouter 2.0

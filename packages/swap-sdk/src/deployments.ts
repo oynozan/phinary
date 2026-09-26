@@ -60,7 +60,7 @@ function pick(flat: Record<string, unknown>, key: string): { present: boolean; v
   return { present: false, value: undefined }
 }
 
-/** `legacyPredictionHooks`, if present: an array of addresses, dropping placeholders. Missing or malformed yields []. */
+/** `legacyPredictionHooks` checksummed, skipping placeholders and non-address entries. Missing or not an array yields []. */
 function legacyPredictionHooks(flat: Record<string, unknown>): Address[] {
   const { value } = pick(flat, 'legacyPredictionHooks')
   if (!Array.isArray(value)) {

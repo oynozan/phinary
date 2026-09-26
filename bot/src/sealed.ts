@@ -3,6 +3,7 @@ import {
   ContractFunctionRevertedError,
   numberToHex,
   parseEventLogs,
+  toHex,
   zeroHash,
   type Account,
   type Address,
@@ -16,6 +17,7 @@ import { loadEnvFiles, loadSealedConfig } from "./config.ts";
 import { verifiedHeader } from "./header.ts";
 import { isRevert } from "./keeper.ts";
 import { createLogger, errMsg, type Logger } from "./log.ts";
+import { poolStateSlot } from "./pricing.ts";
 import {
   buildBlockProof,
   HISTORY_ADDRESS,
@@ -36,6 +38,12 @@ const FIRST_CHUNK = 16;
 const CHUNK = 128;
 /** Parallel RPC reads while building a batch */
 const CONCURRENCY = 4;
+
+/** EIP-7825's per-transaction gas limit */
+export const TX_GAS_CAP = 16_777_216n;
+
+/** Depth of the startup eth_getProof probe, well past the ~30 blocks pruned public nodes serve */
+const PROOF_PROBE_DEPTH = 300n;
 
 /** Includes BlockHashes so reverts such as UnknownBlockHash decode by name */
 const oracleAbi = [...sealedPoolOracleAbi, ...sealedPoolOracleImplAbi] as const;
@@ -96,6 +104,59 @@ function revertName(e: unknown): string | undefined {
   if (!(e instanceof BaseError)) return undefined;
   const revert = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
   return revert?.data?.errorName;
+}
+
+/** Most gas a proveMany estimate may take, half a block and 5/6 of TX_GAS_CAP so the 1.2x padded limit still fits */
+export function batchGasCap(blockGasLimit: bigint): bigint {
+  const half = blockGasLimit / 2n;
+  const perTx = (TX_GAS_CAP * 5n) / 6n;
+  return half < perTx ? half : perTx;
+}
+
+/** A padded gas limit clamped to the block's and to TX_GAS_CAP */
+export function txGasLimit(padded: bigint, blockGasLimit: bigint): bigint {
+  const limit = blockGasLimit < TX_GAS_CAP ? blockGasLimit : TX_GAS_CAP;
+  return padded < limit ? padded : limit;
+}
+
+/** Halves `proofs` until an estimate succeeds within `cap`, a lone proof is kept even over it */
+export async function fitBatch<T>(
+  proofs: readonly T[],
+  cap: bigint,
+  estimate: (batch: T[]) => Promise<bigint>,
+): Promise<{ proofs: T[]; estimate: bigint }> {
+  let batch = [...proofs];
+  for (;;) {
+    let gas: bigint | undefined;
+    try {
+      gas = await estimate(batch);
+    } catch (e) {
+      // A shorter batch starts at the same unknown hash, only checkpoints help
+      if (batch.length === 1 || revertName(e) === "UnknownBlockHash") throw e;
+    }
+    if (gas !== undefined && (gas <= cap || batch.length === 1)) return { proofs: batch, estimate: gas };
+    batch = batch.slice(0, Math.ceil(batch.length / 2));
+  }
+}
+
+/** False, after one warning, when no reader serves eth_getProof PROOF_PROBE_DEPTH blocks behind `head` */
+export async function checkProofWindow(readers: readonly Reader[], target: OracleTarget, head: bigint, log: Logger): Promise<boolean> {
+  const block = head > PROOF_PROBE_DEPTH ? head - PROOF_PROBE_DEPTH : 0n;
+  const slot = poolStateSlot(target.poolId);
+  const errors = await Promise.all(
+    readers.map((r) =>
+      r.request({ method: "eth_getProof", params: [target.poolManager, [slot], toHex(block)] }).then(
+        (p) => (Array.isArray(p?.accountProof) ? undefined : "no accountProof"),
+        (e: unknown) => (e instanceof BaseError && e.details) || errMsg(e),
+      ),
+    ),
+  );
+  if (errors.includes(undefined)) return true;
+  log.warn(
+    "no RPC serves eth_getProof 300 blocks back, so blocks missed during an outage cannot be proven: add an archive RPC to RPC_URL or SEALED_RPC_FALLBACKS",
+    { block, errors: errors.join(" | ") },
+  );
+  return false;
 }
 
 /**
@@ -171,8 +232,7 @@ export class SealedBot {
     const call = { address: this.opts.oracle, abi: oracleAbi, functionName, args, account: this.caller } as const;
     const gasEstimate = estimate ?? (await this.pc.estimateContractGas(call as never));
     if (this.opts.dryRun || !walletClient) return { logs: [] };
-    const limit = await this.blockGasLimit();
-    const gas = pad(gasEstimate) < limit ? pad(gasEstimate) : limit;
+    const gas = txGasLimit(pad(gasEstimate), await this.blockGasLimit());
     const hash = await walletClient.writeContract({ ...call, gas } as never);
     const receipt = await waitForSuccess(this.pc, hash, this.opts.txTimeoutMs);
     return { hash, blockNumber: receipt.blockNumber, gasUsed: receipt.gasUsed, logs: receipt.logs };
@@ -257,7 +317,7 @@ export class SealedBot {
     return total;
   }
 
-  /** Sends one proveMany from `from`, at most `batch` blocks and halved until its gas fits half a block */
+  /** Sends one proveMany from `from`, at most `batch` blocks and halved until its estimate succeeds within batchGasCap */
   private async proveBatch(from: bigint, to: bigint): Promise<{ proven: number; checkpointed: number }> {
     const target = await this.oracleTarget();
     const last = from + BigInt(this.opts.batch) - 1n;
@@ -265,28 +325,26 @@ export class SealedBot {
     const checkpointed = await this.ensureHashes(from, end);
     // A dry run stored nothing, so the proofs would not verify yet
     if (this.opts.dryRun && checkpointed > 0) return { proven: 0, checkpointed };
-    let proofs: BlockProof[] = await mapLimit(range(from, end), CONCURRENCY, (n) =>
+    const built: BlockProof[] = await mapLimit(range(from, end), CONCURRENCY, (n) =>
       buildBlockProof(this.readers, target, n, this.opts.retry),
     );
-    const cap = (await this.blockGasLimit()) / 2n;
-    let estimate: bigint;
-    for (;;) {
-      try {
-        estimate = await this.pc.estimateContractGas({
+    let fit: { proofs: BlockProof[]; estimate: bigint };
+    try {
+      fit = await fitBatch(built, batchGasCap(await this.blockGasLimit()), (proofs) =>
+        this.pc.estimateContractGas({
           address: this.opts.oracle,
           abi: oracleAbi,
           functionName: "proveMany",
           args: [proofs],
           account: this.caller,
-        });
-      } catch (e) {
-        // The windows moved on since ensureHashes looked, so the next attempt starts from scratch
-        if (revertName(e) === "UnknownBlockHash") this.stored = undefined;
-        throw e;
-      }
-      if (estimate <= cap || proofs.length === 1) break;
-      proofs = proofs.slice(0, Math.ceil(proofs.length / 2));
+        }),
+      );
+    } catch (e) {
+      // The windows moved on since ensureHashes looked, so the next attempt starts from scratch
+      if (revertName(e) === "UnknownBlockHash") this.stored = undefined;
+      throw e;
     }
+    const { proofs, estimate } = fit;
     const r = await this.send("proveMany", [proofs], (g) => (g * 12n) / 10n + 100_000n, estimate);
     this.opts.log.debug(r.hash ? "proved" : "prove (dry run)", {
       from,
@@ -364,6 +422,7 @@ async function main(): Promise<void> {
     fallbacks,
   });
   const target = await bot.oracleTarget();
+  await checkProofWindow([clients.publicClient, ...fallbacks], target, await clients.publicClient.getBlockNumber(), log);
   log.info("sealed bot ready", {
     account: clients.account?.address ?? "none (dry run)",
     keyFrom: cfg.privateKey?.source,

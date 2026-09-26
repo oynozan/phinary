@@ -1,19 +1,59 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { isAddress } from 'viem'
+import { describe, expect, it, vi } from 'vitest'
 
 import { loadIndexerDeployment } from '../src/deployment.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
+const sepoliaDeploymentPath = path.join(repoRoot, 'deployments', 'unichain-sepolia.json')
 const localDeploymentPath = path.join(repoRoot, 'deployments', 'local.json')
 
+type DeploymentJson = {
+  chainId: number
+  rpcUrl: string
+  predictionHook: string
+  underlyingOracle: string
+  poolManager: string
+  deployBlock: number
+  marketScheduler?: string
+  legacyPredictionHooks?: string[]
+}
+
+const readDeployment = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as DeploymentJson
+
 describe('loadIndexerDeployment', () => {
-  it('keeps event indexing at deployBlock but starts snapshots after initialization', () => {
+  it('defaults to unichain-sepolia and parses its file field by field, with safe snapshot initialization', () => {
+    // Read the committed file rather than freezing values that change on every redeploy
+    const file = readDeployment(sepoliaDeploymentPath)
     const deployment = loadIndexerDeployment({})
 
     expect(deployment.chainId).toBe(1301)
-    expect(deployment.deployBlock).toBe(63569270)
-    expect(deployment.snapshotStartBlock).toBe(63569470)
+    expect(deployment).toEqual({
+      chainId: file.chainId,
+      rpcUrl: file.rpcUrl,
+      hook: file.predictionHook,
+      oracle: file.underlyingOracle,
+      poolManager: file.poolManager,
+      deployBlock: file.deployBlock,
+      snapshotStartBlock: Math.max(file.deployBlock, 63569470),
+      marketScheduler: file.marketScheduler,
+      legacyPredictionHooks: file.legacyPredictionHooks ?? [],
+    })
+    expect(Number.isSafeInteger(deployment.deployBlock) && deployment.deployBlock > 0).toBe(true)
+    for (const a of [deployment.hook, deployment.oracle, deployment.poolManager]) expect(isAddress(a)).toBe(true)
+  })
+
+  it('parses the scheduler migration of the unichain-sepolia file: marketScheduler and legacyPredictionHooks', () => {
+    const deployment = loadIndexerDeployment({})
+
+    expect(deployment.marketScheduler).toBeDefined()
+    expect(isAddress(deployment.marketScheduler!)).toBe(true)
+    expect(deployment.legacyPredictionHooks.length).toBeGreaterThan(0)
+    for (const legacy of deployment.legacyPredictionHooks) {
+      expect(isAddress(legacy)).toBe(true)
+      expect(legacy.toLowerCase()).not.toBe(deployment.hook.toLowerCase())
+    }
   })
 
   it.each(['63569270', '-1', 'NaN', '63569470.5', '9007199254740992'])('rejects invalid snapshot start %s', value => {
@@ -44,11 +84,24 @@ describe('loadIndexerDeployment', () => {
     expect(deployment.legacyPredictionHooks).toEqual(file.legacyPredictionHooks ?? [])
   })
 
-  it('preserves the configured scheduler and legacy Hook registry', () => {
-    const deployment = loadIndexerDeployment({})
+  it('defaults marketScheduler to undefined and legacyPredictionHooks to [] for a file without them', async () => {
+    const { marketScheduler: _scheduler, legacyPredictionHooks: _legacy, ...premigration } = readDeployment(sepoliaDeploymentPath)
+    vi.resetModules()
+    vi.doMock('node:fs', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('node:fs')>()),
+      readFileSync: () => JSON.stringify(premigration),
+    }))
+    try {
+      const { loadIndexerDeployment: loadFromPremigrationFile } = await import('../src/deployment.ts')
+      const deployment = loadFromPremigrationFile({})
 
-    expect(deployment.marketScheduler).toBe('0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd')
-    expect(deployment.legacyPredictionHooks).toEqual(['0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8'])
+      expect(deployment.hook).toBe(premigration.predictionHook)
+      expect(deployment.marketScheduler).toBeUndefined()
+      expect(deployment.legacyPredictionHooks).toEqual([])
+    } finally {
+      vi.doUnmock('node:fs')
+      vi.resetModules()
+    }
   })
 
   it('overrides the RPC URL with PONDER_RPC_URL_1301', () => {

@@ -2,7 +2,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import { createPublicClient, createTestClient, http, zeroAddress, type Address, type Hex, type PublicClient, type RpcBlock } from "viem";
+import {
+  ContractFunctionRevertedError,
+  createPublicClient,
+  createTestClient,
+  encodeErrorResult,
+  http,
+  zeroAddress,
+  type Address,
+  type Hex,
+  type PublicClient,
+  type RpcBlock,
+} from "viem";
 import { poolManagerAbi, sealedPoolOracleAbi, sealedPoolOracleImplAbi } from "../src/abi.ts";
 import { makeClients } from "../src/chain.ts";
 import { BOT_DIR, loadSealedConfig, REPO_DIR } from "../src/config.ts";
@@ -10,7 +21,7 @@ import { createLogger } from "../src/log.ts";
 import { varE36FromAnnualVol } from "../src/market.ts";
 import { orientationFor, poolId, poolStateSlot, decodeSlot0, sortTokens, sqrtPriceX96FromPrice, type PoolKey } from "../src/pricing.ts";
 import { buildBlockProof, HISTORY_ADDRESS } from "../src/proof.ts";
-import { SealedBot, type SealedTick } from "../src/sealed.ts";
+import { batchGasCap, checkProofWindow, fitBatch, SealedBot, TX_GAS_CAP, txGasLimit, type SealedTick } from "../src/sealed.ts";
 import { ANVIL_KEY, deploy, findAnvil, read, send, startAnvil } from "./helpers/anvil.ts";
 import { loadArtifact, type Artifact } from "./helpers/artifacts.ts";
 
@@ -132,6 +143,80 @@ function proofOf() {
     storageProof: [{ key: FIXTURE.slot, value: FIXTURE.slotValue, proof: FIXTURE.slotProof }],
   };
 }
+
+test("checkProofWindow warns once when no RPC serves eth_getProof 300 blocks back", async () => {
+  const lines: string[] = [];
+  const log = createLogger("sealed-test", "debug", (l) => lines.push(l));
+  const asked: unknown[] = [];
+  const pruned = fixtureClient((r) => {
+    if (r.method !== "eth_getProof") return undefined;
+    asked.push(r.params[2]);
+    throw new Error("distance to target block exceeds maximum proof window");
+  });
+  assert.equal(await checkProofWindow([pruned, pruned], target, 1000n, log), false);
+  assert.deepEqual(asked, ["0x2bc", "0x2bc"], "both RPCs are asked for head - 300");
+  const warns = lines.filter((l) => l.includes(" WARN "));
+  assert.equal(warns.length, 1);
+  assert.match(warns[0]!, /archive/);
+  assert.match(warns[0]!, /maximum proof window/);
+
+  lines.length = 0;
+  assert.equal(await checkProofWindow([pruned, fixtureClient()], target, 1000n, log), true, "one archive fallback is enough");
+  assert.equal(await checkProofWindow([fixtureClient()], target, 100n, log), true, "a chain younger than 300 blocks asks for block 0");
+  assert.deepEqual(lines, []);
+});
+
+test("a proveMany batch is capped at half a block and 5/6 of EIP-7825's per-transaction limit", () => {
+  assert.equal(TX_GAS_CAP, 16_777_216n);
+  assert.equal(batchGasCap(20_000_000n), 10_000_000n);
+  assert.equal(batchGasCap(30_000_000n), 13_981_013n);
+  assert.equal(batchGasCap(60_000_000n), 13_981_013n);
+  assert.ok((batchGasCap(60_000_000n) * 12n) / 10n <= TX_GAS_CAP, "the padded batch still fits one transaction");
+  assert.equal(txGasLimit(20_000_000n, 60_000_000n), TX_GAS_CAP);
+  assert.equal(txGasLimit(20_000_000n, 15_000_000n), 15_000_000n);
+  assert.equal(txGasLimit(1_000_000n, 60_000_000n), 1_000_000n);
+});
+
+test("fitBatch halves on an estimate over the cap and on a failed estimate, but not on UnknownBlockHash", async () => {
+  const proofs = Array.from({ length: 16 }, (_, i) => i);
+  const tried: number[] = [];
+  const perProof = async (ps: number[]) => {
+    tried.push(ps.length);
+    return BigInt(ps.length) * 720_000n;
+  };
+  const fit = await fitBatch(proofs, 3_000_000n, perProof);
+  assert.deepEqual(tried, [16, 8, 4]);
+  assert.deepEqual(fit, { proofs: [0, 1, 2, 3], estimate: 2_880_000n });
+
+  tried.length = 0;
+  const capped = async (ps: number[]) => {
+    tried.push(ps.length);
+    if (ps.length > 2) throw new Error("gas required exceeds allowance (25000000)");
+    return 1_440_000n;
+  };
+  assert.deepEqual(await fitBatch(proofs, 13_981_013n, capped), { proofs: [0, 1], estimate: 1_440_000n });
+  assert.deepEqual(tried, [16, 8, 4, 2], "a failed estimate halves the batch instead of retrying it whole");
+
+  await assert.rejects(
+    fitBatch([0], 13_981_013n, async () => {
+      throw new Error("gas required exceeds allowance");
+    }),
+    /exceeds allowance/,
+    "a single proof that fails throws",
+  );
+
+  tried.length = 0;
+  const unknown = async (ps: number[]) => {
+    tried.push(ps.length);
+    throw new ContractFunctionRevertedError({
+      abi: sealedPoolOracleImplAbi,
+      functionName: "proveMany",
+      data: encodeErrorResult({ abi: sealedPoolOracleImplAbi, errorName: "UnknownBlockHash", args: [5n] }),
+    });
+  };
+  await assert.rejects(fitBatch(proofs, 13_981_013n, unknown), /UnknownBlockHash/);
+  assert.deepEqual(tried, [16], "UnknownBlockHash throws at once, the next tick checkpoints first");
+});
 
 /* Anvil with a PoolManager, a hookless pool and SealedPoolOracle */
 

@@ -1,14 +1,17 @@
 # Demo bots (Unichain Sepolia)
 
-Two small Node 24 processes that keep the live demo moving:
+Small Node 24 processes that keep the live demo moving:
 
 - **`mirror`** keeps the underlying demo ETH/USDC v4 pool (demo WETH 18 dec / demo USDC 6 dec, hooked by
   `UnderlyingOracleHook`) at the real ETH price. Every ~1 s it reads ETH-USD from Coinbase (fallback Kraken, then
   Binance.US), computes the exact `sqrtPriceX96` for the pool's token order and decimals, and calls
   `PriceSteerer.steer(key, target)` when the pool is more than `MIRROR_THRESHOLD_BPS` away.
-- **`keeper`** creates a 1-minute market on the `PredictionHook` every period, struck at the oracle's start-of-block
-  price rounded to the cent (tickers `ETHUP` / `ETHDOWN`, name for example `ETH > $2701.35 26 Sep 14:32`), then settles every market once it expires and
-  sweeps its surplus back to the LP vault.
+- **`keeper`** calls the ownerless `MarketScheduler`'s permissionless `open()` once per slot. The scheduler builds the
+  market on chain, struck at the oracle's start-of-block price rounded to the cent (tickers `ETHUP` / `ETHDOWN`, name
+  for example `ETH > $2701.35 26 Sep 14:32`). The keeper then settles every market once it expires and sweeps its
+  surplus back to the LP vault.
+- **`sealed`** keeps a `SealedPoolOracle`'s history complete, for a hookless pool we do not own (see
+  [Sealed-oracle bot](#sealed-oracle-bot)). The demo pair above does not need it.
 
 TypeScript runs directly on Node 24 (type stripping), so there is no build step. The only runtime dependency is viem.
 
@@ -28,38 +31,46 @@ chain-1301 constants from `docs/md/SPEC.md` §4 and zero placeholders for our co
 |---|---|---|
 | `poolManager` | mirror | Stack A PoolManager `0x00b0…62ac` |
 | `priceSteerer`, `demoWeth`, `demoUsdc` | mirror | from the demo deploy |
-| `underlyingOracle` | keeper, mirror | the `UnderlyingOracleHook`; also the underlying pool's `hooks` |
-| `predictionHook` | keeper | |
+| `underlyingOracle` | mirror | the `UnderlyingOracleHook`; also the underlying pool's `hooks` |
+| `predictionHook` | keeper | the hook whose markets it settles and sweeps |
+| `marketScheduler` | keeper | the ownerless `MarketScheduler` that owns `predictionHook`; its `open()` is the only way to a new market |
+| `sealedOracle` | sealed | the `SealedPoolOracle` to poke and prove (or `SEALED_ORACLE`) |
 | `underlyingPool` | mirror | optional `{currency0, currency1, fee, tickSpacing, hooks}`, or `underlyingPoolFee` / `underlyingPoolTickSpacing`. Normally left out: the mirror reads the key from the oracle's `poolKey()`. A key set here (or via `UNDERLYING_POOL_FEE` / `UNDERLYING_POOL_TICK_SPACING`) must match it, or the mirror refuses to start. Without an oracle the key is the sorted demo tokens with fee 500, spacing 10 |
-| `rpcUrl`, `chainId` | both | `RPC_URL` / `CHAIN_ID` override |
+| `rpcUrl`, `chainId` | all | `RPC_URL` / `CHAIN_ID` override |
 
-Every address can also be overridden from the environment (`PRICE_STEERER`, `PREDICTION_HOOK`, `UNDERLYING_ORACLE`,
-`DEMO_WETH`, `DEMO_USDC`, `POOL_MANAGER`). See `.env.example` for every setting and its default.
+Every address can also be overridden from the environment (`PRICE_STEERER`, `PREDICTION_HOOK`, `MARKET_SCHEDULER`,
+`UNDERLYING_ORACLE`, `SEALED_ORACLE`, `DEMO_WETH`, `DEMO_USDC`, `POOL_MANAGER`). See `.env.example` for every setting and
+its default.
 
 ### Keys and permissions
 
-- The mirror's account must own the `PriceSteerer`; the keeper's account must be the hook owner or its `keeper`
-  (`setKeeper`). Both default to `DEPLOYER_PRIVATE_KEY`.
-- Running both bots from one key works (each waits for its receipt before the next transaction), but two processes can
-  race for the same nonce. For an unattended demo use `MIRROR_PRIVATE_KEY` and `KEEPER_PRIVATE_KEY` with
-  `PriceSteerer.transferOwnership` and `setKeeper`.
+- The mirror's account must own the `PriceSteerer`. The keeper needs no role: `open()`, `settle`, `settleInvalid` and
+  `sweep` are permissionless, so any funded key works. Both default to `DEPLOYER_PRIVATE_KEY`.
+- The sealed bot signs with `SEALED_KEY`, else `KEEPER_PRIVATE_KEY`, and needs no role either.
+- Running bots from one key works (each waits for its receipt before the next transaction), but two processes can race
+  for the same nonce. For an unattended demo give each bot its own key: `MIRROR_PRIVATE_KEY` (then
+  `PriceSteerer.transferOwnership` to it), `KEEPER_PRIVATE_KEY` and `SEALED_KEY`.
 - Keys are validated but never logged; only the derived address and the variable name are printed.
 
 ## Run
 
 ```sh
 npm run mirror        # loop every MIRROR_INTERVAL_MS
-npm run keeper        # loop every KEEPER_POLL_MS, a new market every KEEPER_PERIOD_SEC
+npm run keeper        # loop every KEEPER_POLL_MS, open() once per scheduler slot
+npm run sealed        # loop every SEALED_POLL_MS, needs SEALED_ORACLE or sealedOracle in the file
 DRY_RUN=1 npm run mirror                 # compute and log, send nothing (no key needed)
-DRY_RUN=1 npm run keeper                 # simulates as the hook's keeper (else owner) when no key is set
+DRY_RUN=1 npm run keeper                 # simulates open(), settle and sweep, no key needed
 ONCE=1 LOG_LEVEL=debug npm run keeper    # a single iteration
 ```
+
+From the repo root, `script/bots.sh start <network>` runs the mirror and the keeper in the background, and
+`script/bots.sh start <network> sealed` runs the sealed bot on its own (`stop`, `status` and `logs` work the same way).
 
 Log format (values illustrative):
 
 ```
 2026-09-26T14:30:01.204Z INFO  [mirror] steered source=coinbase feed=2701.35 pool=2700.64 devBps=2.63 target=15… tx=0x… block=… gas=…
-2026-09-26T14:31:00.611Z INFO  [keeper] market created market=17 name="ETH > $2701.35 26 Sep 14:32" strike=2701.35 openTime=… expiry=… budget=10.00 sigma=58.3% tx=0x…
+2026-09-26T14:31:00.611Z INFO  [keeper] market opened market=17 now=… slot=29840551 budget=10.00 strikeCents=270135 tx=0x…
 2026-09-26T14:32:02.090Z INFO  [keeper] settled market=17 yesWon=true status=2 tx=0x…
 2026-09-26T14:32:03.311Z INFO  [keeper] swept market=17 usdc=8.41 tx=0x…
 ```
@@ -80,18 +91,23 @@ Log format (values illustrative):
 
 ### Keeper behaviour
 
-- Market parameters per SPEC §3.1: `openTime` = latest block time (+ `MARKET_OPEN_DELAY_SEC`),
-  `expiry = openTime + MARKET_TENOR_SEC` (optionally rounded up to `MARKET_EXPIRY_ALIGN_SEC`), `window` 10 s,
-  `cutoffBuffer` 2 s, `nSamples` 10, `budget` 10 USDC, `h0` 0.02 (the frozen PLAN §10 value), `gammaS` 0.00005,
-  `lambda` 0.001, `qEpochMax` 100 tokens, `pMin` 0.02, `sigmaMode` 0 (oracle), `kernel` 0 (Gaussian, the only kernel
-  `PredictionHook` accepts). `window` must be at least 1 s.
-- `lnStrikeWad` is `ln(strike)` computed exactly in bigint (40-digit internal precision, rounded to the nearest wei).
-- With `KEEPER_ALIGN=1` (default) markets are created on wall-clock multiples of `KEEPER_PERIOD_SEC`, so 60 s
-  markets expire on the minute.
-- Creation is skipped (with a warning) while `vaultIdle()` is below the budget. Settlement runs before creation, so
-  sweeps recycle budget into the next market.
-- A creation that fails before its transaction is sent (RPC error, revert, budget) is retried on the next poll, and
-  `openTime` comes from a block read just before `createMarket`, after settle and sweep receipts.
+- The keeper passes no parameters. Each `open()` builds the market from the scheduler's immutable config (on Unichain
+  Sepolia: period 60 s, tenor 120 s, `window` 10 s, `cutoffBuffer` 2 s, `nSamples` 10, `h0` 0.02, `gammaS` 0.00002,
+  `lambda` 0.001, `qEpochMax` 100, `pMin` 0.02, `sigmaMode` 0, `kernel` 0). `openTime` is the block's timestamp,
+  `expiry = slot × period + tenor`, and the budget is `min(maxBudget, vaultIdle / 2)` with `maxBudget` 10 USDC.
+  Below `minBudget` (1 USDC) `open()` reverts `InsufficientIdle`.
+- Slots follow block timestamps: a block's slot is `block.timestamp / period`, and `open()` succeeds once per slot. The
+  keeper reads the period from the scheduler's `config()` on start-up, warning when `KEEPER_PERIOD_SEC` differs (it is
+  only the fallback), and with `KEEPER_ALIGN=1` (default) wakes on wall-clock multiples of it.
+- `open()` is simulated first. `AlreadyOpened` for the slot of the later of the wall clock and the latest block means
+  another caller opened it, and the keeper waits for the next slot. `AlreadyOpened` for an earlier slot means the RPC's
+  latest block is still in the previous slot, so the keeper retries every poll until a block of the new slot lands.
+- A refused `open()` (`InsufficientIdle`, or an oracle revert such as the sealed oracle's `StaleSpot`) logs one warning
+  per slot, `open() refused slot=… error=…`, and is retried every poll. An RPC failure logs `tick failed` and is retried
+  every poll too.
+- Every transaction is sent with `estimate × 1.3 + 30k` gas (swap-sdk's `gasWithHeadroom`), since the oracle's
+  start-of-block read can cost more in the block than at the estimate.
+- Settlement runs before creation, so sweeps recycle budget into the next market.
 - A market that cannot `settle` (oracle history unavailable) is retried every poll; after
   `KEEPER_INVALID_AFTER_SEC` past expiry (default 3601, and never below the hook's `GRACE` + 1, read on start-up) the
   keeper also tries `settleInvalid`.
@@ -103,7 +119,8 @@ Log format (values illustrative):
 ### Sealed-oracle bot
 
 `npm run sealed` (or `script/bots.sh start <network> sealed`) keeps a `SealedPoolOracle`'s history complete. It needs no
-role: the contract verifies every seal and proof, so a faulty bot can stall the oracle but never corrupt it.
+role: the contract verifies every seal and proof, so a faulty bot can stall the oracle but never corrupt it. Its
+settings are `SEALED_ORACLE`, `SEALED_KEY`, `SEALED_BATCH` (16), `SEALED_POLL_MS` (500) and `SEALED_RPC_FALLBACKS`.
 
 - Every `SEALED_POLL_MS` it pokes once per new block, unless `snapshot()` already comes from the latest block. A poke
   that finds the pool untouched since the last one seals every block in between.
@@ -113,10 +130,16 @@ role: the contract verifies every seal and proof, so a faulty bot can stall the 
 - Headers are rebuilt from `eth_getBlockByNumber` (`src/header.ts`, the 21 Isthmus fields) and must hash to the block
   hash before anything is sent. `eth_getProof` of the PoolManager's `slot0` slot (`src/proof.ts`) must start at the
   header's state root. Refusals are retried with backoff, then on `SEALED_RPC_FALLBACKS`.
+- Recovering from an outage proves blocks as old as the outage, so `RPC_URL` or a `SEALED_RPC_FALLBACKS` entry must
+  serve historical `eth_getProof` (an archive node or a wide proof window). Most `mainnet.unichain.org` backends refuse
+  a few dozen blocks back, and publicnode needs an archive plan. On start-up the bot asks every RPC for a proof 300
+  blocks back and warns once, without exiting, when none answers.
 - A block hash comes from `BLOCKHASH` for 256 blocks, then from EIP-2935 for 8,191. Past those, and 32 blocks early to
   leave time to land, it first stores the missing hashes with `checkpointHeaders`, walking back from the oldest block a
   window still serves.
-- Gas is estimated before every transaction; a `proveMany` whose estimate exceeds half the block gas limit is halved.
+- Gas is estimated before every transaction and padded, and no limit exceeds the block's or EIP-7825's 16,777,216 per
+  transaction. A `proveMany` is halved while its estimate fails or exceeds half the block gas limit or 5/6 of that cap,
+  so the padded batch always fits one transaction. A single proof that still fails is retried next round.
 
 ## Seeding the underlying pool
 
@@ -151,8 +174,9 @@ npm test              # unit tests + an anvil end-to-end test
 
 - Unit tests cover the pure parts: `sqrtPriceX96` targets for both orientations against exact-integer vectors,
   inverse and deviation, `PoolId` and the PoolManager storage slot against `cast`, strike rounding at the half-cent,
-  `lnWad` against mpmath, parameter building and names, sweep amounts, config and env parsing, feed parsers
-  with fallback, and (with a fake RPC client) the keeper's retry of failed market reads and failed creations.
+  `lnWad` against mpmath, sweep amounts, config and env parsing, feed parsers with fallback, and (with a fake RPC
+  client) the keeper's retry of failed market reads and creations, its `AlreadyOpened` slot check, gas padding and
+  one warning per refused slot.
 - `test/abi.test.ts` checks the TypeScript ABIs against the forge artifacts of `IPredictionHook`,
   `IUnderlyingOracle`, `PriceSteerer`, `PoolManager`, `ISealedPoolOracle` and `SealedPoolOracle`.
 - `test/header.test.ts` rebuilds the Task 6 fixture header offline and, unless `OFFLINE=1`, 5 recent Unichain mainnet
@@ -163,8 +187,9 @@ npm test              # unit tests + an anvil end-to-end test
 - `test/anvil.test.ts` starts anvil, deploys the real `PoolManager`, `DemoToken` and `PriceSteerer`, and runs the
   mirror in both token orderings through a pool hooked by `test/demo/mocks/MockSobHook.sol` (oracle flags, CREATE2-mined
   address), including the `poolKey()` lookup, a pinned-key mismatch and the gas padding. It then drives the keeper
-  against `test/demo/mocks/MockPredictionHook.sol`: create, a struct round-trip through Solidity, settle, sweep, the
-  invalid fallback, the budget guard, `GRACE` and dry runs without a key.
+  through the real `MarketScheduler` owning `test/demo/mocks/MockPredictionHook.sol`: `open()` and the market it
+  builds, padded gas, settle, sweep, the invalid fallback, `InsufficientIdle` (one warning per slot), `GRACE` and dry
+  runs without a key.
 - `test/demo/PriceSteererHooked.t.sol` (Foundry) steers through the mock hook and, when
   `src/oracle/UnderlyingOracleHook.sol` is in the build, through the real oracle: `lnSpotSoBWad` in the next block
   matches the target price in both orderings, and the gas padding covers the first-in-block write.
