@@ -274,7 +274,7 @@
 .app-header .header-menu { border-radius: 8px; background: #121722; color: #c5cce0; }
 .app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 3px; }
 @media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 38px; } .app-header-nav { gap: 26px; } }
-@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 24px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
+@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 28px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
 
 @media (max-width: 380px) { .app-header .header-wallet { font-size: 10px; padding: 0 8px; gap: 6px; } .app-header .wallet-chevron { display: none; } .app-header .wallet-address { max-width: 70px; overflow: hidden; text-overflow: ellipsis; } }
 
