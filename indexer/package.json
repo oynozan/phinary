@@ -14,10 +14,12 @@
     "db": "ponder db",
     "codegen": "ponder codegen",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "patch-package --error-on-fail"
   },
   "dependencies": {
     "hono": "4.13.9",
+    "patch-package": "8.0.1",
     "ponder": "0.17.12",
     "viem": "2.49.0"
   },

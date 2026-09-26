@@ -15,7 +15,7 @@ export function TradesPanel({ market }: { market: Market }) {
     return <section className="detail-panel detail-trades" aria-labelledby="trades-heading"><h2 id="trades-heading">Recent Trades</h2>
         {trades.isLoading ? <p className="detail-empty">Loading trades…</p> : trades.error ? <p className="detail-empty">{trades.error.message === "Not connected yet" ? "Trade history unavailable" : "Unable to load trade history"}</p> : !list.length ? <p className="detail-empty">No trades yet.</p> : <Table><TableHeader><TableRow>{["Time", "Wallet", "Side / Action", "Amount", "Price", "Value (USDC)"].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader><TableBody>{shown.map((t) => <TableRow key={t.id}>
             <TableCell><a href={`${blockExplorer}/tx/${t.txHash}`} target="_blank" rel="noreferrer">{now === null ? "N/A" : formatAgo(t.time, now)}</a></TableCell>
-            <TableCell><a href={`${blockExplorer}/address/${t.account}`} target="_blank" rel="noreferrer">{shortAddress(t.account)}</a></TableCell>
+            <TableCell><a href={`${blockExplorer}/address/${t.account}`} target="_blank" rel="noreferrer">{shortAddress(t.account)}</a>{t.attributedBy === 'txFrom' && <span> (sender)</span>}</TableCell>
             <TableCell className={t.side === "up" ? "detail-up" : "detail-down"}>{t.kind === "claim" ? "Claimed" : t.isBuy ? "Bought" : "Sold"} {t.side.toUpperCase()}</TableCell>
             <TableCell>{formatTokens(t.qty)}</TableCell><TableCell>{formatCents(t.price, 1)}</TableCell><TableCell>{formatUsd(t.usdc)}</TableCell>
         </TableRow>)}</TableBody></Table>}

@@ -23,7 +23,7 @@ type DeploymentJson = {
 const readDeployment = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as DeploymentJson
 
 describe('loadIndexerDeployment', () => {
-  it('defaults to unichain-sepolia and parses its file field by field, deployBlock as the snapshot start', () => {
+  it('defaults to unichain-sepolia and parses its file field by field, with safe snapshot initialization', () => {
     // Read the committed file rather than freezing values that change on every redeploy
     const file = readDeployment(sepoliaDeploymentPath)
     const deployment = loadIndexerDeployment({})
@@ -36,7 +36,7 @@ describe('loadIndexerDeployment', () => {
       oracle: file.underlyingOracle,
       poolManager: file.poolManager,
       deployBlock: file.deployBlock,
-      snapshotStartBlock: file.deployBlock,
+      snapshotStartBlock: Math.max(file.deployBlock, 63569470),
       marketScheduler: file.marketScheduler,
       legacyPredictionHooks: file.legacyPredictionHooks ?? [],
     })
@@ -54,6 +54,10 @@ describe('loadIndexerDeployment', () => {
       expect(isAddress(legacy)).toBe(true)
       expect(legacy.toLowerCase()).not.toBe(deployment.hook.toLowerCase())
     }
+  })
+
+  it.each(['63569270', '-1', 'NaN', '63569470.5', '9007199254740992'])('rejects invalid snapshot start %s', value => {
+    expect(() => loadIndexerDeployment({ SNAPSHOT_START_BLOCK: value })).toThrow('SNAPSHOT_START_BLOCK')
   })
 
   it('honors SNAPSHOT_START_BLOCK when set', () => {

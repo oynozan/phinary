@@ -9,6 +9,8 @@ import { phaseOf, tabOf, type MarketTab } from "@/lib/phase";
 import type { ActivityItem, LeaderboardEntry, Market, Portfolio, PricePoint, Query, Quote, Trade, VaultState, WalletState } from "@/lib/types";
 import { syncChainClock, useNow } from "./clock";
 import { createResource } from "./resource";
+import { useHistory } from "../indexer/use-history";
+import { withHistory } from "../indexer/client";
 
 export const TRADING_ENABLED = true;
 const unsupported = async (): Promise<never> => { throw new Error("This action is not connected yet"); };
@@ -49,9 +51,10 @@ export function useMarkets(tab?: MarketTab): Query<Market[]> {
 }
 export function useMarket(id: number): Query<Market | null> {
     const query = useSnapshot(id);
+    const history = useHistory(id);
     const now = useNow();
     if (!query.data || now === null) return { ...query, data: undefined };
-    return ready(query.data.markets[0] ? current(query.data.markets[0], now) : null);
+    return ready(query.data.markets[0] ? withHistory(current(query.data.markets[0], now), history.data) : null);
 }
 export function useLiveMarketId(exclude?: number): Query<number | null> {
     const query = useMarkets();
@@ -61,14 +64,13 @@ export function useQuote(id: number): Query<Quote | null> {
     const query = useMarket(id);
     return { ...query, data: query.data ? query.data.quote : query.data };
 }
-export function useEthPrice(): Query<{ price: number; sigma: number }> {
+export function useEthPrice(): Query<NonNullable<MarketSnapshot["eth"]>> {
     const query = useSnapshot();
     return { ...query, data: query.data?.eth, error: query.error ?? (query.data && !query.data.eth ? new Error("ETH price unavailable") : undefined) };
 }
 
-// History and wallet-backed features remain explicitly unavailable until their integration phases.
-export function usePriceHistory(_id: number): Query<PricePoint[]> { return unavailable(); }
-export function useMarketTrades(_id: number): Query<Trade[]> { return unavailable(); }
+export function usePriceHistory(id: number): Query<PricePoint[]> { const query = useHistory(id); return { ...query, data: query.data?.prices }; }
+export function useMarketTrades(id: number): Query<Trade[]> { const query = useHistory(id); return { ...query, data: query.data?.trades }; }
 export function usePortfolio(): Query<Portfolio | null> { return ready(null); }
 export function useActivity(_limit = 60): Query<ActivityItem[]> { return unavailable(); }
 export function useLeaderboard(_limit = 20): Query<LeaderboardEntry[]> { return unavailable(); }

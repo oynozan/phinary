@@ -47,8 +47,8 @@ export function sumKnown(values: (number | null)[]): number | null {
 export function portfolioTotals(display: PortfolioDisplay) {
     if (display.availability !== "ready") return { total: null, unrealized: null, realized: null, openCount: null, claimable: null };
     const { open, claimable } = partitionPortfolio(display.rows);
-    const claimableValue = sumKnown(claimable.map((r) => r.value));
-    return { total: sumKnown([...open, ...claimable].map((r) => r.value)), unrealized: sumKnown(open.map((r) => r.profit)), realized: display.realized, openCount: open.length, claimable: claimableValue };
+    const claimableValue = claimPlan(claimable).amount;
+    return { total: sumKnown([...open.map((r) => r.value), claimableValue]), unrealized: sumKnown(open.map((r) => r.profit)), realized: display.realized, openCount: open.length, claimable: claimableValue };
 }
 export function claimPlan(rows: PortfolioRow[]) {
     const candidates = partitionPortfolio(rows).claimable;

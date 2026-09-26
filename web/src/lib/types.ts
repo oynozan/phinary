@@ -102,6 +102,8 @@ export interface PricePoint {
 }
 
 export interface Trade {
+    /** txFrom is the transaction sender, not a confirmed token recipient. */
+    attributedBy?: 'transfer' | 'txFrom';
     id: string;
     /** "claim" is a redeem after resolution, recorded as a sale at the payout price */
     kind: "trade" | "claim";

@@ -12,12 +12,15 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --import tsx --test test/*.test.mts",
     "test:buy:fork": "node --import tsx scripts/test-buy-fork.mts",
+    "test:trading:scheduler:fork": "node --import tsx scripts/test-trading-scheduler-fork.mts",
     "preview:portfolio": "node --import tsx scripts/preview-portfolio.mts",
     "preview:activity": "node --import tsx scripts/preview-activity.mts",
     "preview:vault": "node --import tsx scripts/preview-vault.mts",
     "test:vault:fork": "node --import tsx scripts/test-vault-fork.mts",
     "test:lifecycle:fork": "node --import tsx scripts/test-lifecycle-fork.mts",
-    "test:browser:fork": "node --import tsx scripts/test-browser-fork.mjs"
+    "test:browser:fork": "node --import tsx scripts/test-browser-fork.mjs",
+    "test:indexer:browser": "node scripts/test-indexer-browser.mjs",
+    "test:integration:fork": "PHINARY_INDEXER_E2E=1 node --import tsx scripts/test-browser-fork.mjs"
   },
   "dependencies": {
     "@paper-design/shaders": "^0.0.81",

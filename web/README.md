@@ -42,9 +42,12 @@ credential. No wallet private key is required. This phase targets the recorded
 Sepolia deployment, not a separately deployed local fork. Chain ID 1301 alone
 cannot identify a fork; local deployments require their own address configuration.
 
-The check validates chain ID, bytecode at all eight configured addresses, the
-hook's collateral address, USDC decimals, and SDK reads of the latest three
-markets. A positive market count without a readable latest market is an error.
+The check validates chain ID, bytecode at all nine configured addresses (including
+MarketScheduler), the hook's collateral address and USDC decimals. It verifies
+Hook.owner is the scheduler, Hook.keeper is zero, and the scheduler's hook/oracle
+references match the deployment. It uses the dashboard's market reader for the
+latest 30 markets and reports the latest three, all at one pinned block.
+Unreadable market info or parameters are errors; unavailable quotes are reported separately.
 No tradable market produces a warning: it does not mean the read connection is
 broken. Success is not proof of bytecode identity, wallet connectivity, swap
 execution, or continued bot health. Those are checked in subsequent phases.
@@ -52,6 +55,23 @@ execution, or continued bot health. Those are checked in subsequent phases.
 CLI failures exit nonzero. RPC error request details are deliberately omitted
 because providers can include credentials in their URLs. The report contains
 only contract addresses, market data and block information.
+
+The oracle ABI preserves both outputs of `varianceE36()`: variance and `warm`.
+The diagnostic reports fallback variance (`warm=false`) as a warning, without
+disabling trades that the contract permits. `canOpen=false` can simply mean the
+current scheduler slot was already opened; it is not a connection failure.
+
+Read-only browser verification (requires installed Chrome and a running dev server):
+
+```sh
+PHINARY_DEV_URL=http://127.0.0.1:3101 node scripts/test-market-reads-browser.mjs
+```
+
+This checks live market reads, an older direct link, missing-market handling,
+RPC failure and Retry recovery. Screenshots go to ignored `.review/phase2/`.
+It does not connect a wallet or submit transactions. See
+[`../docs/md/FRONTEND-INTEGRATION.md`](../docs/md/FRONTEND-INTEGRATION.md)
+for the current integration phases (separate from the historical phases below).
 
 The `.npmrc` setting copies the local `file:` SDK into `node_modules` so its
 dependencies resolve inside `web/`. If the
@@ -127,23 +147,65 @@ Browser quote rendering and the disconnected wallet dialog were checked locally;
 actual extension signature prompts and public Sepolia submission still need a
 manual end-to-end check with your test wallet.
 
-## Activity: live indexed history
+## Indexed market history and Activity
 
-Activity consumes a separately supplied `GET /activity` service. Set server-only
-`PHINARY_INDEXER_URL` to its base URL; local development defaults to
-`http://127.0.0.1:42069`. The endpoint must return
-`{ version: 1, chainId, hook, indexedBlock, sourceEvents, snapshot }`, with the
-snapshot validated by `src/lib/activity/client.ts`. Credentials stay on the server.
+The frontend's Next.js routes adapt the repository's existing Ponder `/graphql`
+API. Set server-only `PHINARY_INDEXER_URL` to the indexer's base URL; development
+otherwise uses `http://127.0.0.1:42069`. No separate `/activity` service is needed.
+The browser calls `/api/activity` and `/api/markets/:id/history` on the frontend.
+Upstream URLs and credentials stay on the server.
 
-**Integration dependency:** the indexer currently committed on `main` exposes
-`/sql/*` and `/graphql`, not `/activity`. The compatible service used for local
-verification is separate and is not included or modified by this frontend PR.
-Starting the main indexer alone does not satisfy this dependency. Until a compatible
-service is supplied, Activity shows unavailable; wallet execution and Vault remain usable.
+Market detail shares one history request across its chart, trades and indexed
+metadata (volume, trade count, creation time). It polls every ten seconds.
+Charts use warm-oracle samples before the trading cutoff; zero-valued cutoff
+sentinels are excluded. RPC remains authoritative for quotes, balances and
+settlement state. Home-page market aggregates are not yet connected.
 
-The last-hour summary, newest 12 events and top 10 traders share one snapshot.
-The browser refreshes every five seconds and retains the last good snapshot on
-failure. Missing accounting shows N/A. UI-only samples use `npm run preview:activity`.
+Activity refreshes every five seconds. It fetches all trade pages in the last two
+hours, computes the current hour and previous-hour comparison, and displays the
+newest twelve Buy/Sell events. Hourly realized profit, win rate, rankings and claim
+payout history remain unavailable because the current schema cannot establish them.
+Accounts attributed only by transaction sender are labelled `(sender)`.
+
+The adapter checks `/ready`, chain ID, indexed block time, and the first market's
+UP/DOWN addresses against the configured Hook over RPC. More than 60 seconds of
+indexing lag fails visibly. Pagination errors, duplicate rows and the 20-page cap
+fail the entire request rather than presenting partial totals as complete. Activity
+retains its last good snapshot as paused; market history becomes unavailable on
+failure. Neither blocks wallet execution or Vault actions.
+
+For local validation, run the existing indexer from `indexer/`:
+
+```sh
+SNAPSHOT_START_BLOCK=63569470 npm run dev -- --port 42070 --disable-ui
+```
+
+At the default snapshot start, `navMinus` returned empty data during validation.
+Using the existing `SNAPSHOT_START_BLOCK` option allowed backfill to proceed
+without changing backend code or the start of trade-event indexing.
+Backfilling snapshots through a public RPC can be slow. Choosing a later snapshot
+start speeds a smoke test but only provides price history from that block onward;
+it must not be described as full historical chart coverage.
+
+The Phase 5 stop at block 63575170 was traced to Ponder's empty-response cache.
+The approved indexer patch now bypasses those entries and retries RPC reads;
+`indexer` installs it automatically through `npm ci`. See
+[`INDEXER-VAULT-INVESTIGATION.md`](../docs/md/INDEXER-VAULT-INVESTIGATION.md).
+The current deployment also defaults to a safe snapshot start, so the explicit
+`SNAPSHOT_START_BLOCK=63569470` above is optional.
+
+Start the frontend with `PHINARY_INDEXER_URL=http://127.0.0.1:42070`, then verify a
+market that has snapshots:
+
+```sh
+PHINARY_DEV_URL=http://127.0.0.1:3112 PHINARY_HISTORY_MARKET_ID=90 npm run test:indexer:browser
+```
+
+The read-only browser test checks real history, desktop/mobile rendering, shared
+polling, history failure with RPC still available, and automatic recovery. Choose
+a market ID covered by your indexer's snapshot range. Unit tests cover nonempty
+trades and multipage totals; the public deployment had zero trades during Phase 5
+validation. UI-only samples remain available with `npm run preview:activity`.
 
 ## Frontend v1.0
 
@@ -151,7 +213,7 @@ UP/DOWN exact-input purchases and sales use the existing SDK, Permit2 and Univer
 
 Winning balances redeem through `redeem`; invalid markets combine UP and DOWN balances before the contract floors the half payout. Claim All submits sequentially and stops on a failure or unknown outcome, preserving successful claims. Pending receipts persist across reloads. A shared in-page operation guard prevents concurrent market/Portfolio/Vault submissions and blocks new submissions while a stored transaction awaits confirmation. Wallet extension prompts on public Sepolia are not part of the automated acceptance test.
 
-Current holdings come from RPC. Complete transaction history, historical acquisition costs and P&L are unavailable in this release and remain N/A. Activity uses the separately supplied indexer API; that backend is not included in this frontend PR. Set server-only `PHINARY_INDEXER_URL` to an existing compatible service. Local development assumes port 42069. Missing service shows an unavailable state and does not prevent trading or Vault actions.
+Current holdings come from RPC. Portfolio transaction history, historical acquisition costs and P&L remain unavailable. Market Buy/Sell history and Activity use the repository indexer through the frontend adapter described above. Missing history does not prevent trading or Vault actions.
 
 Validation commands:
 
@@ -165,3 +227,84 @@ npm run test:browser:fork
 ```
 
 The lifecycle fixture starts loopback Anvil at deployment block + 200, funds a generated test-only account, and creates an isolated test market with a deterministic test oracle. All modifications occur on the disposable fork, never public Sepolia. Existing deployed contracts and SDK sources are unchanged. Anvil must be installed or supplied with `ANVIL_BIN`.
+
+## Scheduler deployment: trading verification
+
+```sh
+npm run test:trading:scheduler:fork
+npm run test:browser:fork
+```
+
+The first test opens a market through the deployed Scheduler on a local fork,
+using its real oracle and an ordinary generated trader account. It checks UP/DOWN
+purchases, partial/full sales, minimum outputs, exact balance deltas, insufficient
+balance, stale quotes, account mismatch, Permit2 signature rejection and cutoff.
+It explicitly uses 10% slippage for short-dated test markets; the UI default is unchanged.
+
+The pinned new deployment predates LP funding. Both fixture modes now fund a
+separate local LP and call the existing USDC approval and Hook.deposit paths
+before market creation. Only local ETH/USDC balances are supplied through Anvil;
+the Hook's storage is not patched to manufacture liquidity.
+
+The browser suite retains the isolated long-lived market and test oracle so UI
+timing, pending reload and settlement checks are repeatable. It asserts token and
+USDC deltas for each trade, no balance changes on wallet rejection, and no extra
+submission during receipt recovery. It also checks wrong-network/account changes.
+This is an injected test EIP-1193 wallet, not validation of an installed wallet
+extension. No test sends transactions to public Sepolia.
+
+## Holdings, claims and Vault boundaries
+
+`npm run test:lifecycle:fork` also verifies winning redemption, refusal of repeat
+claims, and post-claim holdings. Invalid-market cases use ordinary token transfers
+to leave 3 raw units on each side: the combined refund is 3 USDC raw units, not 2.
+A single raw unit is excluded from Claim All and cannot submit a redemption.
+Portfolio totals use the same per-market integer rounding as the claim plan.
+
+Vault checks compare minted shares and withdrawn USDC with frontend integer
+estimates and actual balances. A local market reserves nearly all idle collateral
+to verify the exact maximum withdrawal against contract simulation: the maximum
+succeeds and one additional raw share fails. All state changes stay on Anvil.
+
+## Phase 6: browser, chain and indexer integration
+
+Use Node 24, Anvil and installed Chrome. Install the existing dependencies in
+`packages/swap-sdk/`, `indexer/` and `web/` with `npm ci` first; the indexer install
+must report that its Ponder patch applied successfully. From `web/`:
+
+```sh
+npm run test:integration:fork
+npm run test:trading:scheduler:fork
+```
+
+`test:integration:fork` extends the browser fork suite with an actual Ponder
+instance. It creates a temporary source copy and fresh PGlite database, excludes
+shared database environment variables, and uses a loopback-only Anvil RPC with
+random test accounts. It starts Next on 3111 and Ponder on 42071; keep those ports
+free. It stops only its own processes when finished. No public-chain transaction
+is sent, and no existing database is opened.
+
+The suite compares browser UP/DOWN buys and sells with exact wallet balance
+deltas, indexed quantities/USDC and successful transaction receipts. It checks
+market history and Activity in the browser, then stops and restarts Ponder to
+verify delayed updates and recovery without duplicate trade rows. It also covers
+wallet rejection, pending-approval reload without resubmission, chain/account
+switches, Vault event amounts, winning redemption, and a second market's creation
+and settlement. The existing responsive checks cover five routes at three widths.
+
+This browser fixture uses a local test oracle and owner impersonation to make
+settlement deterministic. The separate scheduler suite uses the deployed scheduler
+and real oracle on another local fork. Neither modifies contract source or the
+public deployment. Wallet signatures use a test EIP-1193 bridge, not a browser
+extension's actual permission/signature dialogs.
+
+The integrated fixture starts near wall-clock time so history freshness checks
+remain enabled. Settlement then advances the fork by a day; the post-settlement
+checks use RPC, the claim UI and raw GraphQL. The wall-clock Activity check occurs
+before that jump; future-dated snapshots correctly cease to be presented as live.
+Claims and hourly realized P&L remain outside Activity's supported schema.
+
+Indexer logs are saved in `.review/phase6/indexer.log`; route screenshots are in
+`.review/v1/`. Temporary databases remain in the OS temporary directory for
+failure inspection. A successful local run does not replace a separate, explicitly
+authorized testnet check with a real wallet extension or long-duration monitoring.
