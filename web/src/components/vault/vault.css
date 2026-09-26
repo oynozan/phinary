@@ -22,3 +22,12 @@ body:has(.vault-page) {
 }
 body:has(.vault-page)::before { display: none; }
 .vault-page { background: transparent; }
+
+.vault-connect { max-width: 640px; margin: 24px auto 40px; padding: 40px 28px; border: 1px solid var(--vault-line); border-radius: 12px; background: #0d111a; text-align: center; }
+.vault-connect h2 { margin: 0 0 12px; font-family: inherit; font-size: clamp(24px, 4vw, 30px); font-weight: 750; letter-spacing: -.025em; line-height: 1.25; }
+.vault-connect > p { max-width: 420px; margin: 0 auto 24px; color: var(--vault-muted); font-size: 16px; line-height: 1.5; }
+.vault-connect .vault-primary { width: auto; min-height: 44px; padding: 10px 24px; border-radius: 8px; }
+.vault-connect > a { display: flex; width: fit-content; align-items: center; min-height: 44px; margin: 12px auto 0; color: var(--vault-muted); font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
+.vault-connect > a:hover { color: #f5f3fa; }
+.vault-connect > [role=status] { margin-top: 16px; font-size: 14px; }
+@media (max-width: 639px) { .vault-connect { margin: 20px auto; padding: 28px 20px; } }
