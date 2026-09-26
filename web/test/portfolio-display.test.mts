@@ -55,3 +55,13 @@ test('invalid dust is excluded from Claim All unless combined sides produce a no
  assert.deepEqual(combined.marketIds, [100]); assert.equal(combined.amount, .000001);
  assert.deepEqual(claimPlan([invalid, rows[4]]).marketIds, [5]);
 });
+
+test('portfolio totals round invalid refunds per market after combining both sides', () => {
+ const invalid = { ...rows[5], marketId: 100, phase: 'invalid' as const, quantity: 3n, value: .0000015 };
+ const totals = (items: typeof rows) => portfolioTotals({ availability: 'ready', rows: items, realized: null });
+ assert.equal(totals([invalid]).claimable, .000001);
+ assert.equal(totals([invalid]).total, .000001);
+ assert.equal(totals([invalid, { ...invalid, id: '100:up', side: 'up' }]).claimable, .000003);
+ assert.equal(totals([invalid, { ...invalid, marketId: 101 }]).claimable, .000002);
+ assert.equal(totals([{ ...invalid, quantity: 1n, value: .0000005 }]).total, 0);
+});

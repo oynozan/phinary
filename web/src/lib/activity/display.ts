@@ -1,5 +1,6 @@
 /** Activity display inputs, not an indexer or public API contract. */
 export interface ActivityEvent {
+    attributedBy?: 'transfer' | 'txFrom';
     id: string;
     timestamp: number;
     account: string;

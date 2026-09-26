@@ -24,7 +24,7 @@ export function oracleCode(tick = 81000): Hex {
     });
     return `0x60003560e01c${branches.join('')}60006000fd${bodies.map(b => `5b50${b}`).join('')}` as Hex;
 }
-export async function startFixture() {
+export async function startFixture(options: { marketSource?: 'isolated' | 'scheduler'; wallClock?: boolean } = {}) {
     const binary = process.env.ANVIL_BIN || [`${homedir()}/.foundry/bin/anvil`, '/opt/homebrew/bin/anvil', '/private/tmp/phinary-test-tools/node_modules/@foundry-rs/anvil-darwin-arm64/bin/anvil'].find(existsSync) || 'anvil';
     const port = await new Promise<number>((resolve, reject) => { const server = createServer(); server.once('error', reject); server.listen(0, '127.0.0.1', () => { const address = server.address(); if (!address || typeof address === 'string') return reject(Error('No port')); server.close(() => resolve(address.port)); }); });
     const original = getConnectionConfig();
@@ -37,6 +37,7 @@ export async function startFixture() {
         for (let i = 0; i < 80; i++) { if (startError) throw startError; try { await rpc('eth_chainId'); ready = true; break; } catch { await new Promise(r => setTimeout(r, 250)); } }
         assert.ok(ready, 'Anvil failed to start');
         assert.match(await rpc('web3_clientVersion'), /anvil/i);
+        if (options.wallClock) await rpc('evm_setNextBlockTimestamp', [Math.floor(Date.now() / 1000)]);
         const config = { ...original, rpcUrl };
         const client = createPublicClient({ chain: unichainSepolia, transport: http(rpcUrl), pollingInterval: 100, cacheTime: 0 });
         const account = privateKeyToAccount(generatePrivateKey());
@@ -45,6 +46,34 @@ export async function startFixture() {
         const slot = keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [account.address, 9n]));
         await rpc('anvil_setStorageAt', [config.usdc, slot, pad(numberToHex(1000_000000n), { size: 32 })]);
         assert.equal(await client.readContract({ address: config.usdc, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }), 1000_000000n);
+        // The new deployment's pinned block predates LP funding. Seed through the normal
+        // deposit path with a separate local-only LP; never patch the hook's storage.
+        const lp = privateKeyToAccount(generatePrivateKey());
+        const lpWallet = createWalletClient({ account: lp, chain: unichainSepolia, transport: http(rpcUrl) });
+        await rpc('anvil_setBalance', [lp.address, numberToHex(10n ** 20n)]);
+        const lpSlot = keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [lp.address, 9n]));
+        await rpc('anvil_setStorageAt', [config.usdc, lpSlot, pad(numberToHex(100_000000n), { size: 32 })]);
+        const approval = await lpWallet.writeContract({ address: config.usdc, abi: erc20Abi, functionName: 'approve', args: [config.predictionHook, 100_000000n] });
+        assert.equal((await client.waitForTransactionReceipt({ hash: approval })).status, 'success');
+        const deposit = await lpWallet.writeContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'deposit', args: [100_000000n] });
+        assert.equal((await client.waitForTransactionReceipt({ hash: deposit })).status, 'success');
+        if (options.marketSource === 'scheduler') {
+            // Exercise the deployed scheduler and real oracle. No impersonation or code replacement.
+            const scheduler = config.marketScheduler;
+            assert.ok(scheduler, 'Deployment must define MarketScheduler');
+            const abi = parseAbi(['function open() returns (uint256)', 'function nextOpenTime() view returns (uint256)']);
+            const next = await client.readContract({ address: scheduler, abi, functionName: 'nextOpenTime' });
+            const now = (await client.getBlock()).timestamp;
+            await rpc('evm_setNextBlockTimestamp', [Number(next > now ? next : now + 1n)]);
+            const before = await client.readContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'marketCount' });
+            const opened = await wallet.writeContract({ address: scheduler, abi, functionName: 'open', gas: 5_000_000n });
+            assert.equal((await client.waitForTransactionReceipt({ hash: opened })).status, 'success');
+            const count = await client.readContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'marketCount' });
+            assert.equal(count, before + 1n);
+            const info = await client.readContract({ address: config.predictionHook, abi: predictionHookAbi, functionName: 'marketInfo', args: [count] });
+            assert.equal(info.oracle.toLowerCase(), config.underlyingOracle.toLowerCase());
+            return { rpc, rpcUrl, config, client, wallet, account, marketId: Number(count), expiry: Number(info.expiry), oracle: info.oracle, stop: () => fork.kill('SIGTERM') };
+        }
         const owner = await client.readContract({ address: config.predictionHook, abi: parseAbi(['function owner() view returns (address)']), functionName: 'owner' });
         await rpc('anvil_impersonateAccount', [owner]); await rpc('anvil_setBalance', [owner, numberToHex(10n ** 20n)]);
         const oracle: Address = '0x0000000000000000000000000000000000001234';

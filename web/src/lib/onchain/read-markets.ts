@@ -1,27 +1,21 @@
 import { predictionHookAbi, type HookQuote, type MarketInfo as ChainMarketInfo } from "@phinary/swap-sdk";
-import { parseAbi } from "viem";
 import { createChainClient } from "./client.ts";
 import { getConnectionConfig } from "./config.ts";
 import { toMarket } from "./market-adapter.ts";
 import type { Market } from "../types.ts";
+import { underlyingOracleAbi } from "./read-abis.ts";
 
 export const MARKET_LIMIT = 30;
-const oracleAbi = parseAbi([
-    "function lnSpotSoBWad() view returns (int256)",
-    "function varianceE36() view returns (uint256)",
-]);
 export interface MarketSnapshot {
     markets: Market[];
     timestamp: number;
     blockNumber: bigint;
     count: number;
-    eth?: { price: number; sigma: number };
+    eth?: { price: number; sigma: number; warm: boolean };
 }
 
 /** All values in a snapshot are pinned to one block. Errors never become an empty market list. */
-export async function readMarkets(id?: number): Promise<MarketSnapshot> {
-    const config = getConnectionConfig();
-    const client = createChainClient(config);
+export async function readMarkets(id?: number, client = createChainClient(), config = getConnectionConfig()): Promise<MarketSnapshot> {
     const [chainId, block] = await Promise.all([client.getChainId(), client.getBlock()]);
     if (chainId !== config.chainId) throw new Error("Wrong network returned by RPC");
     const count = await client.readContract({
@@ -43,8 +37,8 @@ export async function readMarkets(id?: number): Promise<MarketSnapshot> {
         }) : [],
         client.multicall({
             contracts: [
-                { address: config.underlyingOracle, abi: oracleAbi, functionName: "lnSpotSoBWad" },
-                { address: config.underlyingOracle, abi: oracleAbi, functionName: "varianceE36" },
+                { address: config.underlyingOracle, abi: underlyingOracleAbi, functionName: "lnSpotSoBWad" },
+                { address: config.underlyingOracle, abi: underlyingOracleAbi, functionName: "varianceE36" },
             ],
             blockNumber: block.number, multicallAddress: config.multicall3, allowFailure: true,
         }),
@@ -62,7 +56,9 @@ export async function readMarkets(id?: number): Promise<MarketSnapshot> {
     return {
         markets, timestamp, blockNumber: block.number, count: total,
         eth: oracle[0].status === "success" && oracle[1].status === "success" ? {
-            price: Math.exp(Number(oracle[0].result) / 1e18), sigma: Math.sqrt(Number(oracle[1].result) / 1e36 * 31557600),
+            price: Math.exp(Number(oracle[0].result) / 1e18),
+            sigma: Math.sqrt(Number(oracle[1].result[0]) / 1e36 * 31557600),
+            warm: oracle[1].result[1],
         } : undefined,
     };
 }

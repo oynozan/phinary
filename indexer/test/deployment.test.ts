@@ -8,12 +8,16 @@ const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const localDeploymentPath = path.join(repoRoot, 'deployments', 'local.json')
 
 describe('loadIndexerDeployment', () => {
-  it('defaults to unichain-sepolia with deployBlock as the snapshot start', () => {
+  it('keeps event indexing at deployBlock but starts snapshots after initialization', () => {
     const deployment = loadIndexerDeployment({})
 
     expect(deployment.chainId).toBe(1301)
-    expect(deployment.deployBlock).toBe(63521900)
-    expect(deployment.snapshotStartBlock).toBe(deployment.deployBlock)
+    expect(deployment.deployBlock).toBe(63569270)
+    expect(deployment.snapshotStartBlock).toBe(63569470)
+  })
+
+  it.each(['63569270', '-1', 'NaN', '63569470.5', '9007199254740992'])('rejects invalid snapshot start %s', value => {
+    expect(() => loadIndexerDeployment({ SNAPSHOT_START_BLOCK: value })).toThrow('SNAPSHOT_START_BLOCK')
   })
 
   it('honors SNAPSHOT_START_BLOCK when set', () => {
@@ -40,11 +44,11 @@ describe('loadIndexerDeployment', () => {
     expect(deployment.legacyPredictionHooks).toEqual(file.legacyPredictionHooks ?? [])
   })
 
-  it('defaults marketScheduler to undefined and legacyPredictionHooks to [] for a file without them', () => {
+  it('preserves the configured scheduler and legacy Hook registry', () => {
     const deployment = loadIndexerDeployment({})
 
-    expect(deployment.marketScheduler).toBeUndefined()
-    expect(deployment.legacyPredictionHooks).toEqual([])
+    expect(deployment.marketScheduler).toBe('0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd')
+    expect(deployment.legacyPredictionHooks).toEqual(['0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8'])
   })
 
   it('overrides the RPC URL with PONDER_RPC_URL_1301', () => {

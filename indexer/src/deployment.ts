@@ -50,7 +50,15 @@ export function loadIndexerDeployment(env: Record<string, string | undefined>): 
 
   const rpcUrl = env.PONDER_RPC_URL_1301 ?? file.rpcUrl
   const deployBlock = file.deployBlock
-  const snapshotStartBlock = env.SNAPSHOT_START_BLOCK ? Number(env.SNAPSHOT_START_BLOCK) : deployBlock
+  // This Hook was deployed after the deployment run's first block. Keep event
+  // indexing at deployBlock, but start state reads after the contracts were initialized.
+  const snapshotFloor = network === 'unichain-sepolia' &&
+    file.predictionHook.toLowerCase() === '0xe6780bbeaee4183ffd8ebe0d2862ded221b96aa8'
+    ? Math.max(deployBlock, 63569470) : deployBlock
+  const snapshotStartBlock = env.SNAPSHOT_START_BLOCK ? Number(env.SNAPSHOT_START_BLOCK) : snapshotFloor
+  if (!Number.isSafeInteger(snapshotStartBlock) || snapshotStartBlock < snapshotFloor) {
+    throw new Error(`SNAPSHOT_START_BLOCK must be an integer >= ${snapshotFloor}`)
+  }
 
   return {
     chainId: file.chainId,
