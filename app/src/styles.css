@@ -460,6 +460,22 @@ a:hover {
   overflow-y: auto;
 }
 
+.track-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-3);
+}
+
+.track-tabs .tab {
+  flex: 1 0 auto;
+  padding: 6px 2px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 @media (max-width: 1180px) {
   .markets-scroll {
     max-height: none;

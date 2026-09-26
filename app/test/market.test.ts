@@ -7,8 +7,10 @@ import {
   groupMarkets,
   marketPhase,
   questionText,
+  sameTrack,
   sigmaAnnual,
   strikeOf,
+  trackName,
   windowStartOf,
   withInfo,
 } from '../src/market.ts'
@@ -102,6 +104,19 @@ describe('display math', () => {
   it('recovers a whole-cent strike and formats the question', () => {
     assert.equal(strikeOf(info()), 2701.35)
     assert.equal(questionText(2701.35, '14:31:00'), 'ETH above $2,701.35 at 14:31:00?')
+    assert.equal(questionText(151.2, '14:45:00', 'SOL'), 'SOL above $151.20 at 14:45:00?')
+  })
+  it('names a market by its asset and track', () => {
+    const t1 = { scheduler: '0x8f1b371e41FeCBb825d0baAB19f906E645C760e0', label: '1m' }
+    const t15 = { scheduler: '0x02f0B250120c817A45C6ba580FE68eB461E0A10e', label: '15m' }
+    const m1 = { asset: 'ETH', track: t1 as never }
+    const m15 = { asset: 'ETH', track: t15 as never }
+    assert.equal(trackName(m15), 'ETH 15m')
+    assert.equal(trackName({ asset: 'SOL' }), 'SOL')
+    assert.equal(sameTrack(m1, m15), false)
+    assert.equal(sameTrack(m1, { ...m1 }), true)
+    assert.equal(sameTrack({ asset: 'ETH' }, { asset: 'ETH' }), true)
+    assert.equal(sameTrack({ asset: 'ETH' }, m1), false)
   })
   it('annualises per-second variance at 1e36', () => {
     const varE36 = (36n * 10n ** 34n) / 31_557_600n

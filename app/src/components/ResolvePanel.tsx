@@ -2,8 +2,7 @@ import { useState } from 'react'
 import type { AppConfig } from '../config.ts'
 import type { LiveState } from '../data.ts'
 import { formatClock, formatToken, formatUsd, parseAmount, toInputString } from '../format.ts'
-import { type Phase, strikeOf, windowStartOf } from '../market.ts'
-import type { Market } from '../sdk.ts'
+import { type AppMarket, type Phase, strikeOf, windowStartOf } from '../market.ts'
 import { describeError, type ExecContext, executeRedeem, executeSettle, executeSwap, type Step } from '../trade.ts'
 import type { Connection } from '../wallet.ts'
 import { Steps, TxLink } from './Steps.tsx'
@@ -11,7 +10,7 @@ import type { ActivityInput } from './TradePanel.tsx'
 
 interface Props {
   cfg: AppConfig
-  market: Market
+  market: AppMarket
   phase: Phase
   live?: LiveState
   conn?: Connection
@@ -88,7 +87,7 @@ export function ResolvePanel(p: Props) {
         <>
           <h2 className="card-title">Trading closed</h2>
           <p className="secondary" style={{ margin: 0 }}>
-            The hook stopped quoting at the cutoff. The outcome is the {market.info.window} s average ETH price from{' '}
+            The hook stopped quoting at the cutoff. The outcome is the {market.info.window} s average {market.asset} price from{' '}
             {formatClock(windowStartOf(market.info))} to {formatClock(market.info.expiry)} against the{' '}
             {formatUsd(strikeOf(market.info))} strike.
           </p>

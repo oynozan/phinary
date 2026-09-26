@@ -7,8 +7,9 @@
  * anvil_setBlockTimestampInterval, since SealedPoolOracle requires it. It deploys in automine, then mines one block per
  * second as `anvil --block-time 1` does. It deploys a PoolManager, a demo USDC and a hookless native ETH/USDC pool with
  * full-range liquidity (fee 500, spacing 10), SealedPoolOracle on that pool with the parameters of
- * test/integration/SealedUnichainFork.t.sol, and the MarketScheduler that owns a PredictionHook reading that oracle,
- * whose CREATE2 salt is mined for flags 0x2AA8. The hook's vault gets 200 USDC.
+ * test/integration/SealedUnichainFork.t.sol, and a MarketGatekeeper with one track, whose MarketScheduler reads that
+ * oracle. The gatekeeper owns a PredictionHook whose CREATE2 salt is mined for flags 0x2AA8. The hook's vault gets
+ * 200 USDC.
  *
  * The sealed bot of bot/src/sealed.ts runs in-process, poking each new block and proving every block no seal covers. A
  * trader swaps random sizes through PoolSwapTest every one to three blocks, so many seals break and leave gaps to
@@ -56,7 +57,7 @@ import {
 } from 'viem'
 import { generatePrivateKey, type PrivateKeyAccount, privateKeyToAccount } from 'viem/accounts'
 import { makeClients } from '../../bot/src/chain.ts'
-import { invalidAfterFor, Keeper } from '../../bot/src/keeper.ts'
+import { invalidAfterFor, Keeper, loadTracks, type Track } from '../../bot/src/keeper.ts'
 import { createLogger, errMsg } from '../../bot/src/log.ts'
 import { varE36FromAnnualVol } from '../../bot/src/market.ts'
 import {
@@ -115,6 +116,7 @@ const ARTIFACTS = {
   lpRouter: ['PoolModifyLiquidityTest.sol', 'PoolModifyLiquidityTest'],
   oracle: ['SealedPoolOracle.sol', 'SealedPoolOracle'],
   scheduler: ['MarketScheduler.sol', 'MarketScheduler'],
+  gatekeeper: ['MarketGatekeeper.sol', 'MarketGatekeeper'],
   hook: ['PredictionHook.sol', 'PredictionHook'],
 } as const
 
@@ -420,7 +422,8 @@ async function main(): Promise<void> {
   const anchorTime = await read<bigint>(oracle, oracleAbi, 'anchorTimestamp')
   await say('oracle', `SealedPoolOracle ${oracle} anchored at block ${anchorBlock} (maxStaleBlocks 3, parameters of the Unichain fork test)`)
 
-  // As in SchedulerPair.sol, the scheduler takes the deployer's next nonce and the hook comes from the CREATE2 factory
+  // As in TrackSet.sol, the gatekeeper takes the deployer's next nonce, creates its scheduler at its own nonce 1, and
+  // the hook comes from the CREATE2 factory with the gatekeeper as owner
   const nonce = await pub.getTransactionCount({ address: deployer.address })
   const predicted = getContractAddress({ from: deployer.address, nonce: BigInt(nonce) })
   const init = concatHex([
@@ -437,15 +440,21 @@ async function main(): Promise<void> {
     tries++
     if ((BigInt(hook) & ALL_HOOK_MASK) === PREDICTION_FLAGS) break
   }
-  const scheduler = await deploy(deployer, arts.scheduler, [hook, oracle, CONFIG])
-  assert.equal(scheduler, predicted, 'the scheduler landed at the predicted nonce address')
+  const gatekeeper = await deploy(deployer, arts.gatekeeper, [hook, [{ oracle, config: CONFIG }]])
+  assert.equal(gatekeeper, predicted, 'the gatekeeper landed at the predicted nonce address')
+  const scheduler = getContractAddress({ from: gatekeeper, nonce: 1n })
+  assert.deepEqual(await read<readonly Address[]>(gatekeeper, arts.gatekeeper.abi, 'schedulers'), [scheduler], 'the gatekeeper made one scheduler')
   const hookTx = await deployer.wallet.sendTransaction({ to: CREATE2_FACTORY, data: concatHex([salt, init]), chain } as never)
   assert.equal((await pub.waitForTransactionReceipt({ hash: hookTx })).status, 'success', 'hook deployment')
   assert.ok(await pub.getCode({ address: hook }), 'hook has code')
-  assert.equal(await read<Address>(hook, hookAbi, 'owner'), scheduler, 'the scheduler owns the hook')
+  assert.equal(await read<Address>(hook, hookAbi, 'owner'), gatekeeper, 'the gatekeeper owns the hook')
   assert.equal(await read<Address>(scheduler, arts.scheduler.abi, 'hook'), hook)
+  assert.equal(await read<Address>(scheduler, arts.scheduler.abi, 'gatekeeper'), gatekeeper)
   assert.equal(await read<Address>(scheduler, arts.scheduler.abi, 'oracle'), oracle, 'the scheduler reads the sealed oracle')
-  await say('market', `MarketScheduler ${scheduler} owns PredictionHook ${hook} (flags 0x2aa8, salt found in ${tries} tries)`)
+  await say(
+    'market',
+    `MarketGatekeeper ${gatekeeper} owns PredictionHook ${hook} (flags 0x2aa8, salt found in ${tries} tries), its scheduler is ${scheduler}`,
+  )
 
   await send(deployer, usdc, erc20Abi, 'approve', [hook, maxUint256])
   await send(deployer, hook, hookAbi, 'deposit', [VAULT_USDC])
@@ -467,12 +476,16 @@ async function main(): Promise<void> {
   const runner = new Loop(async () => void (await runnerBot.tick()), () => 100)
 
   const keeperClients = makeClients({ rpcUrl: url, chainId: CHAIN_ID, privateKey: { key: keeperActor.key, source: 'sealed-e2e' } })
+  const tracks = await loadTracks(keeperClients.publicClient, { hook, gatekeeper, schedulers: [scheduler] })
+  assert.equal(tracks.length, 1, 'the keeper loads the one track')
+  const track = tracks[0] as Track
   const keeper = new Keeper({
     clients: keeperClients,
     hook,
-    scheduler,
-    periodSec: CONFIG.period,
+    gatekeeper,
+    tracks: [track],
     alignToPeriod: false,
+    minTradeSec: 0,
     scanBack: 10,
     invalidAfterSec: await invalidAfterFor(keeperClients.publicClient, hook, 60),
     dryRun: false,
@@ -542,7 +555,8 @@ async function main(): Promise<void> {
   /* Markets */
 
   async function openAndTrade(): Promise<Market> {
-    const id = await keeper.createMarket(await latestTime())
+    const now = await latestTime()
+    const id = await keeper.createMarket(track, now, undefined, Number(now))
     assert.ok(id !== undefined, 'the keeper opened a market through scheduler.open()')
     const info = await read<MarketInfo>(hook, hookAbi, 'marketInfo', [id])
     const [yesKey, noKey] = await read<readonly [PoolKey, PoolKey]>(hook, hookAbi, 'poolKeys', [id])

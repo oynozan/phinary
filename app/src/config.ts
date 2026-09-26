@@ -3,6 +3,7 @@ import {
   type ChainContracts,
   isPlaceholderAddress,
   parseDeployment,
+  sameAddress,
   UNICHAIN_SEPOLIA,
   UNICHAIN_SEPOLIA_EXPLORER,
   UNICHAIN_SEPOLIA_RPC_URL,
@@ -19,6 +20,10 @@ export interface AppConfig {
   hook?: Address
   hookSource: HookSource
   underlyingOracle?: Address
+  /** The deployment's track schedulers, empty unless `hook` is the deployment's own hook */
+  marketSchedulers: Address[]
+  /** Oracle of each price source, to name the asset of a market no track claims */
+  underlyings: { symbol: string; oracle: Address }[]
   /** Anvil helpers (burner wallet, funding) are shown. */
   devTools: boolean
   marketLimit: number
@@ -132,6 +137,8 @@ export function resolveConfig({ search = '', env = {}, deployment = {}, savedHoo
     hook,
     hookSource,
     underlyingOracle: oracleParam ?? parsed.underlyingOracle,
+    marketSchedulers: hook && parsed.predictionHook && sameAddress(hook, parsed.predictionHook) ? parsed.marketSchedulers : [],
+    underlyings: parsed.underlyings.map(({ symbol, oracle }) => ({ symbol, oracle })),
     devTools,
     marketLimit,
     warnings,
