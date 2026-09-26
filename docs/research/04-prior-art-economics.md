@@ -1,12 +1,12 @@
 # 04 — Prior art and LP (underwriter) economics for a Black–Scholes-priced binary market on Uniswap v4
 
-Status: **fact-checked final**, 2026-09-25 (adversarial verification pass; corrections are marked *[FC]* inline and listed in the Verification log at the end). Topic owner: prior art, v4 hook projects, and the economics of LP underwriting.
+Status: **fact-checked final**, 2026-09-25 (adversarial verification pass; corrections are marked *[FC]* inline and listed in the Verification log at the end). §7.1 and Verification-log row 31 were added on 2026-09-26. Topic owner: prior art, v4 hook projects, and the economics of LP underwriting.
 
 **Conventions**
 
 - `$R` = `/private/tmp/claude-501/-Users-oynozan-Desktop-Dev-Web3-UniswapPrediction/1b01c4fe-2032-47bf-9776-990202883598/scratchpad/repos` (shallow clones). `$S` = the parent scratchpad directory.
 - Code citations use the form `repo/path/File.sol:line`. Commits: lyra-v1 `ea9e36a`, rmm-core `8d3ef9b`, premia v2 `0ed54a9`, premia v3 `fe3b821`, Buffer-Protocol-v2.5 `e049261`, panoptic-v2-core `e3b9d12` (2026-09-09), gnosis CTF `eeefca6`, gnosis market makers `6814c02`, Polymarket ctf-exchange `ed5c770`, neg-risk adapter `f78b35b`, Uniswap/hooklist `1d2f09b` (2026-09-21), oz-uniswap-hooks `80bd724`.
-- Thales, OrketHook, Hyperhook, and PolymarketHook source code was fetched from **Sourcify**, where it is verified (exact match), and saved to `$S/thales/` and `$S/hooksrc/`. Live Thales parameters and LP history were read over Optimism RPC (`eth_call`/`eth_getStorageAt`) on 2026-09-25.
+- Thales, OrketHook, Hyperhook, and PolymarketHook source code was fetched from **Sourcify**, where it is verified (exact match), and saved to `$S/thales/` and `$S/hooksrc/`. PolymarketHook and its oracle were re-read from Blockscout on 2026-09-26 (§7.1). Live Thales parameters and LP history were read over Optimism RPC (`eth_call`/`eth_getStorageAt`) on 2026-09-25.
 - Quantitative results I computed are marked **[computed]**. The scripts are in `$S/prior_art/` (see Appendix). Anything I could not verify is marked **UNVERIFIED**, and statements taken from search snippets or secondary sources are marked **(secondary)**.
 - Unless noted, `r = 0`, `τ = T − t` is in years, and the digital is cash-or-nothing, paying $1 if `S_T > K`. `V = N(d2)`, where `d2 = [ln(S/K) − σ²τ/2]/(σ√τ)`.
 
@@ -20,7 +20,7 @@ Status: **fact-checked final**, 2026-09-25 (adversarial verification pass; corre
 4. **Price error from a stale S grows sharply near expiry.** With σ = 60%, a 5 bp error in S moves an ATM digital by 0.24¢ at 7 d, 0.64¢ at 1 d, 3.1¢ at 1 h and 6.2¢ at 15 min **[computed]**. The hedge notional per $1 of payout is 4.8× at 7 d, 12.7× at 1 d and 62× at 1 h. For a 7-day ATM binary, 34.4% of its lifetime price variance `V₀(1−V₀)` occurs in the last 24 h **[computed; closed form `1 − (2/π)·arcsin((T−w)/T)`, independent of σ]** *[FC: draft said 34.5%, a rounding of the numerical estimate]*. These numbers are the quantitative basis for a trading cutoff and for spreads scaled by delta.
 5. **Black–Scholes with realized vol is badly miscalibrated for short ETH horizons.** On Binance ETHUSDT hourly data (2020–2026), with σ taken from trailing 30-day realized vol, the model misprices 1 h and 4 h digitals by up to **±7–9 pp** at strikes ±0.5σ away. Hourly standardized returns have excess kurtosis of 24.5, and P(|z|>3) is 1.9% versus 0.27% for a normal distribution. At 1 d the error is about ±3–7 pp. ETH implied vol (Deribit DVOL) exceeded subsequent 30-day realized vol by **+5.3 vol points** on average, on 66% of days **[computed]**. The model therefore needs a vol premium, fat-tail and seasonality handling, and trade-flow feedback, or a restriction to horizons of at least about 1 day.
 6. **An oracle-free alternative exists.** RMM-01's stable reserve per unit of liquidity equals `K·N(d2)`, which is K times the Black–Scholes digital. The paper "Replicating Monotonic Payoffs Without Oracles" (Angeris, Evans, Chitra 2021, §2.3) shows that the numéraire leg of a CFMM share with trading function `ψ(R1,R2) = R1 − Φ(Φ⁻¹(1 − K·R2) − σ√τ)` *is* a Black–Scholes cash-or-nothing call, settled by arbitrage rather than by an oracle. Paradigm's pm-AMM (2024) is the reserve-based AMM derived for exactly our price process (Gaussian score dynamics equal the BS digital with `r = 0`). Its LVR is `V/(2(T−t))`: the static version loses 100% and the dynamic version 50% of LP wealth in expectation. These make good baselines for proving our design better.
-7. **Among the v4 hooks I found, none prices binaries by Black–Scholes through v4 swaps with LP underwriting.** v4 prediction-market hooks in the Uniswap hooklist (PolymarketHook, Hyperhook, OrketHook, and others) and hackathon repos are reserve- or curve-priced, or charge fees only. I found no hook that prices binaries by BS *through v4 swaps* with LP underwriting, so our design appears novel (search-coverage caveat applies). Production custom-curve hooks (EulerSwap, OZ `BaseCustomCurve`) and Panoptic v2 on v4 (manipulation-resistant internal oracle) supply reusable patterns.
+7. **Among the v4 hooks I found, none prices binaries by Black–Scholes through v4 swaps with LP underwriting.** v4 prediction-market hooks in the Uniswap hooklist (PolymarketHook, Hyperhook, OrketHook, and others) and hackathon repos are reserve- or curve-priced, or charge fees only. I found no hook that prices binaries by BS *through v4 swaps* with LP underwriting, so our design appears novel (search-coverage caveat applies). The closest architecture, PolymarketHook, is dormant and has critical access-control defects: anyone can mint tokens for free, and anyone can set the outcome (§7.1). Production custom-curve hooks (EulerSwap, OZ `BaseCustomCurve`) and Panoptic v2 on v4 (manipulation-resistant internal oracle) supply reusable patterns.
 
 ---
 
@@ -393,7 +393,7 @@ Sources: Uniswap/hooklist registry (4,924 hook JSONs, commit `1d2f09b`, 2026-09-
 
 | Project (chain) | What it does | Pricing | v4 mechanics | Maturity |
 |---|---|---|---|---|
-| **PolymarketHook** (Unichain `0x0fd7…4888`; Sourcify) | YES/USDC and NO/USDC "synthetic" pools. `beforeSwap` takes USDC, mints YES+NO, swaps the unwanted side on a hookless YES/NO v4 pool, and returns the delta. | Reserve-driven (the YES/NO CL pool) | `beforeSwapReturnDelta`; exact-input only; the **sell path is unimplemented** (`// redeem(market, amount);`); `beforeAddLiquidity` reverts | Hackathon-grade; the closest *architecture* to ours (complete-set mint inside `beforeSwap`) |
+| **PolymarketHook** (Unichain mainnet `0x0fd7…4888`; Sourcify, Blockscout; details in §7.1) | YES/USDC and NO/USDC "synthetic" pools for arbitrary events, resolved by a manual oracle. `beforeSwap` takes USDC, mints YES+NO, swaps the unwanted side on a hookless YES/NO v4 pool, and returns the delta. | Reserve-driven (the YES/NO CL pool) | `beforeSwapReturnDelta`; exact-input only; the **sell path is unimplemented** (`// redeem(market, amount);`); `beforeAddLiquidity` reverts | Hackathon-grade and dormant since 2025-11; **critical access-control defects** (free mint, permissionless oracle `finalize`); the closest *architecture* to ours (complete-set mint inside `beforeSwap`) |
 | **Hyperhook** (Ethereum `0x9aef…c488`; Sourcify) | Hourly BTC UP/DOWN epochs, Chainlink resolution, decay tax on winner sells | Bounded "sentiment curve": `price_side = MIN + (MAX−MIN)·(s_side+v)²/((s_UP+v)²+(s_DOWN+v)²)`, 90/5/5 pot split | `beforeSwapReturnDelta` custom accounting | Production-ish, parimutuel |
 | **OrketHook** (Arbitrum; Sourcify) | Binary PM pools with "VALS" fee `e^{λ·Δx/L·σ} − 1` using a **backend-signed σ** per swap (σ is a "toxic velocity" flow parameter, not option volatility; `OrketHook.sol:453-480`; exponent capped at 2) | Reserve-driven price plus dynamic fee | `beforeSwapReturnDelta`; signed hookData required | Deployed |
 | **shift0x/uniswap-v4-prediction-market-hook** | Bull/bear units vs "current price" of a host pool | UniswapV2 math between sides; parimutuel payout | Settlement from the host pool's price after a block-delay; 0% fees for PM participants to encourage arbitrage | Hackathon (Nov 2024) |
@@ -406,6 +406,46 @@ Sources: Uniswap/hooklist registry (4,924 hook JSONs, commit `1d2f09b`, 2026-09-
 | **OZ `BaseCustomCurve`** (`$R/oz-uniswap-hooks/src/base/BaseCustomCurve.sol:44,90,258`) | Library base: override `_getUnspecifiedAmount(params)` and `_getSwapFeeAmount` | — | Implements the NoOp/custom-accounting pattern | In scope of OZ audits v1.0.0-RC1 and v1.1.0-RC1/RC2 (PDFs in `audits/`); repo is now v1.2.2 and its README still labels it "experimental software" *[FC]*; natural base for our hook |
 
 **Conclusion:** among the hooks and repos I surveyed, none (1) prices binaries by Black–Scholes from a Uniswap-derived S and σ, (2) executes via normal v4 swaps with custom deltas, and (3) uses LP underwriting with full collateral. The pieces exist separately: complete-set minting inside `beforeSwap` (PolymarketHook), custom-curve accounting (EulerSwap, OZ), a manipulation-resistant internal oracle on v4 (Panoptic), and IV nudging after swaps (Smile). The search covered the hooklist registry plus web and GitHub search; private or unlisted projects may exist (**UNVERIFIED** absence).
+
+### 7.1 PolymarketHook in detail (re-read 2026-09-26)
+
+Sources: the Blockscout-verified sources of `PolymarketHook` (`0x0Fd7295d9ccB18b17646B64AcF9316B7e75a4888`, Unichain mainnet, solc 0.8.26, verified 2026-08-17) and of its oracle `ManualPolymarketOracle` (`0x8AFFF08Bbd8d0bc8983185F265E491f0E6DF0D62`, solc 0.8.30), fetched from `unichain.blockscout.com/api/v2/smart-contracts/<address>`. The constructor arguments are PoolManager `0x1F98…0004`, that oracle, native USDC `0x078D…7AD6` and PositionManager `0x4529…17bf`. Paths are relative to the verified source tree.
+
+**Mechanism.**
+- The goal is to mirror Polymarket questions (arbitrary events) as v4 pools. `initializeMarket` (`src/PolymarketHook.sol:48-81`) deploys YES and NO tokens (6 decimals) and initialises three pools at price 1: a **hookless** YES/NO pool, and hooked YES/USDC and NO/USDC pools. All three use fee 3000 and tickSpacing 60 (`:83-118`).
+- **Buy** (USDC in, exact-input only, `:162-164`): the hook takes `A` USDC, mints `A` YES + `A` NO, swaps the unwanted `A` exact-in on the YES/NO pool, and returns `(+A, −(A + swapOut))` (`:178-201`). The effective price is `A/(A + swapOut)`, so the YES/NO pool's reserves set the price (FPMM-like, reserve-driven).
+- **Liquidity:** `addLP` (`src/base/MarketManager.sol:49-75`) mints a pair and opens a full-range YES/NO position through PositionManager.
+- **Sell:** the branch is only a comment (`src/PolymarketHook.sol:202-205`). The hook returns a zero delta, so the swap falls through to the hooked pool's own curve, whose liquidity is always zero (`_beforeAddLiquidity` reverts, `:139-146`), and should output nothing. This is from reading the code; I did not execute it. Exits are `redeem` of complete pairs (`MarketManager.sol:88-93`) or `resolve` after the end date (`:95-108`).
+- **Settlement:** `resolve` pays 1 USDC per winning token according to `IPolymarketOracle.outcome`.
+
+**Access-control and liveness defects.** I found these by reading the code and executed nothing on-chain.
+
+| # | Defect | Where | Consequence |
+|---|---|---|---|
+| P1 | `_mint(oracleId, amount, recipient)` is `public` with no access check. The tokens' `onlyOwner` check passes because the hook deployed them. | `MarketManager.sol:82-86` | Anyone can mint YES+NO for free, then `redeem` the pairs for the hook's pooled USDC. All collateral across all markets can be withdrawn. |
+| P2 | `addLP` mints the pair without pulling USDC (the author's TODO is at `:48`). | `MarketManager.sol:48-75` | Uncollateralised tokens enter circulation, with the same effect as P1. |
+| P3 | The oracle's `register`, `finalize` and `registerAndFinalize` have no access control, and `finalize` does not check `end` (`TooEarly` is used only for a zero end). | `ManualPolymarketOracle.sol:47-68` | The first caller picks the outcome, at any time, irreversibly. |
+| P4 | `initializeMarket` is permissionless and overwrites `markets[oracleId]` with fresh tokens. | `PolymarketHook.sol:48-50`, `MarketManager.sol:35-46` | Anyone can re-initialise a live market ID. `resolve` and `redeem` then address the new tokens, which strands existing holders. |
+| P5 | `resolve` reverts on `Invalid`. | `MarketManager.sol:105-107` | Single-sided positions in an Invalid market are locked. Complete pairs can still be redeemed. |
+
+**On-chain activity** (Blockscout, 2026-09-26):
+- 30 direct transactions: `initializeMarket` 17 and `addLP` 13, sent from 4 addresses between 2025-10-10 and 2025-11-05.
+- 86 token transfers and a USDC balance of 5.401. Swaps route through PoolManager, so they are not among the direct transactions.
+
+The deployment is dormant, and the amount that P1–P3 put at risk is small.
+
+**Differences from our design.**
+
+| | PolymarketHook | Ours ([SPEC](../SPEC.md)) |
+|---|---|---|
+| Question | Any event, resolved by an external oracle | Underlying price versus strike, resolved from the source pool's TWAP |
+| Price | YES/NO pool reserves | BS geometric-Asian binary from S_sob, σ̂ and τ, plus spread and per-block impact |
+| Counterparty | Full-range YES/NO LPs | Per-market budget from the in-hook LP vault |
+| Swap coverage | Buy only, exact-in only | Buy and sell, exact-in and exact-out; winner redemption via swap |
+| Resolution trust | Unprotected manual oracle (P3) | Permissionless integer rule on `cumulativeAt`; no admin override |
+| Invalid outcome | Locks single-sided holders (P5) | Both tokens redeem at 0.5 |
+
+The shared piece is complete-set minting inside `beforeSwap`. PolymarketHook mints a pair and swaps half of it away. We mint only the side being bought, after using up inventory first, and solvency is enforced by the per-market bucket. So we need no YES/NO pool and no seeded liquidity.
 
 ---
 
@@ -580,6 +620,7 @@ All paths are under `$S/prior_art/` unless noted. Run with `uv run --with scipy 
 | `$S/rpc.py` | Thales LP round history via Optimism RPC; output `thales_lp_rounds.txt` (§1.6) |
 | `$S/thales/`, `$S/hooksrc/` | Sourcify-verified sources for ThalesAMM, ThalesAMMUtils, ThalesAMMLiquidityPool, PolymarketHook, Hyperhook, OrketHook |
 | `pmamm.html`, `rmp.txt`, `arbfees.txt` | Paradigm pm-AMM page, arXiv:2111.13740 text, arXiv:2305.14604 text |
+| `unichain.blockscout.com/api/v2/smart-contracts/<address>`, `/addresses/<address>/{counters,transactions,token-balances}` | Verified sources of PolymarketHook and ManualPolymarketOracle, plus the hook's activity and balances (§7.1) |
 
 Key external sources:
 
@@ -635,4 +676,5 @@ Method: I checked every claim against primary sources (the cloned repos under `$
 | 28 | Milionis et al. `P_trade = 1/(1 + √(2λ)·γ/σ)`, `ARB ≈ LVR × P_trade` | Confirmed | `$S/prior_art/arbfees.txt:96-160` |
 | 29 | Premia v2 C-level `exp(−steepness·ΔL/max(L))`, `spotOffset`; v3 `c(u)` formula (endpoints checked: `c(0) = minC`, `c(1) = maxC`), geometric-mean C-level, Shore CDF 6.6e-7 | Confirmed; the v3 C-level after decay is floored at `minCLevel` | `Premian-Labs_premia-contracts/contracts/libraries/OptionMath.sol:53-72`, `pool/PoolInternal.sol:154-163`; `premia-v3-contracts/contracts/libraries/OptionMath.sol:21-57,328-371` |
 | 30 | Gnosis CTF function lines, `2 ≤ n ≤ 256`; FPMM `calcBuyAmount :264`; LMSR `b = funding/ln N` in base 2; Polymarket `MatchType` | Confirmed | `ConditionalTokens.sol:65-68,78,105,165,218`; `LMSRMarketMaker.sol:20-39`; `OrderStructs.sol:57-64` |
+| 31 | *(2026-09-26 addendum)* PolymarketHook §7.1: buy mechanism, unimplemented sell, defects P1–P5, 30 transactions from 2025-10-10 to 2025-11-05, 5.401 USDC balance | Confirmed by reading the code and the explorer; nothing executed on-chain; the sell-path fall-through is inferred | Blockscout-verified `src/PolymarketHook.sol:48-81,139-146,162-164,178-205`; `src/base/MarketManager.sol:35-46,48-108`; `ManualPolymarketOracle.sol:47-68`; Blockscout address API |
 | — | Thales docs on IV sourcing, Speed Markets parameters, iosiro audit findings, Buffer BLP 1.11→0.85, Lyra "7.5% fees", Hegic, Smile/HOOK Finance/UHI projects, Thales worst-round attribution to ETH jumps | Unverifiable in this pass (secondary, left marked) | — |

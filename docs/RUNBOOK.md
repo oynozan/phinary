@@ -333,10 +333,11 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 - **Demo bot command:**
 
   ```sh
-  RPC_URL=https://unichain-sepolia.drpc.org MARKET_BUDGET_USDC=10 QUOTE_H0=0.01 QUOTE_GAMMA_S=0.00002 MIRROR_THRESHOLD_BPS=1 script/bots.sh start unichain-sepolia
+  RPC_URL=https://unichain-sepolia.drpc.org MARKET_BUDGET_USDC=10 QUOTE_H0=0.01 QUOTE_GAMMA_S=0.00002 MIRROR_THRESHOLD_BPS=1 MARKET_TENOR_SEC=120 KEEPER_PERIOD_SEC=60 script/bots.sh start unichain-sepolia
   ```
 
-  - This gives an ATM spread of about ±4¢ at 60 s, widening toward the cutoff.
+  - Demo markets last 2 minutes and a new one opens every minute. Markets overlap, so one is always open with at least ~45 s of trading left. Each market settles every minute.
+  - This gives an ATM spread of about ±4¢, widening toward the cutoff.
   - The production values (h0 = 0.02, gammaS = 0.00005) quote ±10¢ at σ ≈ 20%, which is too wide for 60-second markets.
 - **Real-chain smoke test:**
 
