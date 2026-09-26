@@ -25,7 +25,7 @@ export function SwapStack({
     const bridge = "absolute top-0 left-1/2 grid size-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-3 border-surface bg-surface-2";
 
     return (
-        <div className={cn("overflow-hidden rounded-3xl border bg-surface transition-colors has-[input:focus-visible]:border-primary/60 has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring/25", className)}>
+        <div className={cn("overflow-hidden rounded-3xl border bg-surface transition-colors has-[input:focus-visible]:border-primary", className)}>
             <div className="px-5 pt-4 pb-5">{top}</div>
             <div className="relative border-t bg-surface-2 px-5 pt-5 pb-5">
                 {onFlip ? (
@@ -37,7 +37,7 @@ export function SwapStack({
                         }}
                         disabled={flipDisabled}
                         aria-label={flipLabel}
-                        className={cn(bridge, "transition-colors outline-none hover:bg-surface-3 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60")}
+                        className={cn(bridge, "transition-colors outline-none hover:bg-surface-3 focus-visible:ring-3 focus-visible:ring-ring disabled:text-subtle")}
                     >
                         <ArrowDown
                             aria-hidden

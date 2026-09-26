@@ -1,6 +1,6 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { formatCents, formatPercent, formatPrice, formatTimeSeconds } from "@/lib/format";
@@ -20,7 +20,7 @@ function ChartTip({ active, payload }: TooltipProps) {
     const p = payload?.[0]?.payload;
     if (!active || !p) return null;
     return (
-        <div className="rounded-2xl border bg-popover/95 px-3 py-2 font-secondary text-xs shadow-xl backdrop-blur-md">
+        <div className="rounded-2xl border bg-popover px-3 py-2 font-secondary text-xs shadow-xl">
             <div className="text-muted-foreground">{formatTimeSeconds(p.t)}</div>
             <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-sm font-semibold text-up">▲ {formatPercent(p.mid)}</span>
@@ -50,13 +50,7 @@ export function ProbabilityChart({
 }) {
     return (
         <ChartContainer config={config} className={cn("aspect-auto w-full", className)} style={{ height }}>
-            <AreaChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
-                <defs>
-                    <linearGradient id="prob-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-mid)" stopOpacity={0.28} />
-                        <stop offset="100%" stopColor="var(--color-mid)" stopOpacity={0} />
-                    </linearGradient>
-                </defs>
+            <LineChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
                 <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="0" />
                 <XAxis
                     dataKey="t"
@@ -81,17 +75,16 @@ export function ProbabilityChart({
                 />
                 <ReferenceLine y={0.5} stroke="var(--border-strong)" strokeDasharray="4 4" />
                 <ChartTooltip cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }} content={<ChartTip />} />
-                <Area
+                <Line
                     dataKey="mid"
                     type="monotone"
                     stroke="var(--color-mid)"
                     strokeWidth={2}
-                    fill="url(#prob-fill)"
                     isAnimationActive={false}
                     dot={false}
                     activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--background)" }}
                 />
-            </AreaChart>
+            </LineChart>
         </ChartContainer>
     );
 }

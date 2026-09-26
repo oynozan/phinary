@@ -1,6 +1,5 @@
 "use client";
 
-import { TokenIcon } from "@/components/market/token-icon";
 import { formatCents } from "@/lib/format";
 import type { Side } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -47,23 +46,19 @@ export function OutcomeSelector({
                         onClick={() => onChange(side)}
                         onKeyDown={onKeyDown}
                         className={cn(
-                            "flex h-14 min-w-0 items-center gap-2.5 rounded-full border pr-4 pl-2 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
-                            active
-                                ? up
-                                    ? "border-up/60 bg-up/12"
-                                    : "border-down/60 bg-down/12"
-                                : "bg-background/20 hover:bg-white/5",
+                            "flex h-14 min-w-0 items-center gap-2 rounded-full border px-5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed",
+                            active ? (up ? "border-up bg-up-soft" : "border-down bg-down-soft") : "bg-surface hover:bg-surface-2",
                         )}
                     >
-                        <span aria-hidden className={cn("transition-opacity", !active && "opacity-60")}>
-                            <TokenIcon side={side} size={38} />
-                        </span>
                         <span
                             className={cn(
-                                "font-secondary text-sm font-bold tracking-wide",
+                                "flex items-baseline gap-1.5 font-secondary text-sm font-bold tracking-wide",
                                 active ? (up ? "text-up" : "text-down") : "text-muted-foreground",
                             )}
                         >
+                            <span aria-hidden className="text-[0.7rem] leading-none">
+                                {up ? "▲" : "▼"}
+                            </span>
                             {up ? "UP" : "DOWN"}
                         </span>
                         <span className={cn("num ml-auto font-heading text-xl leading-none", !active && "text-muted-foreground")}>

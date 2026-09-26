@@ -34,9 +34,9 @@ export function WalletDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                             type="button"
                             disabled={wallet.status === "connecting"}
                             onClick={choose}
-                            className="flex h-14 items-center gap-3 rounded-2xl border bg-surface-2/60 px-4 text-left text-base transition-colors hover:border-primary/50 hover:bg-surface-2 disabled:opacity-60"
+                            className="flex h-14 items-center gap-3 rounded-2xl border bg-surface-2 px-4 text-left text-base transition-colors hover:border-primary hover:bg-surface-3 disabled:bg-surface disabled:text-subtle"
                         >
-                            <span className="grid size-9 place-items-center rounded-full bg-primary/15 text-primary">
+                            <span className="grid size-9 place-items-center rounded-full bg-primary-soft text-primary">
                                 <Icon className="size-4.5" />
                             </span>
                             {label}

@@ -15,7 +15,7 @@ export function MarketsHome() {
     return (
         <MotionConfig reducedMotion="user">
             <FeaturedMarket market={featured} />
-            <MarketBrowser markets={markets} featuredId={featured?.id ?? null} className="mt-10 sm:mt-12" />
+            <MarketBrowser markets={markets} featuredId={featured?.id ?? null} className="mt-6 sm:mt-8" />
         </MotionConfig>
     );
 }

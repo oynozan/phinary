@@ -13,25 +13,25 @@ export const PHASE_DOT: Partial<Record<Phase, string>> = {
 
 const PILL: Record<Phase, string> = {
     upcoming: "border-border text-muted-foreground",
-    live: "border-primary/40 bg-primary/15 text-primary",
-    closed: "border-warn/30 bg-warn/10 text-warn",
-    averaging: "border-accent-2/50 bg-accent-2/20 text-foreground",
+    live: "border-primary bg-primary-soft text-primary",
+    closed: "border-warn bg-warn-soft text-warn",
+    averaging: "border-accent-2 bg-primary-soft text-foreground",
     awaiting: "border-border text-muted-foreground",
-    "resolved-up": "border-up/40 bg-up/15 text-up",
-    "resolved-down": "border-down/40 bg-down/15 text-down",
+    "resolved-up": "border-up bg-up-soft text-up",
+    "resolved-down": "border-down bg-down-soft text-down",
     invalid: "border-border text-muted-foreground",
 };
 
 const GLYPH: Partial<Record<Phase, string>> = { "resolved-up": "▲", "resolved-down": "▼" };
 
-/** Pill with the market phase */
+/** Phase pill for table cells and rows. Never place it on, above or beside a heading: the countdown carries status there */
 export function PhaseBadge({ phase, className }: { phase: Phase; className?: string }) {
     const dot = PHASE_DOT[phase];
     const glyph = GLYPH[phase];
     return (
         <span
             className={cn(
-                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 font-secondary text-xs font-semibold whitespace-nowrap",
+                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border bg-surface-2 px-3 font-secondary text-xs font-semibold whitespace-nowrap",
                 PILL[phase],
                 className,
             )}

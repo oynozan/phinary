@@ -77,8 +77,8 @@ function DockItem({
                 onFocus={() => setHovered(true)}
                 onBlur={() => setHovered(false)}
                 className={cn(
-                    "flex size-full items-center justify-center rounded-full border shadow-md transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                    active ? "border-primary/60 bg-primary/15 text-primary" : "text-white hover:text-primary",
+                    "flex size-full items-center justify-center rounded-full border shadow-md transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring",
+                    active ? "border-primary bg-primary-soft text-primary" : "bg-surface-2 text-white hover:bg-surface-3 hover:text-primary",
                 )}
             >
                 {children}
@@ -92,7 +92,7 @@ function DockItem({
                         transition={{ duration: 0.2 }}
                         style={{ x: "-50%" }}
                         role="tooltip"
-                        className="pointer-events-none absolute -top-6 left-1/2 w-fit rounded-md border bg-background/80 px-2 py-0.5 font-secondary text-xs whitespace-pre text-white"
+                        className="pointer-events-none absolute -top-6 left-1/2 w-fit rounded-md border bg-surface-2 px-2 py-0.5 font-secondary text-xs whitespace-pre text-white"
                     >
                         {label}
                     </motion.div>
@@ -128,7 +128,7 @@ export function Dock() {
                         mouseX.set(Infinity);
                     }}
                     style={{ height: sizes.panel }}
-                    className="pointer-events-auto absolute bottom-0 left-1/2 flex w-fit -translate-x-1/2 items-end gap-3 rounded-full border bg-background/75 px-4 pb-3 backdrop-blur-md sm:gap-4"
+                    className="pointer-events-auto absolute bottom-0 left-1/2 flex w-fit -translate-x-1/2 items-end gap-3 rounded-full border bg-surface px-4 pb-3 sm:gap-4"
                 >
                     {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
                         <DockItem key={href} href={href} label={label} active={isActivePath(pathname, href)} mouseX={mouseX} sizes={sizes}>

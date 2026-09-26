@@ -39,11 +39,10 @@ export function TradesPanel({ market }: { market: Market }) {
     return (
         <section aria-labelledby="trades-heading">
             <Panel flush className="overflow-hidden">
-                <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-2 sm:px-6">
-                    <h2 id="trades-heading" className="text-xl">
+                <div className="flex justify-center px-5 pt-5 pb-2 sm:px-6">
+                    <h2 id="trades-heading" className="text-center text-xl">
                         Trades
                     </h2>
-                    {list.length > 0 && <span className="num font-secondary text-sm text-muted-foreground">{list.length}</span>}
                 </div>
                 {list.length === 0 ? (
                     <p className="py-12 text-center text-muted-foreground">No trades yet</p>
@@ -81,7 +80,7 @@ export function TradesPanel({ market }: { market: Market }) {
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             transition={{ duration: 0.4 }}
-                                            className={cn("border-b border-border/60 last:border-0", mine && "bg-primary/6")}
+                                            className={cn("border-b border-border/60 last:border-0", mine && "bg-primary-soft")}
                                         >
                                             <td className="py-3 pr-2 pl-5 text-left whitespace-nowrap sm:pl-6">
                                                 <SideCell trade={t} />
@@ -108,7 +107,7 @@ export function TradesPanel({ market }: { market: Market }) {
                 )}
                 {list.length > PAGE && (
                     <div className="flex justify-center border-t p-3">
-                        <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+                        <Button variant="outline" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
                             {expanded ? "Less" : `All ${list.length}`}
                         </Button>
                     </div>

@@ -24,15 +24,11 @@ export function Sparkline({
         return `${x.toFixed(2)},${y.toFixed(2)}`;
     });
     const line = pts.length ? `M${pts.join("L")}` : "";
-    const area = pts.length ? `${line}L100,30L0,30Z` : "";
     return (
         <svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden className={cn("h-10 w-full overflow-visible", className)}>
             <line x1="0" x2="100" y1="15" y2="15" stroke="currentColor" strokeOpacity="0.12" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
             {n > 1 && (
-                <>
-                    <path d={area} fill={color} fillOpacity="0.08" />
-                    <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                </>
+                <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             )}
         </svg>
     );

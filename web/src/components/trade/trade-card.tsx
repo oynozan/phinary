@@ -6,7 +6,7 @@ import { ArrowRight, Droplet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Panel } from "@/components/layout/panel";
-import { AmountInput, AssetChip, Balance, Profit, SegmentedPills, SwapOutput, SwapStack, TokenIcon } from "@/components/market";
+import { AmountInput, AssetChip, Balance, Profit, SegmentedPills, SwapOutput, SwapStack } from "@/components/market";
 import { Button } from "@/components/ui/button";
 import { LiquidMetalButton } from "@/components/ui/liquid-metal-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,7 +37,7 @@ const MODES = [
 ];
 
 const pill =
-    "num rounded-full border bg-background/40 px-3 py-1 font-secondary text-xs font-semibold text-muted-foreground transition-colors outline-none hover:bg-background/70 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40";
+    "num rounded-full border bg-background px-3 py-1 font-secondary text-xs font-semibold text-muted-foreground transition-colors outline-none hover:bg-surface-3 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring disabled:bg-surface disabled:text-subtle";
 
 function priceOf(q: Quote, side: Side, mode: TradeMode) {
     if (mode === "buy") return side === "up" ? q.askUp : q.askDown;
@@ -68,16 +68,6 @@ function OutcomeCard({ market, side }: { market: Market; side: Side }) {
 
     return (
         <Panel highlight className="flex flex-col items-center gap-6 px-6 py-10 text-center">
-            <div className="flex items-center justify-center -space-x-3">
-                {invalid ? (
-                    <>
-                        <TokenIcon side="up" size={56} />
-                        <TokenIcon side="down" size={56} />
-                    </>
-                ) : (
-                    <TokenIcon side={winner} size={64} />
-                )}
-            </div>
             <p className="font-heading text-3xl leading-tight font-medium">
                 {invalid ? (
                     <>
@@ -85,7 +75,12 @@ function OutcomeCard({ market, side }: { market: Market; side: Side }) {
                     </>
                 ) : (
                     <>
-                        <span className={winner === "up" ? "text-up" : "text-down"}>{tokenTicker(winner)}</span>{" "}
+                        <span className={winner === "up" ? "text-up" : "text-down"}>
+                            <span aria-hidden className="mr-1.5 text-xl align-middle">
+                                {winner === "up" ? "▲" : "▼"}
+                            </span>
+                            {tokenTicker(winner)}
+                        </span>{" "}
                         <span className="text-muted-foreground">pays</span> <span className="num">$1.00</span>
                     </>
                 )}
@@ -316,7 +311,7 @@ function OrderForm({
                                     ))}
                                     <button
                                         type="button"
-                                        className={cn(pill, form.max && held > 0 && "border-primary/60 bg-primary/15 text-primary")}
+                                        className={cn(pill, form.max && held > 0 && "border-primary bg-primary text-primary-foreground hover:bg-accent-2 hover:text-primary-foreground")}
                                         aria-pressed={form.max}
                                         disabled={busy || held <= 0}
                                         onClick={() => setAmount(amountString(held), true)}

@@ -22,7 +22,7 @@ export function Leaderboard({ className }: { className?: string }) {
     return (
         <Panel role="region" aria-labelledby="board-heading" className={cn("p-3 sm:p-4", className)}>
             <div className="hidden px-1.5 pt-1 pb-4 xl:block">
-                <h2 id="board-heading" className="text-xl">
+                <h2 id="board-heading" className="text-center text-xl">
                     Leaderboard
                 </h2>
             </div>
@@ -69,7 +69,7 @@ export function Leaderboard({ className }: { className?: string }) {
 
 function Row({ entry: e, pinned }: { entry: LeaderboardEntry; pinned?: boolean }) {
     return (
-        <tr className={cn("font-secondary text-xs", e.isYou && "bg-primary/[0.07]", pinned && "border-t-2 border-dashed border-border-strong")}>
+        <tr className={cn("font-secondary text-xs", e.isYou && "bg-primary-soft", pinned && "border-t-2 border-dashed border-border-strong")}>
             <td className="px-1.5 py-3">
                 <Rank rank={e.rank} />
             </td>

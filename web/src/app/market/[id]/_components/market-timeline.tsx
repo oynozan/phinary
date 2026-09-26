@@ -31,7 +31,7 @@ export function MarketTimeline({ market, className }: { market: Market; classNam
                 {segments.map((s, i) => {
                     const p = now === null ? 0 : Math.min(1, Math.max(0, (now - s.from) / (s.to - s.from)));
                     return (
-                        <div key={i} className="h-full basis-0 overflow-hidden rounded-full bg-white/10" style={{ flexGrow: WEIGHTS[i] }}>
+                        <div key={i} className="h-full basis-0 overflow-hidden rounded-full bg-surface-3" style={{ flexGrow: WEIGHTS[i] }}>
                             <div
                                 className={cn("h-full rounded-full transition-[width] duration-1000 ease-linear", s.fill)}
                                 style={{ width: `${p * 100}%` }}

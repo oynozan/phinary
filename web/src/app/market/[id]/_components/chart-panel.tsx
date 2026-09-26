@@ -17,7 +17,7 @@ const CHART_HEIGHT = 260;
 
 function StatPill({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
     return (
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-full border bg-background/40 px-3 font-secondary text-xs font-semibold whitespace-nowrap">
+        <span className="inline-flex h-7 items-center gap-1.5 rounded-full border bg-surface-2 px-3 font-secondary text-xs font-semibold whitespace-nowrap">
             <span className="text-muted-foreground">{label}</span>
             <span className={cn("num", className)}>{children}</span>
         </span>
@@ -28,11 +28,14 @@ function Headline({ market }: { market: Market }) {
     if (market.phase === "resolved-up" || market.phase === "resolved-down") {
         const up = market.phase === "resolved-up";
         return (
-            <span className={cn("font-heading text-5xl leading-none font-medium", up ? "text-up" : "text-down")}>
-                <span aria-hidden className="mr-2 text-3xl align-middle">
-                    {up ? "▲" : "▼"}
+            <span className="flex items-baseline gap-3">
+                <span className="font-heading text-5xl leading-none font-medium text-muted-foreground">Resolved</span>
+                <span className={cn("font-heading text-5xl leading-none font-medium", up ? "text-up" : "text-down")}>
+                    <span aria-hidden className="mr-2 text-3xl align-middle">
+                        {up ? "▲" : "▼"}
+                    </span>
+                    {up ? "UP" : "DOWN"}
                 </span>
-                {up ? "UP" : "DOWN"}
             </span>
         );
     }
@@ -57,8 +60,10 @@ export function ChartPanel({ market }: { market: Market }) {
     const ethValue = settled ? market.settlementPrice : (eth.data?.price ?? null);
 
     return (
-        <Panel className="pb-5">
-            <Headline market={market} />
+        <Panel className="pb-5 text-center">
+            <div className="flex justify-center">
+                <Headline market={market} />
+            </div>
 
             <div className="relative mt-5 -mr-1 -ml-2">
                 {history.isLoading ? (
@@ -76,7 +81,7 @@ export function ChartPanel({ market }: { market: Market }) {
                 )}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {upPrice !== null && <PriceTag side="up" price={upPrice} />}
                 {downPrice !== null && <PriceTag side="down" price={downPrice} />}
                 <StatPill label="Vol">{formatUsd(market.volume, { compact: true })}</StatPill>

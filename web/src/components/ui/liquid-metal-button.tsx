@@ -23,11 +23,14 @@ interface LiquidMetalButtonProps {
     href?: string;
 }
 
-/** Orchid color-burn tint over the chrome, and the amethyst inner surface. */
+/** Orchid color-burn tint over the chrome. Every layer under it is a flat opaque colour. */
 const TINT = getShaderColorFromString("#d24bdf");
 const TINT_STRENGTH = 0.85;
-const SURFACE = "linear-gradient(180deg, #7a2384 0%, #561a5e 55%, #3f1446 100%)";
-const SURFACE_HOVER = "linear-gradient(180deg, #8c2897 0%, #641c6d 55%, #481650 100%)";
+const SURFACE = "#5f1d67";
+const SURFACE_HOVER = "#6e2177";
+const SURFACE_DISABLED = "#3a2a3d";
+const RIM_FILL = "#9c30a5";
+const RIM_DISABLED = "#4f3e52";
 const EASE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 const RIM = 2;
 
@@ -40,10 +43,6 @@ const STYLE = `
   position: absolute !important;
   inset: 0 !important;
   border-radius: 9999px !important;
-}
-@keyframes liquid-metal-ripple {
-  0% { transform: translate(-50%, -50%) scale(0); opacity: 0.6; }
-  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
 }`;
 
 const SPEED_IDLE = 0.6;
@@ -67,11 +66,8 @@ export function LiquidMetalButton({
 }: LiquidMetalButtonProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
-    const [ripples, setRipples] = useState<Array<{ x: number; y: number; id: number }>>([]);
     const shaderRef = useRef<HTMLDivElement>(null);
     const shaderMount = useRef<ShaderMount | null>(null);
-    const surfaceRef = useRef<HTMLElement>(null);
-    const rippleId = useRef(0);
     const hoveredRef = useRef(false);
 
     const height = viewMode === "icon" ? 46 : fullWidth ? 56 : 46;
@@ -142,19 +138,8 @@ export function LiquidMetalButton({
         }
         setSpeed(SPEED_PRESS);
         setTimeout(() => setSpeed(hoveredRef.current ? SPEED_HOVER : SPEED_IDLE), 300);
-
-        const el = surfaceRef.current;
-        if (el) {
-            const rect = el.getBoundingClientRect();
-            const ripple = { x: e.clientX - rect.left, y: e.clientY - rect.top, id: rippleId.current++ };
-            setRipples((prev) => [...prev, ripple]);
-            setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== ripple.id)), 600);
-        }
         onClick?.();
     }
-
-    // Disabled dims the chrome, not the label, so the reason stays readable
-    const chrome = disabled ? 0.4 : 1;
 
     const layer: React.CSSProperties = {
         position: "absolute",
@@ -163,28 +148,8 @@ export function LiquidMetalButton({
         transition: `all 0.8s ${EASE}, width 0.4s ease, height 0.4s ease`,
     };
 
-    const shadow = isPressed
-        ? "0 0 0 1px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)"
-        : isHovered
-          ? "0 0 0 1px rgba(0,0,0,0.4), 0 8px 24px -6px rgba(200,40,214,0.45), 0 4px 4px rgba(0,0,0,0.15)"
-          : "0 0 0 1px rgba(0,0,0,0.3), 0 12px 28px -10px rgba(200,40,214,0.35), 0 2px 5px rgba(0,0,0,0.15)";
-
-    const wash = ripples.map((r) => (
-        <span
-            key={r.id}
-            style={{
-                position: "absolute",
-                left: r.x,
-                top: r.y,
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%)",
-                pointerEvents: "none",
-                animation: "liquid-metal-ripple 0.6s ease-out",
-            }}
-        />
-    ));
+    const shadow = isPressed ? "0 0 0 1px rgba(0,0,0,0.5)" : "0 0 0 1px rgba(0,0,0,0.3), 0 2px 5px rgba(0,0,0,0.15)";
+    const surface = disabled ? SURFACE_DISABLED : isHovered ? SURFACE_HOVER : SURFACE;
 
     const shared = {
         title,
@@ -220,8 +185,7 @@ export function LiquidMetalButton({
                             style={{
                                 fontSize: fullWidth ? 18 : 14,
                                 fontWeight: 500,
-                                color: disabled ? "rgb(253 253 253 / 0.78)" : "#fdfdfd",
-                                textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                                color: disabled ? "#cfc6d1" : "#fdfdfd",
                                 whiteSpace: "nowrap",
                             }}
                         >
@@ -230,42 +194,38 @@ export function LiquidMetalButton({
                     </div>
                 )}
 
-                <div style={{ ...layer, zIndex: 20, opacity: chrome }}>
+                <div style={{ ...layer, zIndex: 20 }}>
                     <div
                         style={{
                             position: "absolute",
                             inset: RIM,
                             borderRadius: 9999,
-                            background: isHovered ? SURFACE_HOVER : SURFACE,
-                            boxShadow: isPressed
-                                ? "inset 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 2px rgba(0,0,0,0.3)"
-                                : "inset 0 1px 0 rgba(255,255,255,0.14)",
-                            transition: "background 0.3s ease, box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+                            backgroundColor: surface,
+                            boxShadow: isPressed ? "inset 0 2px 4px rgba(0,0,0,0.4)" : "none",
+                            transition: "background-color 0.3s ease, box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
                         }}
                     />
                 </div>
 
-                <div style={{ ...layer, zIndex: 10, boxShadow: shadow, background: "linear-gradient(90deg, var(--amethyst), var(--orchid))", opacity: chrome }}>
+                <div style={{ ...layer, zIndex: 10, boxShadow: shadow, backgroundColor: disabled ? RIM_DISABLED : RIM_FILL }}>
                     <div
                         ref={shaderRef}
                         className="liquid-metal-shader"
-                        style={{ position: "relative", width: "100%", height: "100%", borderRadius: 9999, overflow: "hidden" }}
+                        style={{
+                            position: "relative",
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: 9999,
+                            overflow: "hidden",
+                            visibility: disabled ? "hidden" : "visible",
+                        }}
                     />
                 </div>
 
                 {href && !disabled ? (
-                    <Link ref={surfaceRef as React.RefObject<HTMLAnchorElement>} href={href} {...shared}>
-                        {wash}
-                    </Link>
+                    <Link href={href} {...shared} />
                 ) : (
-                    <button
-                        ref={surfaceRef as React.RefObject<HTMLButtonElement>}
-                        type={type}
-                        disabled={disabled}
-                        {...shared}
-                    >
-                        {wash}
-                    </button>
+                    <button type={type} disabled={disabled} {...shared} />
                 )}
             </div>
         </div>

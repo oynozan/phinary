@@ -19,7 +19,7 @@ export function Header() {
 
     return (
         <header className="fixed z-50 flex w-full items-center justify-center px-2 pt-4 sm:px-4">
-            <div className="flex h-(--header-h) w-full max-w-[1200px] min-w-0 items-center justify-between gap-2 rounded-full border bg-background/20 px-4 backdrop-blur-xs sm:gap-4 sm:px-6 lg:px-10">
+            <div className="flex h-(--header-h) w-full max-w-[1200px] min-w-0 items-center justify-between gap-2 rounded-full border bg-surface px-4 sm:gap-4 sm:px-6 lg:px-10">
                 <Logo />
 
                 <nav className="hidden min-w-0 flex-1 justify-center gap-6 lg:flex">
@@ -29,7 +29,7 @@ export function Header() {
                             href={item.href}
                             className={cn(
                                 "text-lg transition-colors",
-                                isActivePath(pathname, item.href) ? "text-white" : "text-white/60 hover:text-primary",
+                                isActivePath(pathname, item.href) ? "text-white" : "text-muted-foreground hover:text-primary",
                             )}
                         >
                             {item.label}
@@ -43,9 +43,9 @@ export function Header() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
-                                variant="ghost"
+                                variant="secondary"
                                 size="icon"
-                                className="text-white/80 hover:text-white lg:hidden"
+                                className="size-9 sm:size-11 lg:hidden"
                                 aria-label="Open menu"
                             >
                                 <Menu className="size-6" />

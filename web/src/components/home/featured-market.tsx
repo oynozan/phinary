@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 
-import { Chance, MarketQuestion, PhaseBadge, ProbabilityBar } from "@/components/market";
+import { Chance, MarketQuestion, ProbabilityBar } from "@/components/market";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEthPrice, usePriceHistory } from "@/lib/data";
@@ -28,9 +28,11 @@ export function pickFeatured(markets: Market[]): Market | null {
 }
 
 const CARD = "relative mx-auto w-full max-w-[36rem] overflow-hidden rounded-3xl border bg-surface";
-const TOP = "px-5 pt-5 pb-9 sm:px-7 sm:pt-6";
+const TOP = "px-5 pt-6 pb-9 text-center sm:px-7 sm:pt-7";
 const BOTTOM = "relative border-t bg-surface-2 px-5 pt-11 pb-5 sm:px-7 sm:pb-7";
-const BUY = "h-14 w-full gap-2.5 border text-base font-semibold sm:text-lg";
+const BUY =
+    "h-14 w-full gap-2.5 border-0 text-base font-semibold text-background hover:brightness-110 disabled:bg-surface-3 disabled:text-muted-foreground disabled:opacity-100 sm:text-lg";
+const BUY_FILL: Record<Side, string> = { up: "bg-up hover:bg-up", down: "bg-down hover:bg-down" };
 
 export function FeaturedMarket({ market }: { market: Market | null | undefined }) {
     if (market === undefined) return <FeaturedSkeleton />;
@@ -52,17 +54,13 @@ function FeaturedCard({ market: m }: { market: Market }) {
                 transition={{ duration: 0.35, ease: "easeOut" }}
             >
                 <div className={TOP}>
-                    <div className="flex items-center justify-between gap-3">
-                        <PhaseBadge phase={m.phase} />
-                        <EthSpot strike={m.strike} />
-                    </div>
-
                     <Link
                         href={href}
-                        className="-mx-2 mt-5 block rounded-xl px-2 transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="-mx-2 block rounded-xl px-2 transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                         <MarketQuestion as="h2" strike={m.strike} expiry={m.expiry} className="text-2xl sm:text-3xl" />
                     </Link>
+                    <EthSpot strike={m.strike} />
 
                     <div className="mt-6 flex items-end gap-5 sm:gap-8">
                         <Chance value={m.upChance} className="text-6xl sm:text-7xl" />
@@ -92,11 +90,11 @@ function FeaturedCard({ market: m }: { market: Market }) {
 function BuyButton({ market, side, tradable }: { market: Market; side: Side; tradable: boolean }) {
     const q = market.quote;
     const price = q ? (side === "up" ? q.askUp : q.askDown) : null;
-    const className = cn(BUY, side === "up" ? "border-up/25" : "border-down/25");
+    const className = cn(BUY, BUY_FILL[side]);
     const label = (
         <>
             Buy {side === "up" ? "UP" : "DOWN"}
-            {price !== null && <span className="font-medium num opacity-80">{formatCents(price)}</span>}
+            {price !== null && <span className="font-medium num">{formatCents(price)}</span>}
         </>
     );
 
@@ -116,17 +114,17 @@ function BuyButton({ market, side, tradable }: { market: Market; side: Side; tra
 
 function EthSpot({ strike }: { strike: number }) {
     const eth = useEthPrice();
-    if (!eth.data) return <Skeleton className="h-5 w-32 rounded-full" />;
+    if (!eth.data) return <Skeleton className="mx-auto mt-2 h-5 w-32 rounded-full" />;
     const above = eth.data.price > strike;
     return (
-        <span className="flex items-center gap-1.5 font-secondary text-sm text-muted-foreground num">
+        <p className="mt-2 flex items-center justify-center gap-1.5 font-secondary text-sm text-muted-foreground num">
             ETH
             <span className="font-semibold text-foreground">{formatPrice(eth.data.price)}</span>
             <span aria-hidden className={cn("text-[0.65rem]", above ? "text-up" : "text-down")}>
                 {above ? "▲" : "▼"}
             </span>
             <span className="sr-only">{above ? "above strike" : "below strike"}</span>
-        </span>
+        </p>
     );
 }
 
@@ -134,11 +132,8 @@ function FeaturedSkeleton() {
     return (
         <div className={CARD} aria-busy>
             <div className={TOP}>
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-7 w-16 rounded-full" />
-                    <Skeleton className="h-5 w-32 rounded-full" />
-                </div>
-                <Skeleton className="mt-5 h-8 w-4/5 sm:h-9" />
+                <Skeleton className="mx-auto h-8 w-4/5 sm:h-9" />
+                <Skeleton className="mx-auto mt-2 h-5 w-32 rounded-full" />
                 <div className="mt-6 flex items-end gap-5 sm:gap-8">
                     <Skeleton className="h-15 w-40 sm:h-18" />
                     <Skeleton className="mb-1 h-12 flex-1 sm:h-14" />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Clock, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import { AmountInput, AssetChip, Balance, Countdown, MarketQuestion, PhaseBadge, Profit, SwapOutput, SwapStack, TokenIcon } from "@/components/market";
+import { AmountInput, AssetChip, Balance, Countdown, MarketQuestion, Profit, SwapOutput, SwapStack } from "@/components/market";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useQuote, useWallet } from "@/lib/data";
@@ -52,24 +52,16 @@ function SellForm({ position: p, onDone }: { position: Position; onDone: () => v
 
     return (
         <form onSubmit={submit} className="grid gap-5">
-            <div className="flex items-center gap-3 pr-10">
-                <span aria-hidden>
-                    <TokenIcon side={p.side} strike={p.market.strike} expiry={p.market.expiry} size={44} />
-                </span>
-                <div className="min-w-0">
-                    <DialogTitle className="text-lg leading-tight">
-                        <MarketQuestion strike={p.market.strike} expiry={p.market.expiry} as="span" />
-                    </DialogTitle>
-                    <div className="mt-1.5 flex items-center gap-2">
-                        <PhaseBadge phase={p.market.phase} className="h-6 px-2.5 text-[11px]" />
-                        {deadline !== null && (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                <Clock aria-hidden className="size-3" />
-                                <Countdown to={deadline} />
-                            </span>
-                        )}
-                    </div>
-                </div>
+            <div className="px-10 text-center">
+                <DialogTitle className="text-lg leading-tight">
+                    <MarketQuestion strike={p.market.strike} expiry={p.market.expiry} as="span" />
+                </DialogTitle>
+                {deadline !== null && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 font-secondary text-xs text-muted-foreground">
+                        <Clock aria-hidden className="size-3" />
+                        <Countdown to={deadline} />
+                    </p>
+                )}
             </div>
 
             <SwapStack

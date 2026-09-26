@@ -61,7 +61,7 @@ function KindLabel({ kind }: { kind: Kind }) {
     const { label, icon: Icon } = KIND[kind];
     return (
         <span className="inline-flex items-center gap-2 font-medium">
-            <span className="grid size-7 place-items-center rounded-full bg-primary/12 text-primary">
+            <span className="grid size-7 place-items-center rounded-full bg-primary-soft text-primary">
                 <Icon aria-hidden className="size-3.5" />
             </span>
             {label}
@@ -115,7 +115,7 @@ export function HistoryTable({ rows, markets }: { rows: HistoryRow[]; markets: M
             <Panel flush className="hidden overflow-hidden lg:block">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-white/[0.02] hover:bg-white/[0.02]">
+                        <TableRow className="bg-surface-2 hover:bg-surface-2">
                             {["Time", "Action", "Market", "Side", "Tokens", "Price", "USDC", "Transaction"].map((h, i) => (
                                 <TableHead
                                     key={h}
@@ -134,7 +134,7 @@ export function HistoryTable({ rows, markets }: { rows: HistoryRow[]; markets: M
                     </TableHeader>
                     <TableBody>
                         {visible.map((r) => (
-                            <TableRow key={r.id} className="hover:bg-white/[0.025]">
+                            <TableRow key={r.id} className="hover:bg-surface-2">
                                 <TableCell className="py-3.5 pl-6 text-sm text-muted-foreground">
                                     <Time unix={r.time} />
                                 </TableCell>

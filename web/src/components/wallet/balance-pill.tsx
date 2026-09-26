@@ -17,7 +17,7 @@ export function BalancePill({ className }: { className?: string }) {
         return (
             <Button
                 variant="outline"
-                className={cn("h-11 gap-2 border-primary/50 px-5 text-base text-primary hover:bg-primary/10 hover:text-primary", className)}
+                className={cn("h-11 gap-2 border-primary bg-primary-soft px-5 text-base text-primary hover:bg-primary-soft-hover hover:text-primary", className)}
                 disabled={wallet.dripping || wallet.wrongNetwork}
                 onClick={async () => {
                     try {
@@ -35,7 +35,7 @@ export function BalancePill({ className }: { className?: string }) {
     }
 
     return (
-        <div className={cn("flex h-11 items-center gap-2 rounded-full border bg-background/20 px-5 font-secondary text-base", className)}>
+        <div className={cn("flex h-11 items-center gap-2 rounded-full border bg-surface-2 px-5 font-secondary text-base", className)}>
             <span className="num font-semibold">{formatUsd(wallet.usdc)}</span>
             <span className="text-muted-foreground">USDC</span>
         </div>

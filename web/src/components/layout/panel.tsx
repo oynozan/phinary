@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 type PanelProps = React.ComponentProps<"div"> & {
-    /** soft orchid wash for highlights and empty states */
+    /** flat orchid-tinted surface for highlights and empty states */
     highlight?: boolean;
     /** drop the default padding (tables, charts that bleed to the edge) */
     flush?: boolean;

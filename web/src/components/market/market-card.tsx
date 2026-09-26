@@ -14,11 +14,10 @@ import { cn } from "@/lib/utils";
 import { Chance } from "./chance";
 import { Countdown } from "./countdown";
 import { MarketQuestion } from "./market-question";
-import { PhaseBadge } from "./phase-badge";
 import { ProbabilityBar } from "./probability-bar";
 import { Sparkline } from "./sparkline";
 
-const ROW = "flex h-11 items-center justify-between rounded-full border bg-background/40 px-5 font-secondary text-sm";
+const ROW = "flex h-11 items-center justify-between rounded-full border bg-surface-2 px-5 font-secondary text-sm";
 
 function Winner({ market }: { market: Market }) {
     if (market.phase === "invalid") {
@@ -47,7 +46,7 @@ function Settlement({ market }: { market: Market }) {
     const diff = avg !== null ? avg - market.strike : null;
     return (
         <div className={ROW}>
-            <span className="text-muted-foreground">Avg</span>
+            <span className="text-muted-foreground">{market.phase === "invalid" ? "Invalid" : "Settled"}</span>
             <span className="num flex items-baseline gap-2">
                 <span className="font-semibold">{avg !== null ? formatPrice(avg) : "-"}</span>
                 {diff !== null && (
@@ -68,7 +67,7 @@ function Waiting({ market }: { market: Market }) {
     );
 }
 
-/** Market summary card with phase, question, UP chance or winner, then Buy UP / DOWN, a countdown, or the settlement average */
+/** Market summary card: question, UP chance or winner, then Buy UP / DOWN, a countdown row, or the settlement average. No phase pill: the countdown carries status */
 export function MarketCard({ market, onBuy, className }: { market: Market; onBuy?: (side: Side) => void; className?: string }) {
     const history = usePriceHistory(market.id);
     const spark = (history.data ?? []).map((p) => p.mid);
@@ -102,18 +101,7 @@ export function MarketCard({ market, onBuy, className }: { market: Market; onBuy
     };
 
     return (
-        <Panel className={cn("flex flex-col gap-5 transition-colors hover:border-white/20", className)}>
-            <div className="flex h-7 items-center justify-between gap-3">
-                <PhaseBadge phase={market.phase} />
-                {tradable && deadline !== null && (
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock aria-hidden className="size-3.5" />
-                        <span className="sr-only">{DEADLINE_LABEL[market.phase]}</span>
-                        <Countdown to={deadline} />
-                    </span>
-                )}
-            </div>
-
+        <Panel className={cn("flex flex-col gap-5 transition-colors hover:border-border-strong", className)}>
             <Link
                 href={href}
                 className="-mx-2 rounded-xl px-2 transition-colors outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -141,6 +129,13 @@ export function MarketCard({ market, onBuy, className }: { market: Market; onBuy
 
             <div className="flex items-center justify-between font-secondary text-xs text-muted-foreground">
                 <span className="num">{formatUsd(market.volume, { compact: true })} vol</span>
+                {tradable && deadline !== null && (
+                    <span className="flex items-center gap-1.5 text-foreground">
+                        <Clock aria-hidden className="size-3.5 text-muted-foreground" />
+                        <span className="sr-only">{DEADLINE_LABEL[market.phase]}</span>
+                        <Countdown to={deadline} className="font-semibold" />
+                    </span>
+                )}
                 <span className="num">#{market.id}</span>
             </div>
         </Panel>

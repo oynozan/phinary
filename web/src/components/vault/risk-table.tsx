@@ -63,7 +63,7 @@ function Row({ risk: r, market }: { risk: VaultMarketRisk; market: Market | null
     const cell = "num px-1.5 py-3 text-right sm:px-2";
 
     return (
-        <tr className="transition-colors hover:bg-background/40">
+        <tr className="transition-colors hover:bg-surface-2">
             <td className="px-1.5 py-2 sm:px-2">
                 <Link
                     href={`/market/${r.marketId}`}

@@ -19,7 +19,7 @@ function Dot({ state, index }: { state: StepState; index: number }) {
                 state === "idle" && "text-muted-foreground",
                 state === "active" && "border-primary text-primary",
                 state === "done" && "border-primary bg-primary text-primary-foreground",
-                state === "error" && "border-down/50 bg-down/15 text-down",
+                state === "error" && "border-down bg-down-soft text-down",
             )}
         >
             {state === "idle" && index + 1}
@@ -62,7 +62,7 @@ export function TradeSteps({ steps }: { steps: Steps | null }) {
                                     {!last && (
                                         <span
                                             aria-hidden
-                                            className={cn("h-px min-w-3 flex-1 transition-colors", state === "done" ? "bg-primary/60" : "bg-border")}
+                                            className={cn("h-px min-w-3 flex-1 transition-colors", state === "done" ? "bg-primary" : "bg-border")}
                                         />
                                     )}
                                 </li>

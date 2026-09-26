@@ -13,7 +13,7 @@ import { formatAgo, formatCents, formatTokens, formatUsd, marketQuestion, shortA
 import type { ActivityItem, Address, Market } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { LiveDot, Trader } from "./trader";
+import { Trader } from "./trader";
 
 const PAGE = 20;
 const MAX = 240;
@@ -30,11 +30,10 @@ export function LiveFeed({ markets, now, you, className }: { markets: Map<number
 
     return (
         <Panel role="region" aria-labelledby="feed-heading" className={cn("p-3 sm:p-4", className)}>
-            <div className="hidden items-center gap-2.5 px-3 pt-1 pb-4 xl:flex">
-                <h2 id="feed-heading" className="text-xl">
+            <div className="hidden px-3 pt-1 pb-4 xl:block">
+                <h2 id="feed-heading" className="text-center text-xl">
                     Feed
                 </h2>
-                <LiveDot />
             </div>
 
             <div
@@ -81,7 +80,7 @@ export function LiveFeed({ markets, now, you, className }: { markets: Map<number
                     <button
                         type="button"
                         onClick={() => setLimit((l) => Math.min(MAX, l + PAGE))}
-                        className="rounded-full border bg-background/60 px-4 py-1.5 text-xs font-medium transition-colors outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-ring"
+                        className="rounded-full border bg-surface-2 px-4 py-1.5 text-xs font-medium transition-colors outline-none hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         Load more
                     </button>
@@ -112,7 +111,7 @@ function FeedRow({ item, market, now, you }: { item: ActivityItem; market: Marke
         const who = isYou ? "You" : shortAddress(t.account);
         const label = `${who} ${t.isBuy ? "bought" : "sold"} ${formatTokens(t.qty)} ${sideLabel(t.side)} at ${formatCents(t.price, 1)} for ${formatUsd(t.usdc)}, ${question}, ${ago} ago`;
         return (
-            <RowLink href={`/market/${id}`} label={label} className={cn(TRADE_ROW, isYou && "bg-primary/[0.07]")}>
+            <RowLink href={`/market/${id}`} label={label} className={cn(TRADE_ROW, isYou && "bg-primary-soft md:bg-primary-soft")}>
                 <Trader address={t.account} isYou={isYou} hideAddressForYou className="[grid-area:trader]" />
                 <span className="flex min-w-0 items-center gap-2 [grid-area:action]">
                     <span className={cn("w-7 shrink-0 font-secondary text-xs font-semibold", t.isBuy ? "text-foreground" : "text-muted-foreground")}>
@@ -164,8 +163,8 @@ function RowLink({ href, label, className, children }: { href: string; label: st
                 prefetch={false}
                 aria-label={label}
                 className={cn(
-                    "relative grid items-center gap-x-3 gap-y-2 rounded-2xl border bg-background/30 p-3 transition-colors outline-none hover:bg-background/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                    "md:rounded-none md:border-0 md:bg-transparent md:gap-y-0 md:px-3 md:py-3 md:hover:bg-background/40",
+                    "relative grid items-center gap-x-3 gap-y-2 rounded-2xl border bg-surface-2 p-3 transition-colors outline-none hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                    "md:rounded-none md:border-0 md:bg-surface md:gap-y-0 md:px-3 md:py-3 md:hover:bg-surface-2",
                     className,
                 )}
             >
@@ -174,7 +173,7 @@ function RowLink({ href, label, className, children }: { href: string; label: st
                     initial={{ opacity: 1 }}
                     animate={{ opacity: 0 }}
                     transition={{ duration: 2.4, ease: "easeOut" }}
-                    className="pointer-events-none absolute inset-0 rounded-[inherit] bg-primary/15"
+                    className="pointer-events-none absolute inset-0 rounded-[inherit] bg-primary-soft"
                 />
                 {children}
             </Link>

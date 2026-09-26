@@ -12,6 +12,7 @@
     "@paper-design/shaders": "^0.0.81",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^1.48.0",
     "motion": "^13.4.4",
     "next": "16.3.6",

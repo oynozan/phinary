@@ -11,7 +11,7 @@ export function MarketSkeleton() {
         <PageWide aria-busy="true" className={PAGE}>
             <div className="mb-8 flex flex-col items-center">
                 <Skeleton className="h-10 w-full max-w-lg rounded-full sm:h-12" />
-                <Skeleton className="mt-3 h-7 w-40 rounded-full" />
+                <Skeleton className="mt-3 h-7 w-20 rounded-full" />
                 <Skeleton className="mt-4 h-1.5 w-full max-w-xl rounded-full" />
                 <Skeleton className="mt-2.5 h-4 w-full max-w-xl rounded-full" />
             </div>

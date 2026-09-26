@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { Panel } from "@/components/layout/panel";
 import { Profit } from "@/components/market/money";
-import { TokenIcon } from "@/components/market/token-icon";
+import { SideMark } from "@/components/market/price-tag";
 import { useClaims } from "@/components/trade/use-claims";
 import { Button } from "@/components/ui/button";
 import { usePortfolio } from "@/lib/data";
@@ -39,12 +39,9 @@ function Row({
     const p = position;
     return (
         <div className="grid grid-cols-2 items-center gap-x-4 gap-y-4 px-5 py-4 sm:grid-cols-[minmax(0,1.4fr)_1fr_1fr_auto] sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-                <TokenIcon side={p.side} strike={p.market.strike} expiry={p.market.expiry} size={44} />
-                <div className="min-w-0">
-                    <div className="num font-heading text-xl leading-tight">{formatTokens(p.qty)}</div>
-                    <div className="font-secondary text-xs text-muted-foreground">{p.side === "up" ? p.market.upTicker : p.market.downTicker}</div>
-                </div>
+            <div className="min-w-0">
+                <div className="num font-heading text-xl leading-tight">{formatTokens(p.qty)}</div>
+                <SideMark side={p.side} className="text-xs" />
             </div>
             <div className="order-3 sm:order-none">
                 <Metric label="Value">{formatUsd(p.value)}</Metric>
@@ -89,7 +86,7 @@ export function PositionPanel({ market, onSell }: { market: Market; onSell: (sid
                     transition={{ duration: 0.3, ease: "easeOut" }}
                 >
                     <Panel flush className="divide-y">
-                        <h2 id="position-heading" className="px-5 pt-5 pb-3 text-xl sm:px-6">
+                        <h2 id="position-heading" className="px-5 pt-5 pb-3 text-center text-xl sm:px-6">
                             Position
                         </h2>
                         {positions.map((p) => (

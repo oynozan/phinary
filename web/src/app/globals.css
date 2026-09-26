@@ -33,8 +33,16 @@
     --color-amethyst: var(--amethyst);
     --color-up: var(--up);
     --color-down: var(--down);
+    --color-up-soft: var(--up-soft);
+    --color-up-soft-hover: var(--up-soft-hover);
+    --color-down-soft: var(--down-soft);
+    --color-down-soft-hover: var(--down-soft-hover);
+    --color-primary-soft: var(--primary-soft);
+    --color-primary-soft-hover: var(--primary-soft-hover);
+    --color-primary-disabled: var(--primary-disabled);
+    --color-warn-soft: var(--warn-soft);
+    --color-wash: var(--wash);
     --color-warn: var(--warn);
-    --color-usdc: var(--usdc);
     --color-destructive: var(--destructive);
     --color-border: var(--border);
     --color-border-strong: var(--border-strong);
@@ -99,8 +107,18 @@
     --up: #e070ea;
     --down: #e5604f;
     --warn: #e0a64a;
-    --usdc: #2775ca;
     --destructive: #e5604f;
+
+    /* Opaque tints: a side or brand colour mixed into a surface, never alpha, so nothing behind shows through */
+    --up-soft: color-mix(in srgb, var(--up) 16%, var(--surface));
+    --up-soft-hover: color-mix(in srgb, var(--up) 26%, var(--surface));
+    --down-soft: color-mix(in srgb, var(--down) 16%, var(--surface));
+    --down-soft-hover: color-mix(in srgb, var(--down) 26%, var(--surface));
+    --primary-soft: color-mix(in srgb, var(--orchid) 16%, var(--surface));
+    --primary-soft-hover: color-mix(in srgb, var(--orchid) 26%, var(--surface));
+    --primary-disabled: color-mix(in srgb, var(--orchid) 32%, var(--carbon));
+    --warn-soft: color-mix(in srgb, var(--warn) 14%, var(--surface));
+    --wash: color-mix(in srgb, var(--orchid) 12%, var(--surface));
 
     --border: rgb(255 255 255 / 10%);
     --border-strong: rgb(255 255 255 / 16%);
@@ -203,14 +221,9 @@
     }
 }
 
-/* Soft accent wash for highlight and empty-state panels (atomic.cash pattern) */
+/* Flat orchid-tinted surface for highlight and empty-state panels */
 @utility bg-accent-wash {
-    background-image: linear-gradient(
-        to right,
-        color-mix(in oklab, var(--orchid) 20%, transparent),
-        color-mix(in oklab, var(--orchid) 9%, transparent) 50%,
-        transparent
-    );
+    background-color: var(--wash);
 }
 
 ::selection {

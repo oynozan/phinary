@@ -1,15 +1,14 @@
 export { AmountInput } from "./amount-input";
-export { AssetChip, Balance, SharesIcon, UsdcIcon, type Asset } from "./asset-chip";
+export { AssetChip, Balance, type Asset } from "./asset-chip";
 export { Chance } from "./chance";
 export { Countdown } from "./countdown";
 export { MarketCard } from "./market-card";
 export { MarketQuestion } from "./market-question";
 export { isFlat, Money, Profit } from "./money";
 export { PHASE_DOT, PhaseBadge } from "./phase-badge";
-export { PriceTag } from "./price-tag";
+export { PriceTag, SideMark } from "./price-tag";
 export { ProbabilityBar } from "./probability-bar";
 export { ProbabilityChart } from "./probability-chart";
 export { SegmentedPills, type PillOption } from "./segmented-pills";
 export { Sparkline } from "./sparkline";
 export { SwapOutput, SwapStack } from "./swap-stack";
-export { TokenIcon } from "./token-icon";

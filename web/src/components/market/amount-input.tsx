@@ -43,8 +43,8 @@ export function AmountInput({
     const current = Number.parseFloat(value);
     const chip = (active: boolean) =>
         cn(
-            "num rounded-full border px-3 py-1 font-secondary text-xs font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40",
-            active ? "border-primary/60 bg-primary/15 text-primary" : "bg-background/40 text-muted-foreground hover:bg-background/70 hover:text-foreground",
+            "num rounded-full border px-3 py-1 font-secondary text-xs font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:bg-surface disabled:text-subtle",
+            active ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-surface-3 hover:text-foreground",
         );
 
     return (

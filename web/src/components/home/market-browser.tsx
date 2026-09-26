@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
-import { EmptyState, Panel } from "@/components/layout/panel";
+import { Panel } from "@/components/layout/panel";
 import { MarketCard, SegmentedPills, type PillOption } from "@/components/market";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -74,6 +74,7 @@ export function MarketBrowser({
                         setLimit(PAGE);
                     }}
                     size="md"
+                    className="bg-surface"
                 />
             </div>
 
@@ -87,7 +88,7 @@ export function MarketBrowser({
                         ))}
                     </ul>
                 ) : list.length === 0 ? (
-                    <EmptyState title={empty} />
+                    <Panel className="px-8 py-12 text-center text-lg font-medium">{empty}</Panel>
                 ) : (
                     <ul key={tab} className="relative flex flex-wrap justify-center gap-5">
                         <AnimatePresence initial={false} mode="popLayout">
@@ -111,7 +112,7 @@ export function MarketBrowser({
 
             {list && list.length > limit && (
                 <div className="mt-10 flex justify-center">
-                    <Button variant="outline" size="lg" onClick={() => setLimit((n) => n + PAGE)}>
+                    <Button variant="outline" size="lg" className="bg-surface hover:bg-surface-3" onClick={() => setLimit((n) => n + PAGE)}>
                         Show more
                     </Button>
                 </div>
@@ -123,10 +124,6 @@ export function MarketBrowser({
 function CardSkeleton() {
     return (
         <Panel className="flex flex-col gap-5" aria-hidden>
-            <div className="flex items-center justify-between">
-                <Skeleton className="h-7 w-16 rounded-full" />
-                <Skeleton className="h-5 w-12 rounded-full" />
-            </div>
             <Skeleton className="h-7 w-4/5" />
             <div className="flex items-end justify-between">
                 <Skeleton className="h-10 w-24" />
@@ -137,9 +134,10 @@ function CardSkeleton() {
                 <Skeleton className="h-11 rounded-full" />
                 <Skeleton className="h-11 rounded-full" />
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-14 rounded-full" />
                 <Skeleton className="h-4 w-16 rounded-full" />
-                <Skeleton className="h-4 w-12 rounded-full" />
+                <Skeleton className="h-4 w-8 rounded-full" />
             </div>
         </Panel>
     );

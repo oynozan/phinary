@@ -4,22 +4,21 @@ import { cn } from "cn"
 import { Slot } from "radix-ui"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:bg-surface-2 disabled:text-subtle aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-accent-2 disabled:bg-primary/35 disabled:text-white/80 disabled:opacity-100",
+        default: "bg-primary text-primary-foreground hover:bg-accent-2 disabled:bg-primary-disabled disabled:text-[#e6d9e8]",
         outline:
-          "border-border bg-background/20 hover:bg-white/5 hover:text-foreground aria-expanded:bg-white/5",
+          "border-border bg-surface-2 hover:bg-surface-3 hover:text-foreground aria-expanded:bg-surface-3",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-surface-3 aria-expanded:bg-surface-3",
         ghost:
-          "hover:bg-white/5 hover:text-foreground aria-expanded:bg-white/5",
-        up: "bg-up/15 text-up hover:bg-up/25",
-        down: "bg-down/15 text-down hover:bg-down/25",
+          "bg-surface hover:bg-surface-2 hover:text-foreground aria-expanded:bg-surface-2",
+        up: "bg-up-soft text-up hover:bg-up-soft-hover",
+        down: "bg-down-soft text-down hover:bg-down-soft-hover",
         destructive:
-          "bg-destructive/15 text-destructive hover:bg-destructive/25 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-down-soft text-destructive hover:bg-down-soft-hover focus-visible:border-destructive",
       },
       size: {
         default:

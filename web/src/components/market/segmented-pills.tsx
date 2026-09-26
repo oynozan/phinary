@@ -48,7 +48,7 @@ export function SegmentedPills<T extends string>({
             role="radiogroup"
             aria-label={ariaLabel}
             className={cn(
-                "inline-flex items-center gap-1 rounded-full border bg-background/40 p-0.5",
+                "inline-flex items-center gap-1 rounded-full border bg-background p-0.5",
                 size === "md" && "p-1",
                 fullWidth && "flex w-full",
                 className,
@@ -68,14 +68,14 @@ export function SegmentedPills<T extends string>({
                         onClick={() => onChange(o.value)}
                         onKeyDown={onKeyDown}
                         className={cn(
-                            "rounded-full font-secondary font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40",
+                            "rounded-full font-secondary font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:text-subtle",
                             size === "xs" && "px-2.5 py-0.5 text-[11px]",
                             size === "sm" && "px-4 py-1.5 text-xs",
                             size === "md" && "h-10 px-5 text-sm",
                             fullWidth && "flex-1",
                             active
                                 ? (o.activeClassName ?? "bg-primary text-primary-foreground")
-                                : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                                : "bg-background text-muted-foreground hover:bg-surface-3 hover:text-foreground",
                         )}
                     >
                         {o.label}

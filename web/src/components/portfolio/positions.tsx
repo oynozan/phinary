@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Clock, LoaderCircle } from "lucide-react";
 
 import { Panel } from "@/components/layout/panel";
-import { Countdown, isFlat, MarketQuestion, PhaseBadge, PriceTag, Profit, TokenIcon } from "@/components/market";
+import { Countdown, isFlat, MarketQuestion, PriceTag, Profit, SideMark } from "@/components/market";
 import type { Claims } from "@/components/trade/use-claims";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,7 +13,6 @@ import { formatCents, formatPercent, formatTokens, formatUsd, marketQuestion, si
 import { isTradable, nextDeadline } from "@/lib/phase";
 import type { Position } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
 
 export const positionKey = (p: Pick<Position, "marketId" | "side">) => `${p.marketId}:${p.side}`;
 
@@ -62,27 +61,30 @@ function Action({ position: p, claims, onSell }: { position: Position; claims: C
     return null;
 }
 
-function MarketCell({ position: p, size = 40, withSide = false }: { position: Position; size?: number; withSide?: boolean }) {
+function MarketCell({ position: p, withSide = false }: { position: Position; withSide?: boolean }) {
     const m = p.market;
     const deadline = nextDeadline(m, m.phase);
+    const live = m.phase === "live" && deadline !== null;
     return (
-        <div className="flex min-w-0 items-center gap-3">
-            <span aria-hidden className="shrink-0">
-                <TokenIcon side={p.side} strike={m.strike} expiry={m.expiry} size={size} />
-            </span>
-            <div className="min-w-0">
-                <Link
-                    href={`/market/${m.id}`}
-                    className="rounded-sm outline-none transition-colors hover:text-primary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    <MarketQuestion strike={m.strike} expiry={m.expiry} as="span" className="text-base" />
-                </Link>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    {withSide && <PriceTag side={p.side} className="h-6 px-2.5 text-[11px]" />}
-                    <PhaseBadge phase={m.phase} className="h-6 px-2.5 text-[11px]" />
-                    {m.phase === "live" && deadline !== null && <Countdown to={deadline} className="text-xs text-muted-foreground" />}
+        <div className="min-w-0">
+            <Link
+                href={`/market/${m.id}`}
+                className="rounded-sm outline-none transition-colors hover:text-primary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <MarketQuestion strike={m.strike} expiry={m.expiry} as="span" className="text-base" />
+            </Link>
+            {(withSide || live) && (
+                <div className="mt-1 flex flex-wrap items-center gap-3 font-secondary text-xs">
+                    {withSide && <SideMark side={p.side} />}
+                    {live && (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <Clock aria-hidden className="size-3" />
+                            <span className="sr-only">Trading closes in</span>
+                            <Countdown to={deadline} />
+                        </span>
+                    )}
                 </div>
-            </div>
+            )}
         </div>
     );
 }
@@ -107,7 +109,7 @@ export function PositionsTable({ positions, claims, onSell }: { positions: Posit
             <Panel flush className="hidden overflow-hidden lg:block">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-white/[0.02] hover:bg-white/[0.02]">
+                        <TableRow className="bg-surface-2 hover:bg-surface-2">
                             {["Market", "Side", "Tokens", "Avg cost", "Bid", "Value", "Profit"].map((h, i) => (
                                 <TableHead
                                     key={h}
@@ -128,7 +130,7 @@ export function PositionsTable({ positions, claims, onSell }: { positions: Posit
                     </TableHeader>
                     <TableBody>
                         {positions.map((p) => (
-                            <TableRow key={positionKey(p)} className={cn("hover:bg-white/[0.025]", p.state === "lost" && "opacity-55")}>
+                            <TableRow key={positionKey(p)} className={cn("hover:bg-surface-2", p.state === "lost" && "opacity-55")}>
                                 <TableCell className="py-4 pl-6">
                                     <MarketCell position={p} />
                                 </TableCell>
@@ -154,8 +156,8 @@ export function PositionsTable({ positions, claims, onSell }: { positions: Posit
             <ul className="grid gap-3 md:grid-cols-2 lg:hidden">
                 {positions.map((p) => (
                     <li key={positionKey(p)} className={cn("rounded-3xl border bg-surface p-4 sm:p-5", p.state === "lost" && "opacity-60")}>
-                        <MarketCell position={p} size={44} withSide />
-                        <dl className="mt-4 grid grid-cols-4 gap-2 rounded-2xl border bg-background/30 px-3 py-2.5">
+                        <MarketCell position={p} withSide />
+                        <dl className="mt-4 grid grid-cols-4 gap-2 rounded-2xl border bg-surface-2 px-3 py-2.5">
                             {[
                                 ["Tokens", formatTokens(p.qty)],
                                 ["Avg", formatCents(p.avgPrice)],
@@ -182,7 +184,7 @@ export function PositionsTable({ positions, claims, onSell }: { positions: Posit
 export function PositionsSkeleton() {
     return (
         <Panel flush aria-hidden className="overflow-hidden">
-            <div className="h-11 border-b bg-white/[0.02]" />
+            <div className="h-11 border-b bg-surface-2" />
             {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-4 border-b px-6 py-5 last:border-0">
                     <Skeleton className="size-10 rounded-full" />

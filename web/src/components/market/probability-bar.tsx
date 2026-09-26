@@ -21,7 +21,7 @@ export function ProbabilityBar({ up, labels = false, className }: { up: number; 
                 aria-label="UP chance"
             >
                 <div className="h-full rounded-full bg-up transition-[width] duration-700" style={{ width: `${p * 100}%` }} />
-                <div className="h-full flex-1 rounded-full bg-down/80 transition-[width] duration-700" />
+                <div className="h-full flex-1 rounded-full bg-down transition-[width] duration-700" />
             </div>
         </div>
     );
