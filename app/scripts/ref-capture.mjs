@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer-core'
-const OUT = '../docs/design/atomic-cash'
+const OUT = '../docs/md/design/atomic-cash'
 const url = process.argv[2] ?? 'https://atomic.cash'
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox'] })
 const page = await browser.newPage()

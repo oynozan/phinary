@@ -2,32 +2,24 @@ import {
   BaseError,
   ContractFunctionRevertedError,
   parseEventLogs,
-  zeroAddress,
+  type Abi,
   type Address,
   type Hash,
   type PublicClient,
   type TransactionReceipt,
 } from "viem";
-import { MarketStatus, predictionHookAbi, predictionHookAdminAbi, underlyingOracleAbi } from "./abi.ts";
+import { marketSchedulerAbi, MarketStatus, predictionHookAbi, predictionHookAdminAbi } from "./abi.ts";
 import { assertChainId, makeClients, shutdownSignal, sleep, waitForSuccess, type Clients } from "./chain.ts";
 import { loadEnvFiles, loadKeeperConfig, requireAddress, USDC_DECIMALS, type KeeperConfig } from "./config.ts";
 import { createLogger, errMsg, type Logger } from "./log.ts";
-import {
-  buildMarketParams,
-  isSettleDue,
-  SECONDS_PER_YEAR,
-  sweepableAmount,
-  type MarketInfo,
-  type MarketParams,
-  type MarketTemplate,
-} from "./market.ts";
-import { formatRational, isqrt } from "./math.ts";
+import { isSettleDue, sweepableAmount, type MarketInfo } from "./market.ts";
+import { formatRational } from "./math.ts";
 
 export interface KeeperOptions {
   clients: Clients;
   hook: Address;
-  oracle: Address;
-  template: MarketTemplate;
+  /** The ownerless MarketScheduler that owns `hook`; `open()` is the only path to a new market. */
+  scheduler: Address;
   periodSec: number;
   alignToPeriod: boolean;
   scanBack: number;
@@ -39,9 +31,7 @@ export interface KeeperOptions {
   sender?: Address;
 }
 
-type HookWrite =
-  | { functionName: "createMarket"; args: readonly [MarketParams] }
-  | { functionName: "settle" | "settleInvalid" | "sweep"; args: readonly [bigint] };
+type HookWrite = { functionName: "settle" | "settleInvalid" | "sweep"; args: readonly [bigint] };
 
 /** First wall-clock second at which the next market should be created. */
 export function nextCreateTime(nowSec: number, periodSec: number, align: boolean, first: boolean): number {
@@ -63,13 +53,11 @@ export function isRevert(e: unknown): boolean {
   return e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError) !== null;
 }
 
-/** The hook's keeper, else its owner: the account createMarket accepts, for dry runs without a key. */
-export async function hookOperator(publicClient: PublicClient, hook: Address): Promise<Address | undefined> {
-  const read = (functionName: "keeper" | "owner") =>
-    publicClient.readContract({ address: hook, abi: predictionHookAdminAbi, functionName }).catch(() => undefined);
-  const keeper = await read("keeper");
-  if (keeper && keeper !== zeroAddress) return keeper;
-  return read("owner");
+/** True when a simulated `open()` reverted because this slot is already open (someone else's call landed first). */
+export function isAlreadyOpened(e: unknown): boolean {
+  if (!(e instanceof BaseError)) return false;
+  const revert = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
+  return revert?.data?.errorName === "AlreadyOpened";
 }
 
 /** Seconds after expiry from which settleInvalid can succeed: past the hook's GRACE, and at least `configured`. */
@@ -94,7 +82,6 @@ export class Keeper {
   readonly pending = new Set<bigint>();
   lastCount: bigint | undefined;
   nextCreateAt: number | undefined;
-  private budgetWarned = false;
 
   constructor(opts: KeeperOptions) {
     this.opts = opts;
@@ -119,14 +106,16 @@ export class Keeper {
     return this.fetchInfo(id).catch(() => undefined);
   }
 
-  private async write(
-    call: HookWrite,
+  private async send(
+    address: Address,
+    abi: Abi,
+    call: { functionName: string; args: readonly unknown[] },
     onSubmitted?: () => void,
   ): Promise<{ result: unknown; hash?: Hash; receipt?: TransactionReceipt }> {
     const { publicClient, walletClient, account } = this.opts.clients;
     const { request, result } = await publicClient.simulateContract({
-      address: this.opts.hook,
-      abi: predictionHookAbi,
+      address,
+      abi,
       ...call,
       account: account ?? this.opts.sender,
     } as Parameters<typeof publicClient.simulateContract>[0]);
@@ -138,6 +127,10 @@ export class Keeper {
     onSubmitted?.();
     const receipt = await waitForSuccess(publicClient, hash, this.opts.txTimeoutMs);
     return { result, hash, receipt };
+  }
+
+  private write(call: HookWrite, onSubmitted?: () => void) {
+    return this.send(this.opts.hook, predictionHookAbi, call, onSubmitted);
   }
 
   /** Picks up markets created since the last call (or the last `scanBack` on startup), plus reads that failed. */
@@ -236,40 +229,45 @@ export class Keeper {
   }
 
   /**
-   * Creates one market struck at the oracle's current start-of-block price. Returns its id, if known. `onSubmitted`
-   * runs once the transaction is sent (or simulated in a dry run); a skip for budget or an earlier error leaves it
-   * uncalled, so the caller can retry.
+   * Calls the scheduler's permissionless `open()` for the current slot. Returns the opened market's id, if known.
+   * `onSubmitted` runs once the transaction is sent (or simulated in a dry run); `AlreadyOpened` counts as
+   * submitted too, since the slot is done either way (another caller's `open()` landed first) and there is
+   * nothing to retry until the next one. Any other failure leaves `onSubmitted` uncalled, so the caller can retry.
    */
   async createMarket(now: bigint, onSubmitted?: () => void): Promise<bigint | undefined> {
-    const { publicClient } = this.opts.clients;
-    const { log, template } = this.opts;
-    const [lnSpot, idle] = await Promise.all([
-      publicClient.readContract({ address: this.opts.oracle, abi: underlyingOracleAbi, functionName: "lnSpotSoBWad" }),
-      publicClient.readContract({ address: this.opts.hook, abi: predictionHookAbi, functionName: "vaultIdle" }),
-    ]);
-    if (idle < template.budget) {
-      const fields = { idle: usdc(idle), budget: usdc(template.budget) };
-      if (this.budgetWarned) log.debug("vault idle below market budget, skipping", fields);
-      else log.warn("vault idle below market budget, skipping", fields);
-      this.budgetWarned = true;
-      return undefined;
+    const { log, scheduler } = this.opts;
+    let outcome: { result: unknown; hash?: Hash; receipt?: TransactionReceipt };
+    try {
+      outcome = await this.send(scheduler, marketSchedulerAbi, { functionName: "open", args: [] }, onSubmitted);
+    } catch (e) {
+      if (isAlreadyOpened(e)) {
+        log.debug("scheduler slot already opened, nothing to do", { now });
+        onSubmitted?.();
+        return undefined;
+      }
+      throw e;
     }
-    const built = buildMarketParams(this.opts.oracle, lnSpot, now, template);
-    const { result, hash, receipt } = await this.write({ functionName: "createMarket", args: [built.params] }, onSubmitted);
+    const { result, hash, receipt } = outcome;
     let id = typeof result === "bigint" ? result : undefined;
+    let slot: bigint | undefined;
+    let budget: bigint | undefined;
+    let strikeCents: bigint | undefined;
     if (receipt) {
-      const created = parseEventLogs({ abi: predictionHookAbi, logs: receipt.logs, eventName: "MarketCreated" });
-      const own = created.find((l) => l.address.toLowerCase() === this.opts.hook.toLowerCase());
-      if (own) id = own.args.marketId;
+      const opened = parseEventLogs({ abi: marketSchedulerAbi, logs: receipt.logs, eventName: "MarketOpened" });
+      const own = opened.find((l) => l.address.toLowerCase() === scheduler.toLowerCase());
+      if (own) {
+        id = own.args.marketId;
+        slot = own.args.slot;
+        budget = own.args.budget;
+        strikeCents = own.args.strikeCents;
+      }
     }
-    log.info(hash ? "market created" : "createMarket (dry run)", {
+    log.info(hash ? "market opened" : "open (dry run)", {
       market: id,
-      name: built.params.yesName,
-      strike: built.strike,
-      openTime: built.params.openTime,
-      expiry: built.params.expiry,
-      budget: usdc(built.params.budget),
-      sigma: await this.annualVol(),
+      now,
+      slot,
+      budget: budget !== undefined ? usdc(budget) : undefined,
+      strikeCents,
       tx: hash,
     });
     if (hash && id !== undefined) {
@@ -277,20 +275,6 @@ export class Keeper {
       if (info) this.tracked.set(id, info);
     }
     return id;
-  }
-
-  private async annualVol(): Promise<string | undefined> {
-    try {
-      const [varE36, warm] = await this.opts.clients.publicClient.readContract({
-        address: this.opts.oracle,
-        abi: underlyingOracleAbi,
-        functionName: "varianceE36",
-      });
-      const volE18 = isqrt(varE36 * SECONDS_PER_YEAR);
-      return `${formatRational({ num: volE18 * 100n, den: 10n ** 18n }, 1)}%${warm ? "" : " (warm-up)"}`;
-    } catch {
-      return undefined;
-    }
   }
 
   isCreateDue(nowSec: number): boolean {
@@ -302,13 +286,12 @@ export class Keeper {
 
   scheduleNextCreate(nowSec: number): void {
     this.nextCreateAt = nextCreateTime(nowSec, this.opts.periodSec, this.opts.alignToPeriod, false);
-    this.budgetWarned = false;
   }
 }
 
 /**
- * One poll: settle and sweep, then create the period's market if due. A creation that fails before its transaction
- * is sent (RPC error, revert, budget) is retried on the next poll; openTime uses a block read just before creating.
+ * One poll: settle and sweep, then open the period's market if due by calling the scheduler. A call that fails
+ * before its transaction is sent (RPC error, a revert other than AlreadyOpened) is retried on the next poll.
  */
 export async function keeperTick(keeper: Keeper, cfg: Pick<KeeperConfig, "create" | "settle">): Promise<void> {
   const { publicClient } = keeper.opts.clients;
@@ -328,15 +311,12 @@ async function main(): Promise<void> {
   const clients = makeClients(cfg);
   await assertChainId(clients.publicClient, cfg.chainId);
   const hook = requireAddress(cfg.deployments, "predictionHook");
-  const oracle = requireAddress(cfg.deployments, "underlyingOracle");
-  const sender = clients.account ? undefined : await hookOperator(clients.publicClient, hook);
-  if (!clients.account && !sender) log.warn("dry run without a key and no hook keeper/owner found: createMarket will revert");
+  const scheduler = requireAddress(cfg.deployments, "marketScheduler");
   const invalidAfterSec = await invalidAfterFor(clients.publicClient, hook, cfg.invalidAfterSec);
   const keeper = new Keeper({
     clients,
     hook,
-    oracle,
-    template: cfg.template,
+    scheduler,
     periodSec: cfg.periodSec,
     alignToPeriod: cfg.alignToPeriod,
     scanBack: cfg.scanBack,
@@ -344,21 +324,13 @@ async function main(): Promise<void> {
     dryRun: cfg.dryRun,
     txTimeoutMs: cfg.txTimeoutMs,
     log,
-    sender,
   });
-  const t = cfg.template;
   log.info("keeper ready", {
-    account: clients.account?.address ?? `none (simulating as ${sender ?? "0x0"})`,
+    account: clients.account?.address ?? "none (dry run)",
     keyFrom: cfg.privateKey?.source,
     hook,
-    oracle,
+    scheduler,
     periodSec: cfg.periodSec,
-    tenor: t.tenorSec,
-    window: t.windowSec,
-    cutoffBuffer: t.cutoffBufferSec,
-    nSamples: t.nSamples,
-    budget: usdc(t.budget),
-    h0: formatRational({ num: t.quote.h0Wad, den: 10n ** 18n }, 4),
     invalidAfterSec,
     create: cfg.create,
     settle: cfg.settle,

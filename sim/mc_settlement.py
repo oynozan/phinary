@@ -1,7 +1,7 @@
 """T2 Monte Carlo: the closed-form price (BinaryPricer via the bit-exact integer spec sim/evm.py) against the
 settlement rule applied to GBM paths sampled the way the oracle samples them.
 
-Oracle and settlement (docs/SPEC.md §2, §3.5): blocks every `dt` seconds, the normalised tick floor(ln S / ln 1.0001)
+Oracle and settlement (docs/md/SPEC.md §2, §3.5): blocks every `dt` seconds, the normalised tick floor(ln S / ln 1.0001)
 written at each block prevails until the next, so D = cumulativeAt(T) - cumulativeAt(T - w) = dt * sum_k tick(t_k)
 over the left endpoints t_k = T - w + k dt, k = 0..n-1 (n = w / dt). YES iff D * 1e18 > w * (strikeTickWad - 0.5e18).
 Under r = 0 GBM, ln S(t) = ln S0 - s^2 t / 2 + s W(t). The closed form is priced with nSamples = n.

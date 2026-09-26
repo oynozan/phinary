@@ -37,6 +37,15 @@ const iface = artifact('IPredictionHook.sol', 'IPredictionHook')
 if (!iface) throw new Error(`missing ${out}/IPredictionHook.sol/IPredictionHook.json; run forge build first`)
 emit('predictionHook.generated.ts', 'predictionHookAbi', iface.abi.map(strip), 'src/interfaces/IPredictionHook.sol')
 
+const scheduler = artifact('IMarketScheduler.sol', 'IMarketScheduler')
+if (!scheduler) throw new Error(`missing ${out}/IMarketScheduler.sol/IMarketScheduler.json; run forge build first`)
+emit(
+  'marketScheduler.generated.ts',
+  'marketSchedulerAbi',
+  scheduler.abi.map(strip),
+  'src/interfaces/IMarketScheduler.sol',
+)
+
 const token = artifact('OutcomeToken.sol', 'OutcomeToken')
 if (!token) throw new Error('missing OutcomeToken artifact')
 emit(

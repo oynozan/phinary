@@ -7,7 +7,7 @@ Checks: (i) the reduced range [T0, T1] from exact segment ends; (ii) P, Q and G 
 Sturm counts) and are positive at 0; (iii) a rigorous lower bound on F' = G/Q^2 (Taylor enclosure on 64 chunks) times the
 minimum step of t per wei of x. expwad_err.py bounds all floors by ~1 unit, far below this increase.
 
-Origin: docs/research/gaps/formal-verification-scripts/py/expwad_cert.py; internals from sim/evm.py.
+Origin: docs/md/research/gaps/formal-verification-scripts/py/expwad_cert.py; internals from sim/evm.py.
 Run:  uv run --with sympy python formal/hart36/expwad_cert.py
 """
 import os

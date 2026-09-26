@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Abi, AbiParameter } from "viem";
 import {
+  marketSchedulerAbi,
   poolManagerAbi,
   predictionHookAbi,
   predictionHookAdminAbi,
@@ -44,6 +45,7 @@ test("TypeScript ABIs match the Solidity sources (forge artifacts)", (t) => {
     assertSubset(underlyingOracleAbi, "IUnderlyingOracle.sol", "IUnderlyingOracle"),
     assertSubset(priceSteererAbi, "PriceSteerer.sol", "PriceSteerer"),
     assertSubset(poolManagerAbi, "PoolManager.sol", "PoolManager"),
+    assertSubset(marketSchedulerAbi, "IMarketScheduler.sol", "IMarketScheduler"),
   ];
   if (checked.some((c) => !c)) t.skip("run `forge build` in the repo root to check every ABI");
 });

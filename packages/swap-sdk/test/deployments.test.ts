@@ -3,10 +3,13 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
+import { getAddress } from 'viem'
 import { isPlaceholderAddress, parseDeployment, requireHook, UNICHAIN_SEPOLIA } from '../src/index.ts'
 import { loadDeployment } from '../src/node.ts'
 
 const HOOK = '0x5aE3c0de00000000000000000000000000002Aa8'
+const SCHEDULER = `0x${'ab'.repeat(19)}01` as const
+const LEGACY = `0x${'cd'.repeat(19)}02` as const
 
 describe('parseDeployment', () => {
   it('reads a flat file and fills Uniswap defaults', () => {
@@ -63,6 +66,31 @@ describe('parseDeployment', () => {
       () => parseDeployment({ universalRouter: '0x8B844f885672f333Bc0042cB669255f93a4C1E6b' }),
       /different PoolManager/,
     )
+  })
+
+  it('parses marketScheduler and legacyPredictionHooks', () => {
+    const d = parseDeployment({
+      chainId: 1301,
+      predictionHook: HOOK,
+      marketScheduler: SCHEDULER.toLowerCase(),
+      legacyPredictionHooks: [LEGACY.toLowerCase()],
+    })
+    assert.equal(d.marketScheduler, getAddress(SCHEDULER))
+    assert.deepEqual(d.legacyPredictionHooks, [getAddress(LEGACY)])
+  })
+
+  it('defaults legacyPredictionHooks to [] and marketScheduler to undefined for old files', () => {
+    const d = parseDeployment({ chainId: 1301, predictionHook: HOOK })
+    assert.equal(d.marketScheduler, undefined)
+    assert.deepEqual(d.legacyPredictionHooks, [])
+  })
+
+  it('drops placeholder entries from legacyPredictionHooks', () => {
+    const d = parseDeployment({
+      chainId: 1301,
+      legacyPredictionHooks: [LEGACY, '0x0000000000000000000000000000000000000000', 'TBD'],
+    })
+    assert.deepEqual(d.legacyPredictionHooks, [getAddress(LEGACY)])
   })
 })
 

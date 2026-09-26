@@ -1,4 +1,4 @@
-# Build, test and demo operations for the PredictionHook stack. `make` lists the targets, docs/RUNBOOK.md explains them.
+# Build, test and demo operations for the PredictionHook stack. `make` lists the targets, docs/md/RUNBOOK.md explains them.
 SHELL := /bin/bash
 export PATH := $(PATH):$(HOME)/.foundry/bin
 

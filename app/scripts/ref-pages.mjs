@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer-core'
-const OUT = '../docs/design/atomic-cash'
+const OUT = '../docs/md/design/atomic-cash'
 const base = 'http://localhost:3107'
 const routes = ['/', '/pools', '/tokens', '/trades', '/portfolio']
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox'] })

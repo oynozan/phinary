@@ -6,6 +6,7 @@ import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {IHookEvents} from "@openzeppelin/uniswap-hooks/interfaces/IHookEvents.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
+import {QuoterRevert} from "v4-periphery/src/libraries/QuoterRevert.sol";
 
 /// @notice The 8 swap cases through PoolSwapTest and V4Router, checked against the spec formulas and V4Quoter
 abstract contract SwapCases is HookFixture {
@@ -366,6 +367,39 @@ abstract contract SwapCases is HookFixture {
         _checkInvariants();
     }
 
+    /// @dev False when the hook refuses the sell because it lies beyond the impact curve or the band this epoch (by design);
+    ///      any other failure is re-raised
+    function _sellExecutable(PoolKey memory k, bool exactIn, uint256 amt) internal returns (bool) {
+        IV4Quoter.QuoteExactSingleParams memory qp = IV4Quoter.QuoteExactSingleParams({
+            poolKey: k,
+            zeroForOne: _swapParams(k, false, exactIn, amt).zeroForOne,
+            exactAmount: uint128(amt),
+            hookData: ""
+        });
+        bytes memory err;
+        if (exactIn) {
+            try quoter.quoteExactInputSingle(qp) returns (uint256, uint256) {
+                return true;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        } else {
+            try quoter.quoteExactOutputSingle(qp) returns (uint256, uint256) {
+                return true;
+            } catch (bytes memory e) {
+                err = e;
+            }
+        }
+        bytes4[3] memory byDesign = [QuoteMath.Unreachable.selector, QuoteMath.Band.selector, PredictionHook.OutOfBand.selector];
+        for (uint256 j; j < 3; ++j) {
+            bytes memory refusal = abi.encodeWithSelector(QuoterRevert.UnexpectedRevertBytes.selector, _wrapped(byDesign[j]));
+            if (keccak256(err) == keccak256(refusal)) return false;
+        }
+        assembly ("memory-safe") {
+            revert(add(err, 0x20), mload(err))
+        }
+    }
+
     function test_completeSetSell_returnsAtMostQ_fuzz(
         uint256 amt,
         int256 dx,
@@ -380,11 +414,73 @@ abstract contract SwapCases is HookFixture {
         vm.warp(block.timestamp + 1);
         _preFlow(dx, pre, preYes);
         amt = firstExactIn ? bound(amt, E6, 5_000 * E6) : bound(amt, E6, 600 * E6);
+        vm.assume(_sellExecutable(yesFirst ? kYes : kNo, firstExactIn, amt));
         (uint256 c1, uint256 q) = _leg(via, yesFirst, false, firstExactIn, amt);
         (uint256 c2, uint256 q2) = _leg(via >> 1, !yesFirst, false, true, q);
         assertEq(q2, q);
         assertLe(c1 + c2, q, "complete set sold above par");
         _checkInvariants();
+    }
+
+    /* No address-based pricing: Thales' whitelisted 0.5% router cost its LPs more than their whole net loss */
+
+    /// @dev The hook owner, the keeper, an LP, the usual trader, or a fresh address
+    function _caller(uint256 seed) internal returns (address) {
+        uint256 k = seed % 5;
+        if (k == 0) return address(this);
+        if (k == 1) return keeperAddr;
+        if (k == 2) return lp;
+        if (k == 3) return trader;
+        return makeAddr(vm.toString(seed));
+    }
+
+    /// @dev `who` is both msg.sender and tx.origin
+    function _swapAs(address who, bool viaRouter, PoolKey memory k, bool isBuy, bool exactIn, uint256 amt, bytes memory data)
+        internal
+    {
+        vm.prank(who, who);
+        if (viaRouter) router.executeActions(_routerPlan(k, isBuy, exactIn, amt, data));
+        else swapRouter.swap(k, _swapParams(k, isBuy, exactIn, amt), PoolSwapTest.TestSettings(false, false), data);
+    }
+
+    /// @dev USDC and tokens moved by one swap from `who`, which must match the spec formula; sells first buy `pre` tokens
+    function _fillAs(address who, bool viaRouter, Case memory c, uint256 pre, bytes memory data)
+        internal
+        returns (uint256 cash, uint256 q)
+    {
+        _fund(who, 1_000_000 * E6);
+        PoolKey memory k = c.isYes ? kYes : kNo;
+        if (!c.isBuy) _swapAs(who, viaRouter, k, true, false, pre, data);
+        (uint256 eq, uint256 ecash) = _expect(mId, c.isYes, c.isBuy, c.exactIn, c.amt);
+        OutcomeToken t = c.isYes ? yes : no;
+        uint256 u0 = usdc.balanceOf(who);
+        uint256 t0 = t.balanceOf(who);
+        _swapAs(who, viaRouter, k, c.isBuy, c.exactIn, c.amt, data);
+        (cash, q) = c.isBuy
+            ? (u0 - usdc.balanceOf(who), t.balanceOf(who) - t0)
+            : (usdc.balanceOf(who) - u0, t0 - t.balanceOf(who));
+        assertEq(q, eq, "tokens == spec");
+        assertEq(cash, ecash, "usdc == spec");
+    }
+
+    function test_fillIndependentOfCaller_fuzz(uint256 seedA, uint256 seedB, uint256 amt, uint256 pre, bytes calldata data)
+        public
+    {
+        address a = _caller(seedA);
+        address b = _caller(seedB);
+        pre = bound(pre, 5_000 * E6, 10_000 * E6);
+        Case[8] memory cs = _cases();
+        for (uint256 j; j < 8; ++j) {
+            Case memory c = cs[j];
+            c.amt = c.isBuy ? bound(amt, E6, 2_000 * E6) : bound(amt, E6, 1_000 * E6);
+            uint256 snap = vm.snapshotState();
+            (uint256 cashA, uint256 qA) = _fillAs(a, (seedA >> 8) & 1 == 1, c, pre, "");
+            vm.revertToState(snap);
+            (uint256 cashB, uint256 qB) = _fillAs(b, (seedB >> 8) & 1 == 1, c, pre, data);
+            vm.revertToState(snap);
+            assertEq(cashA, cashB, "usdc depends on caller");
+            assertEq(qA, qB, "tokens depend on caller");
+        }
     }
 
     /* Swap gas does not depend on the number of markets (T19) */

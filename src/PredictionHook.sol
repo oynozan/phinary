@@ -24,7 +24,7 @@ import {StrikeMath} from "./hook/StrikeMath.sol";
 /// @title PredictionHook
 /// @notice Singleton v4 hook that prices binary YES/NO outcome tokens against USDC with the settlement-matched
 ///         Black-Scholes (discrete geometric-Asian) binary, and underwrites them from an internal LP vault.
-/// @dev Normative spec: docs/SPEC.md §3. Every swap on a market pool is a full NoOp (specified = -amountSpecified):
+/// @dev Normative spec: docs/md/SPEC.md §3. Every swap on a market pool is a full NoOp (specified = -amountSpecified):
 ///      inputs are taken as hook ERC-6909 claims, outputs are paid from inventory claims first and any outcome-token
 ///      shortfall is minted on demand (sync, mint, settle). Per market the ledger keeps a USDC bucket and the
 ///      outstanding YES/NO, and every mutation ends with bucket >= max(outYes, outNo) (or the settled requirement).

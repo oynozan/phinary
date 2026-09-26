@@ -4,7 +4,7 @@ propagated through the Horner stages by magnitude. F_max is the exact maximum of
 there: G = P'Q - PQ' has no real root, checked here with an exact Sturm count), which closes the research caveat that
 assumed F < 2^95 from observation.
 
-Origin: docs/research/gaps/formal-verification-scripts/py/expwad_err.py.
+Origin: docs/md/research/gaps/formal-verification-scripts/py/expwad_err.py.
 Run:  uv run --with sympy python formal/hart36/expwad_err.py
 """
 import math

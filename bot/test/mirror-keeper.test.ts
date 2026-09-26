@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ContractFunctionRevertedError, type Address } from "viem";
-import { MarketStatus, predictionHookAbi } from "../src/abi.ts";
+import { ContractFunctionRevertedError, encodeErrorResult, type Address } from "viem";
+import { marketSchedulerAbi, MarketStatus, predictionHookAbi } from "../src/abi.ts";
 import type { Clients } from "../src/chain.ts";
-import { loadMarketTemplate } from "../src/config.ts";
-import { idsToScan, isRevert, Keeper, keeperTick, nextCreateTime } from "../src/keeper.ts";
+import { idsToScan, isAlreadyOpened, isRevert, Keeper, keeperTick, nextCreateTime } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
-import type { MarketInfo, MarketParams } from "../src/market.ts";
-import { lnWad } from "../src/math.ts";
+import type { MarketInfo } from "../src/market.ts";
 import {
   decideSteer,
   JUMP_CONFIRMATIONS,
@@ -94,8 +92,18 @@ test("steer gas padding covers the oracle's first-write-in-block cost", () => {
 });
 
 const HOOK: Address = "0x00000000000000000000000000000000000000cc";
+const SCHEDULER: Address = "0x00000000000000000000000000000000005cbed";
+/** A market's own oracle field (IPredictionHook.MarketInfo.oracle); unrelated to the keeper's scheduler. */
 const ORACLE: Address = "0x00000000000000000000000000000000000000aa";
 const revert = () => new ContractFunctionRevertedError({ abi: predictionHookAbi, functionName: "marketInfo" });
+
+/** A real decoded AlreadyOpened revert, as the scheduler's `open()` would produce it. */
+const alreadyOpened = () =>
+  new ContractFunctionRevertedError({
+    abi: marketSchedulerAbi,
+    functionName: "open",
+    data: encodeErrorResult({ abi: marketSchedulerAbi, errorName: "AlreadyOpened", args: [1n] }),
+  });
 
 function info(status: number): MarketInfo {
   return {
@@ -120,21 +128,19 @@ function info(status: number): MarketInfo {
 interface Fake {
   count: bigint;
   infoFails: Map<bigint, number>;
-  lnSpotFails: number;
+  /** Generic (non-revert) failures `open()`'s simulate should throw before it succeeds, e.g. an RPC error. */
+  openFails: number;
+  /** When true, every `open()` simulate reverts AlreadyOpened instead of succeeding. */
+  alreadyOpened: boolean;
   blockTimes: bigint[];
-  created: MarketParams[];
+  /** Args recorded on each `open()` simulate that was accepted (i.e. did not throw). */
+  opens: unknown[][];
 }
 
 function fakeKeeper(f: Fake): Keeper {
   const publicClient = {
     readContract: async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
       if (functionName === "marketCount") return f.count;
-      if (functionName === "vaultIdle") return 10n ** 12n;
-      if (functionName === "lnSpotSoBWad") {
-        if (f.lnSpotFails-- > 0) throw new Error("fetch failed");
-        return lnWad({ num: 270135n, den: 100n });
-      }
-      if (functionName === "varianceE36") throw new Error("not needed");
       if (functionName === "marketInfo") {
         const id = args![0] as bigint;
         const fails = f.infoFails.get(id) ?? 0;
@@ -148,16 +154,18 @@ function fakeKeeper(f: Fake): Keeper {
       throw new Error(`unexpected read ${functionName}`);
     },
     getBlock: async () => ({ timestamp: f.blockTimes.shift() ?? 0n }),
-    simulateContract: async ({ args }: { args: readonly [MarketParams] }) => {
-      f.created.push(args[0]);
+    simulateContract: async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+      if (functionName !== "open") throw new Error(`unexpected write ${functionName}`);
+      if (f.alreadyOpened) throw alreadyOpened();
+      if (f.openFails-- > 0) throw new Error("fetch failed");
+      f.opens.push([...(args ?? [])]);
       return { request: {}, result: f.count + 1n };
     },
   };
   return new Keeper({
     clients: { publicClient } as unknown as Clients,
     hook: HOOK,
-    oracle: ORACLE,
-    template: loadMarketTemplate({}),
+    scheduler: SCHEDULER,
     periodSec: 60,
     alignToPeriod: false,
     scanBack: 50,
@@ -174,7 +182,7 @@ test("isRevert tells contract reverts from transport errors", () => {
 });
 
 test("a market whose read failed is retried after marketCount has moved on", async () => {
-  const f: Fake = { count: 3n, infoFails: new Map([[2n, 2]]), lnSpotFails: 0, blockTimes: [], created: [] };
+  const f: Fake = { count: 3n, infoFails: new Map([[2n, 2]]), openFails: 0, alreadyOpened: false, blockTimes: [], opens: [] };
   const k = fakeKeeper(f);
   await k.refresh();
   assert.deepEqual([...k.tracked.keys()].sort(), [1n, 3n]);
@@ -190,17 +198,50 @@ test("a market whose read failed is retried after marketCount has moved on", asy
 });
 
 test("a failed creation is retried on the next tick with a fresh block time", async () => {
-  const f: Fake = { count: 0n, infoFails: new Map(), lnSpotFails: 1, blockTimes: [], created: [] };
+  const f: Fake = { count: 0n, infoFails: new Map(), openFails: 1, alreadyOpened: false, blockTimes: [], opens: [] };
   const k = fakeKeeper(f);
   f.blockTimes.push(1000n, 1001n);
   await assert.rejects(keeperTick(k, { create: true, settle: true }), /fetch failed/);
   const due = k.nextCreateAt;
   assert.ok(due !== undefined && due <= Math.floor(Date.now() / 1000), "still due after the failure");
-  assert.equal(f.created.length, 0);
+  assert.equal(f.opens.length, 0);
 
   f.blockTimes.push(2000n, 2007n);
   await keeperTick(k, { create: true, settle: true });
-  assert.equal(f.created.length, 1);
-  assert.equal(f.created[0]!.openTime, 2007n, "openTime from the block read right before createMarket");
+  assert.equal(f.opens.length, 1);
+  assert.deepEqual(f.opens[0], [], "scheduler.open() takes no args");
   assert.ok(k.nextCreateAt! > due!, "next period scheduled once submitted");
+});
+
+test("createMarket calls scheduler.open with no args, and AlreadyOpened counts as done for this slot", async () => {
+  const f: Fake = { count: 5n, infoFails: new Map(), openFails: 0, alreadyOpened: false, blockTimes: [], opens: [] };
+  const k = fakeKeeper(f);
+  const id = await k.createMarket(1000n);
+  assert.equal(id, 6n);
+  assert.equal(f.opens.length, 1);
+  assert.deepEqual(f.opens[0], []);
+
+  f.alreadyOpened = true;
+  let submitted = false;
+  const again = await k.createMarket(1000n, () => (submitted = true));
+  assert.equal(again, undefined, "nothing to do: the slot is already open");
+  assert.equal(f.opens.length, 1, "a second call in the same slot sends nothing");
+  assert.equal(submitted, true, "AlreadyOpened still counts as submitted, so the caller schedules the next slot");
+});
+
+test("isAlreadyOpened recognises a decoded AlreadyOpened revert and nothing else", () => {
+  assert.equal(isAlreadyOpened(alreadyOpened()), true);
+  assert.equal(isAlreadyOpened(revert()), false);
+  assert.equal(isAlreadyOpened(new Error("fetch failed")), false);
+});
+
+test("a second tick in the same slot sends nothing", async () => {
+  const f: Fake = { count: 0n, infoFails: new Map(), openFails: 0, alreadyOpened: false, blockTimes: [], opens: [] };
+  const k = fakeKeeper(f);
+  f.blockTimes.push(1000n, 1000n);
+  await keeperTick(k, { create: true, settle: true });
+  assert.equal(f.opens.length, 1);
+  f.blockTimes.push(1000n, 1000n);
+  await keeperTick(k, { create: true, settle: true });
+  assert.equal(f.opens.length, 1, "isCreateDue is false right after a successful open, so nothing is sent");
 });

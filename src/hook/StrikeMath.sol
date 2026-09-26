@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 /// @title StrikeMath
-/// @notice Settlement threshold of the half-tick integer rule (docs/SPEC.md §3.5)
+/// @notice Settlement threshold of the half-tick integer rule (docs/md/SPEC.md §3.5)
 /// @dev The oracle's normalised tick satisfies ln(USD per ETH) = normTick * ln(1.0001) + decimalsShift * ln(10)
 library StrikeMath {
     int256 internal constant LN10_E36 = 2302585092994045684017991454684364208;

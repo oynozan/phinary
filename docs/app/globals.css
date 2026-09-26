@@ -1,0 +1,230 @@
+:root {
+    color-scheme: dark;
+
+    /* Palette */
+    --orchid: #c828d6;
+    --amethyst: #9c30a5;
+    --carbon: #191919;
+
+    /* Surfaces, lightest last */
+    --surface: #201f21;
+    --surface-2: #282629;
+    --surface-3: #312e32;
+
+    --foreground: #f4f2f5;
+    --muted-foreground: #a19ea4;
+    --border: #2c2a2d;
+    --primary-soft: color-mix(in srgb, var(--orchid) 16%, var(--surface));
+
+    --font-heading: var(--font-akt), var(--font-lexend-deca), ui-sans-serif, system-ui, sans-serif;
+    --font-sans: var(--font-lexend-deca), ui-sans-serif, system-ui, sans-serif;
+    --font-secondary: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-ubuntu-mono), ui-monospace, monospace;
+
+    /* Theme tokens remapped onto the palette */
+    --x-font-sans: var(--font-sans);
+    --x-font-mono: var(--font-mono);
+    --x-color-slate-100: var(--foreground);
+    --x-color-slate-200: #dcd9de;
+    --x-color-gray-400: var(--muted-foreground);
+    --x-color-neutral-400: var(--muted-foreground);
+    --x-color-neutral-700: var(--surface-3);
+    --x-color-neutral-800: var(--border);
+    --x-color-neutral-900: var(--surface);
+}
+
+body {
+    background-color: var(--carbon);
+    font-variant-numeric: tabular-nums;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.wordmark {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+}
+
+b,
+strong {
+    font-weight: 600;
+}
+
+.nextra-navbar nav,
+.nextra-sidebar,
+.nextra-mobile-nav,
+.nextra-toc,
+.nextra-breadcrumb,
+.nextra-search,
+.nextra-search-results {
+    font-family: var(--font-secondary);
+}
+
+.wordmark {
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--foreground);
+}
+
+:root ::selection {
+    background-color: var(--orchid);
+    color: #ffffff;
+}
+
+/* Solid bars, buttons and menus: no blur, no translucent fills */
+.x\:backdrop-blur-md {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+.x\:bg-nextra-bg\/70 {
+    background-color: var(--surface);
+}
+
+.nextra-navbar .nextra-navbar-blur {
+    background-color: var(--carbon);
+}
+
+.nextra-search input {
+    background-color: var(--surface);
+}
+
+.x\:dark\:bg-primary-100\/5,
+.x\:dark\:bg-primary-100\/10,
+.x\:bg-gray-400\/20,
+.x\:dark\:hover\:bg-primary-100\/5:hover,
+.x\:hover\:bg-gray-800\/5:hover,
+.x\:dark\:hover\:bg-gray-100\/5:hover {
+    background-color: var(--surface-2);
+}
+
+.x\:bg-primary-500\/10,
+.x\:dark\:bg-primary-400\/10,
+.x\:dark\:bg-primary-500\/10 {
+    background-color: var(--primary-soft);
+}
+
+.nextra-search-results mark {
+    background-color: var(--amethyst);
+    color: #ffffff;
+}
+
+.x\:even\:dark\:bg-gray-600\/20:nth-child(even) {
+    background-color: var(--surface);
+}
+
+.x\:dark\:bg-green-900\/30 {
+    background-color: color-mix(in srgb, var(--x-color-green-900) 30%, var(--carbon));
+}
+
+.x\:dark\:bg-red-900\/30 {
+    background-color: color-mix(in srgb, var(--x-color-red-900) 30%, var(--carbon));
+}
+
+.x\:dark\:bg-blue-900\/30 {
+    background-color: color-mix(in srgb, var(--x-color-blue-900) 30%, var(--carbon));
+}
+
+.x\:dark\:bg-yellow-700\/30 {
+    background-color: color-mix(in srgb, var(--x-color-yellow-700) 30%, var(--carbon));
+}
+
+.x\:dark\:bg-purple-900\/30 {
+    background-color: color-mix(in srgb, var(--x-color-purple-900) 30%, var(--carbon));
+}
+
+.x\:dark\:bg-black {
+    background-color: var(--surface);
+}
+
+:not(pre) > code.nextra-code:not([class*="twoslash-"]) {
+    background-color: var(--surface-2);
+    border-color: var(--surface-3);
+}
+
+pre code.nextra-code:not([class*="twoslash-"]) > span[data-highlighted-line] {
+    background-color: var(--primary-soft);
+}
+
+pre code.nextra-code:not([class*="twoslash-"]) > span [data-highlighted-chars] {
+    background-color: color-mix(in srgb, var(--amethyst) 40%, var(--surface));
+}
+
+[data-rmiz-btn-zoom],
+[data-rmiz-btn-unzoom] {
+    background-color: var(--surface-2);
+    color: var(--foreground);
+}
+
+[data-rmiz-modal-overlay] {
+    background: var(--carbon);
+}
+
+/* No gradients */
+.nextra-banner {
+    background-image: none;
+    background-color: var(--surface);
+}
+
+.nextra-mask {
+    mask-image: none;
+}
+
+.landing,
+.not-found {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    text-align: center;
+}
+
+/* Fills the article: its padding and bottom spacer take 7rem */
+.landing {
+    min-height: calc(100dvh - var(--nextra-navbar-height) - 7rem);
+}
+
+.not-found {
+    min-height: calc(100dvh - var(--nextra-navbar-height));
+    padding: 0 1rem;
+}
+
+.landing h1,
+.not-found h1 {
+    margin: 0;
+    font-size: clamp(3rem, 12vw, 6rem);
+    line-height: 1;
+    color: var(--foreground);
+}
+
+.landing p,
+.not-found p {
+    max-width: 34rem;
+    margin: 0;
+    font-size: clamp(1rem, 2.6vw, 1.25rem);
+    line-height: 1.6;
+    color: var(--foreground);
+}
+
+.not-found p {
+    color: var(--muted-foreground);
+}
+
+.not-found a {
+    color: var(--orchid);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+
+.not-found a:hover {
+    text-decoration: none;
+}

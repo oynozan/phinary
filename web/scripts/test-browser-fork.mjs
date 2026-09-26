@@ -103,7 +103,7 @@ try {
         for (const route of ['/', `/market/${f.marketId}`, '/portfolio', '/activity', '/vault']) {
             await page.goto(`${url}${route}`); await page.getByRole('main').waitFor();
             if (route === '/vault') await page.getByText(/As of /).waitFor();
-            if (route === '/portfolio') await page.getByText('Market #' + f.marketId, { exact: true }).first().waitFor();
+            if (route === '/portfolio') await page.locator('strong:visible').filter({ hasText: 'Market #' + f.marketId }).first().waitFor();
             await page.screenshot({ path: `.review/v1/${width}-${route.replaceAll('/', '_') || 'home'}.png`, fullPage: true });
             assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${route} overflow at ${width}`);
         }

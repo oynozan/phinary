@@ -5,6 +5,10 @@ import { type ChainContracts, FORBIDDEN_ROUTERS, UNICHAIN_SEPOLIA } from './cons
 export interface PredictionDeployment extends ChainContracts {
   predictionHook?: Address
   underlyingOracle?: Address
+  /** The ownerless MarketScheduler that owns `predictionHook` and is the only account able to open markets. */
+  marketScheduler?: Address
+  /** Prior `predictionHook` addresses the scheduler migrated away from, oldest first. Empty for a file with none. */
+  legacyPredictionHooks: Address[]
   deployBlock?: bigint
   /** Keys that were present but held a placeholder value. */
   placeholders: string[]
@@ -13,6 +17,7 @@ export interface PredictionDeployment extends ChainContracts {
 const ALIASES: Record<string, string[]> = {
   predictionHook: ['predictionHook', 'PredictionHook', 'prediction_hook', 'hook'],
   underlyingOracle: ['underlyingOracle', 'UnderlyingOracleHook', 'underlyingOracleHook', 'oracleHook', 'oracle'],
+  marketScheduler: ['marketScheduler', 'MarketScheduler'],
   usdc: ['usdc', 'USDC', 'collateral'],
   poolManager: ['poolManager', 'PoolManager'],
   v4Quoter: ['v4Quoter', 'V4Quoter', 'quoter'],
@@ -55,6 +60,15 @@ function pick(flat: Record<string, unknown>, key: string): { present: boolean; v
   return { present: false, value: undefined }
 }
 
+/** `legacyPredictionHooks`, if present: an array of addresses, dropping placeholders. Missing or malformed yields []. */
+function legacyPredictionHooks(flat: Record<string, unknown>): Address[] {
+  const { value } = pick(flat, 'legacyPredictionHooks')
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter((v): v is string => !isPlaceholderAddress(v)).map((v) => getAddress(v))
+}
+
 /**
  * Parses `deployments/unichain-sepolia.json`. Accepts flat or `{contracts: {...}}` layouts and common key spellings.
  * Placeholders fall back to the chain defaults for Uniswap contracts and to `undefined` for ours.
@@ -92,6 +106,8 @@ export function parseDeployment(json: unknown, defaults: ChainContracts = UNICHA
     chainId,
     predictionHook: address('predictionHook'),
     underlyingOracle: address('underlyingOracle'),
+    marketScheduler: address('marketScheduler'),
+    legacyPredictionHooks: legacyPredictionHooks(flat),
     usdc: address('usdc') ?? defaults.usdc,
     poolManager: address('poolManager') ?? defaults.poolManager,
     v4Quoter: address('v4Quoter') ?? defaults.v4Quoter,

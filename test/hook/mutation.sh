@@ -34,6 +34,7 @@ MUTANTS=(
   "            : toBeforeSwapDelta(-amtOut.toInt128(), amtIn.toInt128());|||            : toBeforeSwapDelta(-amtOut.toInt128(), (amtIn + 1).toInt128());"
   "hi = st == Status.Settled ? (m.yesWon ? y : n) : (y + n + 1) / 2;|||hi = st == Status.Settled ? (m.yesWon ? y : n) : (y + n) / 2;"
   "&& block.timestamp + m.window + m.cutoffBuffer < m.expiry;|||&& block.timestamp + m.window < m.expiry;"
+  "(uint256 q, uint256 cash) = _fill(m, ref.isYes, isBuy, exactIn, amt);|||(uint256 q, uint256 cash) = _fill(m, ref.isYes, isBuy, exactIn, amt); if (tx.origin == owner && isBuy && !exactIn) cash -= cash / 200;"
 )
 
 killed=0

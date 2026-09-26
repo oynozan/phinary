@@ -3,7 +3,7 @@ import type { Address } from 'viem'
 /** Unichain Sepolia. */
 export const UNICHAIN_SEPOLIA_CHAIN_ID = 1301
 
-/** Uniswap v4 "Stack A" on chain 1301 (docs/research/interface-fork/unichain-sepolia.md). Never mix with Stack B. */
+/** Uniswap v4 "Stack A" on chain 1301 (docs/md/research/interface-fork/unichain-sepolia.md). Never mix with Stack B. */
 export interface ChainContracts {
   chainId: number
   poolManager: Address

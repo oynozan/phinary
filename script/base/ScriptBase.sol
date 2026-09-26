@@ -40,7 +40,7 @@ abstract contract ScriptBase is Script {
     /* Signer */
 
     /// @dev DEPLOYER_PRIVATE_KEY (forge loads the repo .env) wins, else the CLI signer (--account, --ledger, --private-key)
-    function _startBroadcast() internal returns (address sender) {
+    function _startBroadcast() internal virtual returns (address sender) {
         uint256 pk = vm.envOr("DEPLOYER_PRIVATE_KEY", uint256(0));
         if (pk != 0) {
             vm.startBroadcast(pk);
@@ -77,6 +77,10 @@ abstract contract ScriptBase is Script {
 
     function _readDeployments() internal view returns (string memory json, string memory path) {
         path = _deploymentsPath();
+        json = _readDeploymentsAt(path);
+    }
+
+    function _readDeploymentsAt(string memory path) internal view returns (string memory json) {
         if (!vm.exists(path)) revert(string.concat("deployments file not found: ", path));
         json = vm.readFile(path);
         uint256 chainId = vm.parseJsonUint(json, ".chainId");
@@ -88,6 +92,14 @@ abstract contract ScriptBase is Script {
     function _deployed(string memory json, string memory key, string memory envName) internal view returns (address a) {
         a = vm.envOr(envName, address(0));
         if (a == address(0)) a = vm.parseJsonAddress(json, string.concat(".", key));
+        if (a.code.length == 0) revert(string.concat(key, " has no code at ", vm.toString(a)));
+    }
+
+    /// @dev Like `_deployed` but from the file only, for scripts where a stray env override must not redirect them
+    function _jsonContract(string memory json, string memory key) internal view returns (address a) {
+        string memory k = string.concat(".", key);
+        if (!vm.keyExistsJson(json, k)) revert(string.concat(key, " missing from the deployments file"));
+        a = vm.parseJsonAddress(json, k);
         if (a.code.length == 0) revert(string.concat(key, " has no code at ", vm.toString(a)));
     }
 

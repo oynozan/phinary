@@ -4,7 +4,7 @@ Scope: frontend, tests and frontend documentation only. Existing contracts, SDK 
 
 ## Automated checks
 
-- Unit tests cover integer input, quote expiry/cutoff, wallet identity, full-registry balance reads, unavailable data, claim rounding/dust, sequential claim interruption, replacement recovery, and Vault transaction states.
+- 64 unit tests passed. Tests cover integer input, quote expiry/cutoff, wallet identity, full-registry balance reads, unavailable data, claim rounding/dust, sequential claim interruption, replacement recovery, and Vault transaction states.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build -- --webpack`.
 - `npm run test:lifecycle:fork`: fixed historical Sepolia fork, test-only oracle and account, both outcome purchases/sales, full registry portfolio, deposit/withdraw, settlement/claim and combined invalid refund. No public-chain submission.
 - `npm run test:browser:fork`: Chrome with a test-only EIP-1193 bridge to the local fork. Buys/sells, wallet rejection, reload, Vault and winning claim, responsive routes at 1440/768/390px. Screenshots go to ignored `.review/v1`. Test Next output is isolated in `.next-e2e`; production has no injected signer.
@@ -29,3 +29,7 @@ Regression tests cover these findings. Legacy records without a saved nonce atte
 ## Release boundaries
 
 Portfolio displays actual holdings; complete transaction history, acquisition cost and P&L remain unavailable. Activity requires a separately supplied compatible `/activity` service (documented in README); the frontend PR does not include that service. The production build retains the existing viem/ox dynamic-import warning.
+
+Latest-main integration: its committed indexer only exposes SQL/GraphQL, while this frontend Activity adapter requires the separately verified `/activity` service. Keep the PR Draft until that service dependency is supplied for the target environment or a separately scoped integration is completed. Local `/api/activity` returned a validated live snapshot during read-only verification.
+
+Browser evidence includes pending approval reload/recovery, wrong-network handling and account isolation. A signature rejection left the form recoverable. Fork tests passed both partial and full sells for each side, winning redemption, invalid combined-side refund, and Vault balance deltas.

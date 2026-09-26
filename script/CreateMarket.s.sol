@@ -5,6 +5,7 @@ import {console2} from "forge-std/Script.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
 import {IPredictionHook} from "../src/interfaces/IPredictionHook.sol";
 import {IUnderlyingOracle} from "../src/interfaces/IUnderlyingOracle.sol";
+import {MarketNames} from "../src/lib/MarketNames.sol";
 import {ScriptBase} from "./base/ScriptBase.sol";
 
 /// @title CreateMarket
@@ -30,7 +31,7 @@ contract CreateMarket is ScriptBase {
         console2.log(_isDryRun() ? "Market simulated (nothing broadcast)" : "Market created");
         _log("id", vm.toString(id));
         _log("name", p.yesName);
-        _log("strike USD", _formatUnits(_strikeCents(p.lnStrikeWad), 2, 2));
+        _log("strike USD", MarketNames.formatCents(MarketNames.strikeCents(p.lnStrikeWad)));
         _log("YES", i.yes);
         _log("NO", i.no);
         _log("openTime", vm.toString(i.openTime));
@@ -56,7 +57,7 @@ contract CreateMarket is ScriptBase {
         uint256 openTime = block.timestamp + vm.envOr("MARKET_OPEN_DELAY_SEC", uint256(0));
         uint256 expiry = openTime + vm.envOr("MARKET_TENOR_SEC", uint256(60));
         p.oracle = oracle;
-        p.lnStrikeWad = F.lnWad(int256(cents * 1e16));
+        p.lnStrikeWad = MarketNames.lnStrikeWad(cents);
         p.openTime = uint64(openTime);
         p.expiry = uint64(expiry);
         p.window = uint32(vm.envOr("MARKET_WINDOW_SEC", uint256(10)));
@@ -75,42 +76,16 @@ contract CreateMarket is ScriptBase {
         p.kernel = 0;
 
         string memory ticker = vm.envOr("MARKET_TICKER", string("ETH"));
-        string memory suffix = string.concat("$", _formatUnits(cents, 2, 2), " ", _date(expiry), " ", _hhmm(expiry));
-        p.yesName = string.concat(ticker, " > ", suffix);
-        p.noName = string.concat(ticker, " < ", suffix);
-        p.yesSymbol = string.concat(ticker, "UP");
-        p.noSymbol = string.concat(ticker, "DOWN");
+        (p.yesName, p.noName, p.yesSymbol, p.noSymbol) = MarketNames.names(ticker, cents, expiry);
     }
 
-    function _strikeCents(int256 lnStrikeWad) internal pure returns (uint256) {
-        return (uint256(F.expWad(lnStrikeWad)) + 0.5e16) / 1e16;
-    }
-
-    /// @dev HH:MM (UTC) of a unix timestamp
-    function _hhmm(uint256 t) internal pure returns (string memory) {
-        uint256 s = t % 86_400;
-        return string.concat(_two(s / 3600), ":", _two((s / 60) % 60));
-    }
-
-    /// @dev "26 Sep" (UTC) of a unix timestamp, via Hinnant's days-to-civil conversion
+    /// @dev Exposed to test/script/CreateMarketNames.t.sol's harness, which checks these against the keeper bot's
+    ///      date math directly; kept as thin delegations so that check still exercises MarketNames.
     function _date(uint256 t) internal pure returns (string memory) {
-        uint256 z = t / 86_400 + 719_468;
-        uint256 era = z / 146_097;
-        uint256 doe = z - era * 146_097;
-        uint256 yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-        uint256 doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        uint256 mp = (5 * doy + 2) / 153;
-        uint256 day = doy - (153 * mp + 2) / 5 + 1;
-        uint256 month = mp < 10 ? mp + 3 : mp - 9;
-        bytes memory names = "JanFebMarAprMayJunJulAugSepOctNovDec";
-        bytes memory mon = new bytes(3);
-        for (uint256 i; i < 3; ++i) {
-            mon[i] = names[(month - 1) * 3 + i];
-        }
-        return string.concat(vm.toString(day), " ", string(mon));
+        return MarketNames.date(t);
     }
 
-    function _two(uint256 v) internal pure returns (string memory) {
-        return v < 10 ? string.concat("0", vm.toString(v)) : vm.toString(v);
+    function _hhmm(uint256 t) internal pure returns (string memory) {
+        return MarketNames.hhmm(t);
     }
 }

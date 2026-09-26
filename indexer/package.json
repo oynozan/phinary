@@ -1,0 +1,30 @@
+{
+  "name": "@prediction/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ponder indexer for PredictionHook events, UP/DOWN outcome-token transfers, and price/vault snapshots on Unichain Sepolia.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "serve": "ponder serve",
+    "db": "ponder db",
+    "codegen": "ponder codegen",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "4.13.9",
+    "ponder": "0.17.12",
+    "viem": "2.49.0"
+  },
+  "devDependencies": {
+    "@ponder/client": "0.17.12",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2"
+  }
+}

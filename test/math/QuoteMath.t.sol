@@ -29,7 +29,7 @@ contract QuoteHarness {
     }
 }
 
-/// @notice Exact-integer solvers (Lemma S, E1, E2, Theorem N of docs/research/gaps/formal-verification-integer-proofs.md
+/// @notice Exact-integer solvers (Lemma S, E1, E2, Theorem N of docs/md/research/gaps/formal-verification-integer-proofs.md
 ///         §4.1) against their defining inequalities, plus bit-exact vectors vs the search-based Python definitions.
 contract QuoteMathTest is Test {
     uint256 constant W = 1e18;

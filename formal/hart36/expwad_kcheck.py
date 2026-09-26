@@ -2,7 +2,7 @@
 boundary k -> k+1 in [-41.45e18, 0], checked exhaustively for +-2e5 wei around each boundary with the bit-exact
 emulation in sim/evm.py.
 
-Origin: docs/research/gaps/formal-verification-scripts/py/expwad_kcheck.py.
+Origin: docs/md/research/gaps/formal-verification-scripts/py/expwad_kcheck.py.
 Run:  python3 formal/hart36/expwad_kcheck.py
 """
 import os

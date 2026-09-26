@@ -8,7 +8,7 @@ Bounds (z >= 0 integer, W = 1e18, all quantities non-negative):
 Sufficient for n(z+1)/d(z+1) <= n(z)/d(z) on a chunk [za, zb]:  U_n * max d <= min n * L_d (uppers at zb, lowers at za).
 Every bound is monotone in z on a chunk, so evaluating uppers at zb and lowers at za is sound.
 
-Origin: docs/research/gaps/formal-verification-scripts/py/ratio_cert.py + ratio_cert36.py; constants from sim/evm.py
+Origin: docs/md/research/gaps/formal-verification-scripts/py/ratio_cert.py + ratio_cert36.py; constants from sim/evm.py
 (bit-exact vs the Solidity) and checked against the Solidity source by formal/hart36/seams.py.
 Run:  python3 formal/hart36/ratio_cert36.py
 """

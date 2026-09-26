@@ -26,8 +26,8 @@ contract MockPredictionHook is IPredictionHook {
     MarketParams[] internal _params;
     MarketInfo[] internal _info;
 
-    constructor(address usdc_, uint256 idle_) {
-        owner = msg.sender;
+    constructor(address owner_, address usdc_, uint256 idle_) {
+        owner = owner_;
         usdc = usdc_;
         vaultIdle = idle_;
     }

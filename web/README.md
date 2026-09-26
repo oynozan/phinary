@@ -129,17 +129,21 @@ manual end-to-end check with your test wallet.
 
 ## Activity: live indexed history
 
-Activity uses the Ponder service in [`../indexer`](../indexer/README.md). Start it
-with `npm run dev` from `indexer/`, then use `npm run dev:onchain` here. Local
-development defaults to `http://127.0.0.1:42069`; production requires server-only
-`PHINARY_INDEXER_URL`. No indexer URL or credential is sent to the browser.
+Activity consumes a separately supplied `GET /activity` service. Set server-only
+`PHINARY_INDEXER_URL` to its base URL; local development defaults to
+`http://127.0.0.1:42069`. The endpoint must return
+`{ version: 1, chainId, hook, indexedBlock, sourceEvents, snapshot }`, with the
+snapshot validated by `src/lib/activity/client.ts`. Credentials stay on the server.
 
-The fixed last-hour summary, newest 12 events and top 10 traders share a single
-snapshot. The read-only proxy and five-second refresh are independent of wallet
-and execution paths. Failed refreshes retain the last snapshot; missing or
-ambiguous accounting shows N/A. UI-only sample scenarios remain available via
-`npm run preview:activity`. See the indexer README for exact realisation,
-transfer, settlement and deployment limitations.
+**Integration dependency:** the indexer currently committed on `main` exposes
+`/sql/*` and `/graphql`, not `/activity`. The compatible service used for local
+verification is separate and is not included or modified by this frontend PR.
+Starting the main indexer alone does not satisfy this dependency. Until a compatible
+service is supplied, Activity shows unavailable; wallet execution and Vault remain usable.
+
+The last-hour summary, newest 12 events and top 10 traders share one snapshot.
+The browser refreshes every five seconds and retains the last good snapshot on
+failure. Missing accounting shows N/A. UI-only samples use `npm run preview:activity`.
 
 ## Frontend v1.0
 
@@ -157,6 +161,7 @@ npm run typecheck
 npm run lint
 npm run build -- --webpack
 npm run test:lifecycle:fork
+npm run test:browser:fork
 ```
 
 The lifecycle fixture starts loopback Anvil at deployment block + 200, funds a generated test-only account, and creates an isolated test market with a deterministic test oracle. All modifications occur on the disposable fork, never public Sepolia. Existing deployed contracts and SDK sources are unchanged. Anvil must be installed or supplied with `ANVIL_BIN`.

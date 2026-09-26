@@ -9,8 +9,9 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
+import {IMarketScheduler} from "../src/interfaces/IMarketScheduler.sol";
 import {IUnderlyingOracle} from "../src/interfaces/IUnderlyingOracle.sol";
-import {ScriptBase, IPredictionHookAdmin} from "./base/ScriptBase.sol";
+import {SchedulerPair} from "./base/SchedulerPair.sol";
 
 interface IDemoToken {
     function setMinter(address account, bool allowed) external;
@@ -29,15 +30,13 @@ interface IOracleHookView {
 /// @title Deploy
 /// @notice Deploys the demo stack on Unichain Sepolia (1301) or an anvil fork of it and writes deployments/<NETWORK>.json:
 ///         demo WETH/USDC, the UnderlyingOracleHook at a mined CREATE2 address, the owner-initialised underlying pool,
-///         a PriceSteerer seeding full-range liquidity, and the PredictionHook (flags 0x2AA8) with its keeper.
+///         a PriceSteerer seeding full-range liquidity, and the MarketScheduler with the PredictionHook it owns
+///         (flags 0x2AA8, no keeper).
 /// @dev forge script script/Deploy.s.sol --rpc-url <rpc> --broadcast. Every parameter has an env override, see
-///      docs/RUNBOOK.md. A run without --broadcast writes <NETWORK>.dry-run.json instead.
-contract Deploy is ScriptBase {
+///      docs/md/RUNBOOK.md and SchedulerPair. A run without --broadcast writes <NETWORK>.dry-run.json instead.
+///      KEEPER_ADDRESS only names the keeper bot's account in the file, the hook grants it no role.
+contract Deploy is SchedulerPair {
     uint160 internal constant ORACLE_FLAGS = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);
-    uint160 internal constant PREDICTION_FLAGS = uint160(
-        Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-            | Hooks.BEFORE_SWAP_FLAG | Hooks.BEFORE_DONATE_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
-    );
 
     struct OracleConfig {
         uint32 gridSeconds;
@@ -59,6 +58,7 @@ contract Deploy is ScriptBase {
         address demoUsdc;
         address underlyingOracle;
         address priceSteerer;
+        address marketScheduler;
         address predictionHook;
         PoolKey underlyingPool;
         uint160 sqrtPriceX96;
@@ -78,15 +78,18 @@ contract Deploy is ScriptBase {
         uint24 fee = uint24(vm.envOr("UNDERLYING_FEE", uint256(500)));
         int24 spacing = int24(int256(vm.envOr("UNDERLYING_TICK_SPACING", uint256(10))));
         require(d.ethPriceWad >= 1e18 && d.ethPriceWad <= 1e24, "ETH_PRICE_USD out of range");
+        IMarketScheduler.Config memory sc = schedulerConfig();
+        _checkConfig(sc);
 
         d.deployer = _startBroadcast();
         d.keeper = _envAddress("KEEPER_ADDRESS", d.deployer);
         _deployUnderlying(d, oc, fee, spacing);
-        _deployPredictionHook(d);
+        _deployPredictionHook(d, sc);
         vm.stopBroadcast();
 
-        _verify(d, oc);
+        _verify(d, oc, sc);
         _write(d, oc);
+        _logConfig(sc);
     }
 
     /// @notice Oracle parameters for 1-minute demo markets: 10 s grid, 30 min lookback, 5 min warm-up, >= 2 h of history
@@ -155,25 +158,18 @@ contract Deploy is ScriptBase {
         IPriceSteerer(d.priceSteerer).addLiquidityFullRange(d.underlyingPool, d.liquidity);
     }
 
-    function _deployPredictionHook(Deployment memory d) internal {
-        bytes memory init = abi.encodePacked(
-            vm.getCode("src/PredictionHook.sol:PredictionHook"), abi.encode(d.poolManager, d.usdc, d.deployer)
-        );
-        (bytes32 salt, address hook) = _mineHookSalt(PREDICTION_FLAGS, init);
-        _create2(salt, init, hook);
-        d.predictionHook = hook;
-        if (d.keeper != address(0)) IPredictionHookAdmin(hook).setKeeper(d.keeper);
+    function _deployPredictionHook(Deployment memory d, IMarketScheduler.Config memory sc) internal {
+        (Pair memory p,) = _deployPair(d.deployer, d.poolManager, d.usdc, d.underlyingOracle, sc);
+        d.marketScheduler = p.scheduler;
+        d.predictionHook = p.hook;
     }
 
-    function _verify(Deployment memory d, OracleConfig memory oc) internal view {
-        require(uint160(d.predictionHook) & Hooks.ALL_HOOK_MASK == 0x2AA8, "prediction hook flags");
+    function _verify(Deployment memory d, OracleConfig memory oc, IMarketScheduler.Config memory sc) internal view {
+        _verifyPair(Pair(d.marketScheduler, d.predictionHook), d.poolManager, d.usdc, d.underlyingOracle, sc);
         require(uint160(d.underlyingOracle) & Hooks.ALL_HOOK_MASK == ORACLE_FLAGS, "oracle hook flags");
         require(PoolId.unwrap(IOracleHookView(d.underlyingOracle).poolId()) == PoolId.unwrap(_poolId(d.underlyingPool)), "oracle not bound");
         require(IOracleHookView(d.underlyingOracle).owner() == d.deployer, "oracle owner");
         require(IPriceSteerer(d.priceSteerer).owner() == d.deployer, "steerer owner");
-        require(IPredictionHookAdmin(d.predictionHook).owner() == d.deployer, "hook owner");
-        require(IPredictionHookAdmin(d.predictionHook).keeper() == d.keeper, "hook keeper");
-        require(IPredictionHookAdmin(d.predictionHook).usdc() == d.usdc, "hook usdc");
         int256 lnSpot = IUnderlyingOracle(d.underlyingOracle).lnSpotSoBWad();
         int256 diff = lnSpot - F.lnWad(int256(d.ethPriceWad));
         require(diff < 1e12 && diff > -1e12, "oracle spot differs from ETH_PRICE_USD");
@@ -205,6 +201,7 @@ contract Deploy is ScriptBase {
         vm.serializeAddress(o, "multicall3", MULTICALL3);
         vm.serializeAddress(o, "usdc", d.usdc);
         vm.serializeAddress(o, "predictionHook", d.predictionHook);
+        vm.serializeAddress(o, "marketScheduler", d.marketScheduler);
         vm.serializeAddress(o, "underlyingOracle", d.underlyingOracle);
         vm.serializeAddress(o, "priceSteerer", d.priceSteerer);
         vm.serializeAddress(o, "demoWeth", d.demoWeth);
@@ -223,12 +220,13 @@ contract Deploy is ScriptBase {
         console2.log(_isDryRun() ? "Dry run (nothing broadcast)" : "Deployed");
         _log("network", _network());
         _log("deployer", d.deployer);
-        _log("keeper", d.keeper);
+        _log("keeper bot", d.keeper);
         _log("demoWeth (dWETH)", d.demoWeth);
         _log("demoUsdc (dUSDC)", d.demoUsdc);
         _log("underlyingOracle", d.underlyingOracle);
         _log("priceSteerer", d.priceSteerer);
         _log("predictionHook", d.predictionHook);
+        _log("marketScheduler", d.marketScheduler);
         _log("underlying pool", vm.toString(PoolId.unwrap(_poolId(d.underlyingPool))));
         _log("initial ETH price", _formatUnits(d.ethPriceWad, 18, 2));
         _log("written", path);
