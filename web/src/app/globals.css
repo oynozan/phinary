@@ -157,6 +157,8 @@
     :root {
         --header-h: 6rem;
         --shell-top: 11rem;
+        /* The dock is mobile-only; desktop navigates from the header */
+        --shell-bottom: 5rem;
     }
 }
 

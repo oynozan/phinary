@@ -57,7 +57,7 @@ Utilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash`
 ## Layout
 
 - Shell: fixed pill header (top, opaque `bg-surface`) and floating dock (bottom, opaque `bg-surface`, icons on `bg-surface-2`) live in `app/layout.tsx`. `<main>` already pads for both (`--shell-top`, `--shell-bottom`) and uses `overflow-x-clip`, so `sticky` works on every page; pages start directly with content.
-- Keep the primary action above the fold at 1440x900 and clear of the dock (the dock spans roughly x 568-872 there).
+- The dock is mobile and tablet navigation only (hidden from 1024 px, where the header nav takes over). Keep primary actions clear of it below 1024 px.
 - Containers (`@/components/layout/page`): `PageWide` (1200px, header gutters) for grids and tables; `PageNarrow` (`size="sm"` 575px for trade box and forms, `size="md"` 720px for lists and detail). Everything is centered.
 - Headings: `PageHeading` (centered h1, 3xl to 5xl) for section pages; `HeroHeading` + `Accent` (one accent word) for the home hero. Every page hero is centered on the page, above any two-column grid (the market page puts its question, its countdown and the timeline in a full-width row, then the grid). Titles of panels in a column sit inside the panel (`h2 text-xl` in the panel's padding); `SectionHeading` is for centered section titles in a single column.
 - Spacing: generous. Panels `p-5 sm:p-6`, grids `gap-5`, sections `space-y-10` or more. Large type.

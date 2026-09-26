@@ -115,7 +115,7 @@ export function Dock() {
     return (
         <nav
             aria-label="Dock"
-            className="pointer-events-none fixed right-0 bottom-4 left-0 z-50 flex max-w-[100vw] justify-center overflow-hidden"
+            className="pointer-events-none fixed right-0 bottom-4 left-0 z-50 flex max-w-[100vw] justify-center overflow-hidden lg:hidden"
         >
             <motion.div style={{ height }} className="relative mx-2 flex max-w-full items-center">
                 <motion.div
