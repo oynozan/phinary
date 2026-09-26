@@ -1,5 +1,7 @@
 # Phinary
 
+Our developer feedback for ETHGlobal Tokyo 2026 is in [FEEDBACK.md](FEEDBACK.md).
+
 Phinary runs binary prediction markets on ETH through a Uniswap v4 hook. Each market asks a question like "ETH > $2,684.53 at 00:48?". It is priced with Black-Scholes, not with a liquidity curve, and it trades through ordinary Uniswap v4 swaps.
 
 Each market has two tokens, `ETHUP` and `ETHDOWN`. Each costs between $0.00 and $1.00, and a winning token redeems for exactly $1.00.
