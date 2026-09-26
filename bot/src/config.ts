@@ -3,10 +3,10 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { getAddress, isAddress, zeroAddress, type Address, type Hex } from "viem";
-import { isSourceName, type SourceName } from "./feeds.ts";
+import { isSourceName, normalizeSymbol, type SourceName } from "./feeds.ts";
 import { isLevel, type Level } from "./log.ts";
 import { parseDecimal, type Rational } from "./math.ts";
-import { sortTokens, type PoolKey } from "./pricing.ts";
+import { poolId, sortTokens, type PoolKey } from "./pricing.ts";
 
 export const BOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO_DIR = resolve(BOT_DIR, "..");
@@ -69,12 +69,22 @@ const ADDRESS_ENV: Record<AddressKey, string> = {
   sealedOracle: "SEALED_ORACLE",
 };
 
+/** One oracle-hooked demo pool, `token` against demoUsdc, from the deployments file's `underlyings` list. */
+export interface Underlying {
+  symbol: string;
+  token: Address;
+  oracle: Address;
+  pool: PoolKey;
+}
+
 export type Deployments = Record<AddressKey, Address> & {
   chainId: number;
   rpcUrl?: string;
   underlyingPool: PoolKey;
   /** False when fee and tickSpacing are defaults; the mirror then takes the key from the oracle's poolKey(). */
   underlyingPoolExplicit: boolean;
+  /** The `underlyings` list, or undefined when the file only has the flat single-ETH keys. */
+  underlyings?: Underlying[];
 };
 
 function asAddress(v: unknown, what: string): Address {
@@ -94,6 +104,51 @@ function asObject(v: unknown, what: string): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
 
+function asPoolKey(v: unknown, what: string): PoolKey {
+  const p = asObject(v, what);
+  return {
+    currency0: asAddress(p.currency0, `${what}.currency0`),
+    currency1: asAddress(p.currency1, `${what}.currency1`),
+    fee: asInt(p.fee, `${what}.fee`),
+    tickSpacing: asInt(p.tickSpacing, `${what}.tickSpacing`),
+    hooks: asAddress(p.hooks, `${what}.hooks`),
+  };
+}
+
+function assertSorted(pool: PoolKey, what: string): void {
+  if (BigInt(pool.currency0) >= BigInt(pool.currency1) && pool.currency1 !== zeroAddress) {
+    throw new Error(`${what} currencies must be sorted (currency0 < currency1)`);
+  }
+}
+
+export function parseUnderlyings(v: unknown): Underlying[] {
+  if (!Array.isArray(v) || v.length === 0) throw new Error("underlyings must be a non-empty array");
+  const seen = new Set<string>();
+  return v.map((entry, i) => {
+    const e = asObject(entry, `underlyings[${i}]`);
+    if (typeof e.symbol !== "string") throw new Error(`underlyings[${i}].symbol is not a string`);
+    const symbol = normalizeSymbol(e.symbol);
+    const what = `underlyings[${i}] (${symbol})`;
+    if (seen.has(symbol)) throw new Error(`underlyings has ${symbol} twice`);
+    seen.add(symbol);
+    const u: Underlying = {
+      symbol,
+      token: asAddress(e.token, `${what}.token`),
+      oracle: asAddress(e.oracle, `${what}.oracle`),
+      pool: asPoolKey(e.pool, `${what}.pool`),
+    };
+    assertSorted(u.pool, `${what}.pool`);
+    if (u.token === zeroAddress || (u.pool.currency0 !== u.token && u.pool.currency1 !== u.token)) {
+      throw new Error(`${what}.token ${u.token} is not in its pool`);
+    }
+    if (u.pool.hooks !== u.oracle) throw new Error(`${what}.pool.hooks ${u.pool.hooks} is not its oracle ${u.oracle}`);
+    if (e.poolId !== undefined && String(e.poolId).toLowerCase() !== poolId(u.pool)) {
+      throw new Error(`${what}.poolId ${String(e.poolId)} does not match its pool key (${poolId(u.pool)})`);
+    }
+    return u;
+  });
+}
+
 /** Parses a deployments file; addresses may be flat or under "contracts", and missing ones are zero. */
 export function parseDeployments(json: unknown, env: Env = {}): Deployments {
   const root = asObject(json, "deployments");
@@ -105,14 +160,7 @@ export function parseDeployments(json: unknown, env: Env = {}): Deployments {
   let pool: PoolKey;
   let explicit = true;
   if (flat.underlyingPool !== undefined) {
-    const p = asObject(flat.underlyingPool, "underlyingPool");
-    pool = {
-      currency0: asAddress(p.currency0, "underlyingPool.currency0"),
-      currency1: asAddress(p.currency1, "underlyingPool.currency1"),
-      fee: asInt(p.fee, "underlyingPool.fee"),
-      tickSpacing: asInt(p.tickSpacing, "underlyingPool.tickSpacing"),
-      hooks: asAddress(p.hooks, "underlyingPool.hooks"),
-    };
+    pool = asPoolKey(flat.underlyingPool, "underlyingPool");
   } else {
     const [currency0, currency1] = sortTokens(addrs.demoWeth, addrs.demoUsdc);
     const fee = env.UNDERLYING_POOL_FEE ?? flat.underlyingPoolFee;
@@ -126,9 +174,7 @@ export function parseDeployments(json: unknown, env: Env = {}): Deployments {
       hooks: addrs.underlyingOracle,
     };
   }
-  if (BigInt(pool.currency0) >= BigInt(pool.currency1) && pool.currency1 !== zeroAddress) {
-    throw new Error("underlyingPool currencies must be sorted (currency0 < currency1)");
-  }
+  assertSorted(pool, "underlyingPool");
   const rpcUrl = typeof flat.rpcUrl === "string" ? flat.rpcUrl : undefined;
   return {
     ...addrs,
@@ -136,6 +182,7 @@ export function parseDeployments(json: unknown, env: Env = {}): Deployments {
     rpcUrl,
     underlyingPool: pool,
     underlyingPoolExplicit: explicit,
+    underlyings: flat.underlyings === undefined || flat.underlyings === null ? undefined : parseUnderlyings(flat.underlyings),
   };
 }
 
@@ -251,14 +298,77 @@ function loadCommon(env: Env, keyVars: string[]): CommonConfig {
   };
 }
 
+/** A pool the mirror steers to `symbol`-USD. */
+export interface MirrorTarget {
+  symbol: string;
+  /** The base token; the other side of the pool is demoUsdc */
+  token: Address;
+  oracle: Address;
+  key: PoolKey;
+  /** False when fee and tickSpacing are defaults; the mirror then takes the key from the oracle's poolKey(). */
+  keyExplicit: boolean;
+  /** Feed prices outside [minPrice, maxPrice] are dropped */
+  minPrice: Rational;
+  maxPrice: Rational;
+}
+
+/** Sanity band per asset, in USD. MIRROR_<SYM>_MIN_PRICE / MIRROR_<SYM>_MAX_PRICE override them. */
+export const DEFAULT_PRICE_BANDS: Record<string, { min: string; max: string }> = {
+  ETH: { min: "100", max: "100000" },
+  SOL: { min: "5", max: "2000" },
+  BTC: { min: "1000", max: "10000000" },
+};
+
+function priceBand(env: Env, symbol: string): { minPrice: Rational; maxPrice: Rational } {
+  const def = DEFAULT_PRICE_BANDS[symbol];
+  const bound = (side: "MIN" | "MAX", fallback: string | undefined): Rational => {
+    const name = `MIRROR_${symbol}_${side}_PRICE`;
+    // MIRROR_MIN_PRICE / MIRROR_MAX_PRICE predate the multi-asset mirror and are ETH-sized, so they only apply to ETH
+    const legacy = `MIRROR_${side}_PRICE`;
+    if (raw(env, name) !== undefined) return envRational(env, name, "0");
+    if (symbol === "ETH" && raw(env, legacy) !== undefined) return envRational(env, legacy, "0");
+    if (fallback === undefined) throw new Error(`no default price band for ${symbol}: set ${name}`);
+    return parseDecimal(fallback);
+  };
+  const minPrice = bound("MIN", def?.min);
+  const maxPrice = bound("MAX", def?.max);
+  if (minPrice.num * maxPrice.den >= maxPrice.num * minPrice.den) {
+    throw new Error(`MIRROR_${symbol}_MIN_PRICE must be below MIRROR_${symbol}_MAX_PRICE`);
+  }
+  return { minPrice, maxPrice };
+}
+
+/**
+ * The pools to steer: every `underlyings` entry, or, when the file has none, the single demoWeth/demoUsdc pool from
+ * the flat keys as ETH. MIRROR_SYMBOLS (comma-separated) keeps only the listed ones.
+ */
+export function mirrorTargets(d: Deployments, env: Env = {}): MirrorTarget[] {
+  const all: Omit<MirrorTarget, "minPrice" | "maxPrice">[] = d.underlyings
+    ? d.underlyings.map((u) => ({ symbol: u.symbol, token: u.token, oracle: u.oracle, key: u.pool, keyExplicit: true }))
+    : [{ symbol: "ETH", token: d.demoWeth, oracle: d.underlyingOracle, key: d.underlyingPool, keyExplicit: d.underlyingPoolExplicit }];
+  const only = raw(env, "MIRROR_SYMBOLS")
+    ?.split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "")
+    .map(normalizeSymbol);
+  let picked = all;
+  if (only && only.length > 0) {
+    const missing = only.filter((s) => !all.some((t) => t.symbol === s));
+    if (missing.length > 0) {
+      throw new Error(`MIRROR_SYMBOLS has ${missing.join(", ")}, the deployments have ${all.map((t) => t.symbol).join(", ")}`);
+    }
+    picked = all.filter((t) => only.includes(t.symbol));
+  }
+  return picked.map((t) => ({ ...t, ...priceBand(env, t.symbol) }));
+}
+
 export interface MirrorConfig extends CommonConfig {
   intervalMs: number;
   thresholdBps: number;
   sources: SourceName[];
   fetchTimeoutMs: number;
   maxJumpBps: number;
-  minPrice: Rational;
-  maxPrice: Rational;
+  targets: MirrorTarget[];
 }
 
 export function loadMirrorConfig(env: Env = process.env): MirrorConfig {
@@ -276,8 +386,7 @@ export function loadMirrorConfig(env: Env = process.env): MirrorConfig {
     sources: sources as SourceName[],
     fetchTimeoutMs: envInt(env, "MIRROR_FETCH_TIMEOUT_MS", 2500, 100),
     maxJumpBps: envNumber(env, "MIRROR_MAX_JUMP_BPS", 1000, 0),
-    minPrice: envRational(env, "MIRROR_MIN_PRICE", "100"),
-    maxPrice: envRational(env, "MIRROR_MAX_PRICE", "100000"),
+    targets: mirrorTargets(common.deployments, env),
   };
 }
 

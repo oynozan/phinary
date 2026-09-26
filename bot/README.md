@@ -2,10 +2,11 @@
 
 Small Node 24 processes that keep the live demo moving:
 
-- **`mirror`** keeps the underlying demo ETH/USDC v4 pool (demo WETH 18 dec / demo USDC 6 dec, hooked by
-  `UnderlyingOracleHook`) at the real ETH price. Every ~1 s it reads ETH-USD from Coinbase (fallback Kraken, then
-  Binance.US), computes the exact `sqrtPriceX96` for the pool's token order and decimals, and calls
-  `PriceSteerer.steer(key, target)` when the pool is more than `MIRROR_THRESHOLD_BPS` away.
+- **`mirror`** keeps the underlying demo v4 pools (each demo asset against demo USDC 6 dec, hooked by its own
+  `UnderlyingOracleHook`) at the real prices, ETH and SOL from one process. Every ~1 s it reads `<SYM>-USD` for every
+  pool in parallel from Coinbase (fallback Kraken, then Binance.US), computes the exact `sqrtPriceX96` for the pool's
+  token order and decimals, and calls `PriceSteerer.steer(key, target)` for each pool more than
+  `MIRROR_THRESHOLD_BPS` away.
 - **`keeper`** calls the ownerless `MarketScheduler`'s permissionless `open()` once per slot. The scheduler builds the
   market on chain, struck at the oracle's start-of-block price rounded to the cent (tickers `ETHUP` / `ETHDOWN`, name
   for example `ETH > $2701.35 26 Sep 14:32`). The keeper then settles every market once it expires and sweeps its
@@ -31,6 +32,7 @@ chain-1301 constants from `docs/md/SPEC.md` §4 and zero placeholders for our co
 |---|---|---|
 | `poolManager` | mirror | Stack A PoolManager `0x00b0…62ac` |
 | `priceSteerer`, `demoWeth`, `demoUsdc` | mirror | from the demo deploy |
+| `underlyings` | mirror | optional list `[{symbol, token, oracle, pool: {currency0, currency1, fee, tickSpacing, hooks}, poolId}]`, one per steered asset (ETH, SOL). Each `pool` pairs `token` with `demoUsdc` and is hooked by `oracle`, and `poolId` must match it. When absent, the mirror steers the single ETH pool from `demoWeth`, `underlyingOracle` and `underlyingPool` |
 | `underlyingOracle` | mirror | the `UnderlyingOracleHook`; also the underlying pool's `hooks` |
 | `predictionHook` | keeper | the hook whose markets it settles and sweeps |
 | `marketScheduler` | keeper | the ownerless `MarketScheduler` that owns `predictionHook`; its `open()` is the only way to a new market |
@@ -69,7 +71,8 @@ From the repo root, `script/bots.sh start <network>` runs the mirror and the kee
 Log format (values illustrative):
 
 ```
-2026-09-26T14:30:01.204Z INFO  [mirror] steered source=coinbase feed=2701.35 pool=2700.64 devBps=2.63 target=15… tx=0x… block=… gas=…
+2026-09-26T14:30:01.204Z INFO  [mirror] steered symbol=ETH source=coinbase feed=2701.35 pool=2700.64 devBps=2.63 target=15… tx=0x… block=… gas=…
+2026-09-26T14:30:02.377Z INFO  [mirror] steered symbol=SOL source=coinbase feed=148.27 pool=148.19 devBps=5.39 target=… tx=0x… block=… gas=…
 2026-09-26T14:31:00.611Z INFO  [keeper] market opened market=17 now=… slot=29840551 budget=10.00 strikeCents=270135 tx=0x…
 2026-09-26T14:32:02.090Z INFO  [keeper] settled market=17 yesWon=true status=2 tx=0x…
 2026-09-26T14:32:03.311Z INFO  [keeper] swept market=17 usdc=8.41 tx=0x…
@@ -77,17 +80,26 @@ Log format (values illustrative):
 
 ### Mirror behaviour
 
-- Target: `sqrtPriceX96 = floor(sqrt(P · 10^dUSDC / 10^dWETH) · 2^96)` when WETH is `currency0`, and the inverse
-  price when demo USDC sorts first. Decimals are read from the tokens on start-up, and so is the owner check.
-- A feed price outside `[MIRROR_MIN_PRICE, MIRROR_MAX_PRICE]` is dropped. So is a jump of more than
-  `MIRROR_MAX_JUMP_BPS` against the last accepted price, until it repeats 3 times in a row (then it is real).
+- Pools: every `underlyings` entry, or without that list the demoWeth/demoUsdc pool as ETH, exactly as before.
+  `MIRROR_SYMBOLS=ETH` (comma-separated) steers only the listed ones. On start-up each pool is checked against its
+  oracle's `poolKey()`: it must pair the entry's own token with demo USDC, be hooked by that oracle, and equal the key
+  in the file.
+- Target: `sqrtPriceX96 = floor(sqrt(P · 10^dUSDC / 10^dBase) · 2^96)` when the base token is `currency0`, and the
+  inverse price when demo USDC sorts first. Decimals are read from the tokens on start-up, and so is the owner check.
+- Each asset has its own guard. A feed price outside its band is dropped: `MIRROR_<SYM>_MIN_PRICE` /
+  `MIRROR_<SYM>_MAX_PRICE`, by default ETH 100..100000 and SOL 5..2000 (the older `MIRROR_MIN_PRICE` /
+  `MIRROR_MAX_PRICE` still set ETH's). So is a jump of more than `MIRROR_MAX_JUMP_BPS` against that asset's last
+  accepted price, until it repeats 3 times in a row (then it is real).
+- The pools that need a steer are sent one after the other from the one mirror account, each waiting for its receipt.
+  The nonce is read once per tick and counted up locally, so a lagging RPC cannot hand the second steer a used one. A
+  feed, RPC or transaction failure on one asset logs `tick failed symbol=…` and leaves the others running.
 - The steer is an exact-in swap with the target as the price limit, so the pool lands on the target exactly. The steerer
   pays from its balance and mints any shortfall (it should be a `DemoToken` minter of both tokens).
 - The oracle hook writes on the first swap of each block, which adds about 70k gas (a steer is ~193k first in a block,
   ~122k after). An RPC that estimates in a block that already has a steer would miss that write, so the gas limit is
   `estimate · 1.3 + 100k`.
-- `binance` prices ETHUSDT, not ETH-USD, and is not in the default list; the mirror warns when it is configured and
-  tags a fallback to it with `quotedIn=USDT`.
+- `binance` prices `<SYM>USDT`, not `<SYM>-USD`, and is not in the default list; the mirror warns when it is
+  configured and tags a fallback to it with `quotedIn=USDT`.
 
 ### Keeper behaviour
 
@@ -174,8 +186,9 @@ npm test              # unit tests + an anvil end-to-end test
 
 - Unit tests cover the pure parts: `sqrtPriceX96` targets for both orientations against exact-integer vectors,
   inverse and deviation, `PoolId` and the PoolManager storage slot against `cast`, strike rounding at the half-cent,
-  `lnWad` against mpmath, sweep amounts, config and env parsing, feed parsers with fallback, and (with a fake RPC
-  client) the keeper's retry of failed market reads and creations, its `AlreadyOpened` slot check, gas padding and
+  `lnWad` against mpmath, sweep amounts, config and env parsing (including `underlyings` and per-asset bands), ETH and
+  SOL feed parsers with fallback, and (with a fake RPC client) the mirror's per-asset guards and consecutive nonces
+  across pools, and the keeper's retry of failed market reads and creations, its `AlreadyOpened` slot check, gas padding and
   one warning per refused slot.
 - `test/abi.test.ts` checks the TypeScript ABIs against the forge artifacts of `IPredictionHook`,
   `IUnderlyingOracle`, `PriceSteerer`, `PoolManager`, `ISealedPoolOracle` and `SealedPoolOracle`.
@@ -186,7 +199,8 @@ npm test              # unit tests + an anvil end-to-end test
   tick with the pool's end-of-block tick.
 - `test/anvil.test.ts` starts anvil, deploys the real `PoolManager`, `DemoToken` and `PriceSteerer`, and runs the
   mirror in both token orderings through a pool hooked by `test/demo/mocks/MockSobHook.sol` (oracle flags, CREATE2-mined
-  address), including the `poolKey()` lookup, a pinned-key mismatch and the gas padding. It then drives the keeper
+  address), including the `poolKey()` lookup, a pinned-key mismatch and the gas padding, then ETH and SOL pools from an
+  `underlyings` list steered in one tick with consecutive nonces. It then drives the keeper
   through the real `MarketScheduler` owning `test/demo/mocks/MockPredictionHook.sol`: `open()` and the market it
   builds, padded gas, settle, sweep, the invalid fallback, `InsufficientIdle` (one warning per slot), `GRACE` and dry
   runs without a key.

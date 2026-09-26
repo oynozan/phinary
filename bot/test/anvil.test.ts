@@ -23,7 +23,7 @@ import { createLogger } from "../src/log.ts";
 import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
 import { mirrorTick, setupMirror, steerGasLimit } from "../src/mirror.ts";
-import { orientationFor, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
+import { orientationFor, poolId, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
 import { ANVIL_KEY, deploy, findAnvil, read, send, startAnvil } from "./helpers/anvil.ts";
 import { loadArtifact, type Artifact } from "./helpers/artifacts.ts";
 
@@ -124,8 +124,11 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       );
       const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: file, DEPLOYER_PRIVATE_KEY: ANVIL_KEY, MIRROR_THRESHOLD_BPS: "2" });
       const ctx = await setupMirror(cfg, log);
-      assert.equal(ctx.orientation.baseIsToken0, o.baseIsToken0);
-      assert.deepEqual(ctx.key, key);
+      assert.equal(ctx.targets.length, 1, "no underlyings: the single ETH pool from the flat keys");
+      const eth = ctx.targets[0]!;
+      assert.equal(eth.symbol, "ETH");
+      assert.equal(eth.orientation.baseIsToken0, o.baseIsToken0);
+      assert.deepEqual(eth.key, key);
       const pinned = loadMirrorConfig({
         DEPLOYMENTS_FILE: file,
         DEPLOYER_PRIVATE_KEY: ANVIL_KEY,
@@ -134,7 +137,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
       await assert.rejects(setupMirror(pinned, log), /differs from the oracle's/);
 
       let feed = "2701.35";
-      ctx.getPrice = async () => ({ quote: { source: "coinbase", raw: feed, price: price(feed) }, failures: [] });
+      eth.getPrice = async () => ({ quote: { symbol: "ETH", source: "coinbase", raw: feed, price: price(feed) }, failures: [] });
 
       const expectAt = async (s: string) => {
         const slot0 = await readSlot0(c.publicClient, pm, key);
@@ -144,29 +147,84 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
 
       await testClient.increaseTime({ seconds: 1 });
       await testClient.mine({ blocks: 1 });
-      const up = await mirrorTick(ctx);
-      assert.equal(up.decision.action, "steer");
-      assert.ok(up.hash);
+      const [up] = await mirrorTick(ctx);
+      assert.equal(up!.decision?.action, "steer");
+      assert.ok(up!.hash);
       await expectAt("2701.35");
       const [tx, receipt] = await Promise.all([
-        c.publicClient.getTransaction({ hash: up.hash }),
-        c.publicClient.getTransactionReceipt({ hash: up.hash }),
+        c.publicClient.getTransaction({ hash: up!.hash }),
+        c.publicClient.getTransactionReceipt({ hash: up!.hash }),
       ]);
       assert.ok(tx.gas >= steerGasLimit(receipt.gasUsed), "steer gas is padded");
       assert.equal(await read<bigint>(c, hook, a.sobHook.abi, "writes"), 1n, "hook wrote on the steer");
 
       feed = "2701.40";
-      const hold = await mirrorTick(ctx);
-      assert.equal(hold.decision.action, "hold");
-      assert.equal(hold.hash, undefined);
+      const [hold] = await mirrorTick(ctx);
+      assert.equal(hold!.decision?.action, "hold");
+      assert.equal(hold!.hash, undefined);
       await expectAt("2701.35");
 
       feed = "2650.07";
-      const down = await mirrorTick(ctx);
-      assert.equal(down.decision.action, "steer");
+      const [down] = await mirrorTick(ctx);
+      assert.equal(down!.decision?.action, "steer");
       await expectAt("2650.07");
     }
     assert.ok(lines.some((l) => l.includes("] steered ")));
+  });
+
+  await t.test("mirror: one process steers ETH and SOL pools listed in underlyings, with consecutive nonces", async () => {
+    const pm = await deploy(c, a.poolManager, [me]);
+    const steerer = await deploy(c, a.steerer, [pm, me]);
+    const usdc = await deploy(c, a.demoToken, ["Demo USDC", "dUSDC", 6, 0n, 0n, me]);
+    const assets = [
+      { symbol: "ETH", decimals: 18, start: "2000", feed: "2701.35" },
+      { symbol: "SOL", decimals: 9, start: "150", feed: "148.27" },
+    ];
+    const pools: { symbol: string; token: Address; oracle: Address; key: PoolKey; o: ReturnType<typeof orientationFor>; feed: string }[] = [];
+    await send(c, usdc, a.demoToken.abi, "setMinter", [steerer, true]);
+    for (const asset of assets) {
+      const token = await deploy(c, a.demoToken, [`Demo ${asset.symbol}`, `d${asset.symbol}`, asset.decimals, 0n, 0n, me]);
+      await send(c, token, a.demoToken.abi, "setMinter", [steerer, true]);
+      const oracle = await deployHook(c, a.sobHook, encodeAbiParameters([{ type: "address" }], [pm]), ORACLE_FLAGS);
+      const [currency0, currency1] = BigInt(token) < BigInt(usdc) ? [token, usdc] : [usdc, token];
+      const key: PoolKey = { currency0, currency1, fee: 500, tickSpacing: 10, hooks: oracle };
+      const o = orientationFor(key, token, asset.decimals, 6);
+      await send(c, pm, a.poolManager.abi, "initialize", [key, sqrtPriceX96FromPrice(price(asset.start), o)]);
+      await send(c, steerer, a.steerer.abi, "addLiquidityFullRange", [key, 10n ** 15n]);
+      pools.push({ symbol: asset.symbol, token, oracle, key, o, feed: asset.feed });
+    }
+    const dir = mkdtempSync(join(tmpdir(), "bot-deploy-"));
+    const file = join(dir, "deployments.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        chainId: 31337,
+        rpcUrl: url,
+        poolManager: pm,
+        priceSteerer: steerer,
+        demoUsdc: usdc,
+        underlyings: pools.map((p) => ({ symbol: p.symbol, token: p.token, oracle: p.oracle, pool: p.key, poolId: poolId(p.key) })),
+      }),
+    );
+    const cfg = loadMirrorConfig({ DEPLOYMENTS_FILE: file, DEPLOYER_PRIVATE_KEY: ANVIL_KEY });
+    const ctx = await setupMirror(cfg, log);
+    assert.deepEqual(ctx.targets.map((x) => x.symbol), ["ETH", "SOL"]);
+    for (const [i, p] of pools.entries()) {
+      const target = ctx.targets[i]!;
+      assert.deepEqual(target.key, p.key);
+      assert.deepEqual(target.orientation, p.o);
+      target.getPrice = async () => ({ quote: { symbol: p.symbol, source: "coinbase", raw: p.feed, price: price(p.feed) }, failures: [] });
+    }
+    const nonceBefore = await c.publicClient.getTransactionCount({ address: me });
+    const results = await mirrorTick(ctx);
+    assert.deepEqual(results.map((r) => [r.symbol, r.decision?.action, r.error]), [["ETH", "steer", undefined], ["SOL", "steer", undefined]]);
+    const txs = await Promise.all(results.map((r) => c.publicClient.getTransaction({ hash: r.hash! })));
+    assert.deepEqual(txs.map((x) => x.nonce), [nonceBefore, nonceBefore + 1]);
+    for (const p of pools) {
+      const slot0 = await readSlot0(c.publicClient, pm, p.key);
+      assert.equal(slot0.sqrtPriceX96, sqrtPriceX96FromPrice(price(p.feed), p.o), `${p.symbol} pool at ${p.feed}`);
+    }
+    assert.ok(lines.some((l) => /\] steered symbol=SOL /.test(l)));
   });
 
   await t.test("keeper: create, settle, sweep and invalid fallback through the Task 3 scheduler pair", async () => {
