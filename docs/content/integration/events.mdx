@@ -1,6 +1,6 @@
 ---
 title: Events and indexing
-description: The events PredictionHook emits and how to attribute trades to real accounts.
+description: The events PredictionHook and the schedulers emit, how to tell the tracks apart and how to attribute trades to real accounts.
 ---
 
 # Events and indexing
@@ -31,12 +31,28 @@ event KeeperSet(address keeper);
 | Event | Emitted when |
 |---|---|
 | `MarketCreated` | A market opens. It carries both pool ids, so an indexer can discover the pools |
+| `MarketOpened` | Emitted by the track's `MarketScheduler`, not the hook, in the same transaction as `MarketCreated` ([below](#marketopened)) |
 | `Trade` | Every swap: side, token quantity, USDC amount and average price |
 | `HookSwap` | Every swap, with the real amounts. OpenZeppelin's standard event for custom-accounting hooks |
 | `MarketSettled` | The result is recorded, including `Invalid` markets |
 | `Redeemed` | Someone redeems tokens with `redeem` |
 | `Swept` | A settled market returns its surplus to the vault |
 | `Deposit`, `Withdraw` | LP shares are minted or burned |
+
+## `MarketOpened`
+
+The scheduler of each track emits its own event, right after the hook's `MarketCreated` in the same transaction:
+
+<Source path="src/interfaces/IMarketScheduler.sol" lines="31-34" />
+
+```solidity showLineNumbers{31}
+/// @dev Trust it only when the emitter is in `IMarketGatekeeper(hook.owner()).schedulers()`
+event MarketOpened(
+    uint256 indexed marketId, uint256 indexed slot, address indexed caller, uint256 budget, uint256 strikeCents
+);
+```
+
+The address that emitted it names the market's track, `slot` is `block.timestamp / period` of the open, `caller` is whoever called `open()`, and `strikeCents` is the strike in cents. Index it only from the addresses in `marketSchedulers` (the gatekeeper's `schedulers()`), because anyone can deploy a copy of `MarketScheduler` whose event names an existing market. `gatekeeper.schedulerOf(marketId)` gives the same answer on chain ([Market tracks](/integration#market-tracks)).
 
 ## `HookSwap`
 

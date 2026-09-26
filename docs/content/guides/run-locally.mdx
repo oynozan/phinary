@@ -42,7 +42,7 @@ make build && make test
 make local-env
 ```
 
-It forks Unichain Sepolia, deploys every contract and starts both bots.
+It forks Unichain Sepolia, deploys every contract (the ETH and SOL price sources, the gatekeeper with its four tracks and the hook) and starts both bots.
 
 ### Run a full market
 
@@ -70,7 +70,7 @@ make local-stop
 make vendor-interface
 ```
 
-It copies `@phinary/swap-sdk` into the fork and writes the hook address from `deployments/unichain-sepolia.json`.
+It copies `@phinary/swap-sdk` into the fork and writes the hook, gatekeeper and scheduler addresses from `deployments/unichain-sepolia.json`.
 
 ### Start the app
 
@@ -99,5 +99,5 @@ make bots-logs     # follow their logs
 make bots-stop
 ```
 
-- **Keeper:** opens a market every minute, then settles and sweeps each one when due. Every call is permissionless, so any account can do this.
-- **Price mirror:** keeps the testnet ETH/USDC pool at the real ETH price, the job arbitrageurs do on mainnet.
+- **Keeper:** opens the next market on every track (ETH and SOL every minute and every quarter hour), then settles and sweeps each one when due. Every call is permissionless, so any account can do this.
+- **Price mirror:** keeps the testnet ETH/USDC and SOL/USDC pools at the real prices, the job arbitrageurs do on mainnet.

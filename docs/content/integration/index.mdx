@@ -13,25 +13,41 @@ Phinary pools are ordinary Uniswap v4 pools with a hook, so integrating uses the
 
 | Contract | Address |
 |---|---|
-| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` |
-| MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` |
-| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| PredictionHook | `0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8` |
+| MarketGatekeeper (the hook's owner) | `0x755dBc10AB4b9BFDB8c46939702dC08B8F3e607A` |
+| MarketScheduler, ETH 1 minute | `0x8f1b371e41FeCBb825d0baAB19f906E645C760e0` |
+| MarketScheduler, ETH 15 minutes | `0x02f0B250120c817A45C6ba580FE68eB461E0A10e` |
+| MarketScheduler, SOL 1 minute | `0x067180DE54F4a800C88C3dC9EDa8b106f7126b83` |
+| MarketScheduler, SOL 15 minutes | `0x950eEDA8303253b76f0d47f4a3eD33aA7fF54E74` |
+| UnderlyingOracleHook, ETH/USDC pool | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| UnderlyingOracleHook, SOL/USDC pool | `0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080` |
 | USDC (Circle, testnet) | `0x31d0220469e10c4E71834a79b1f276d740d3768F` |
 | PoolManager | `0x00B036B58a818B1BC34d502D3fE730Db729e62AC` |
 | V4Quoter | `0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472` |
 | UniversalRouter 2.0 | `0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D` |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
 
-The current values always live in [`deployments/unichain-sepolia.json`](https://github.com/oynozan/phinary/blob/main/deployments/unichain-sepolia.json).
+The current values always live in [`deployments/unichain-sepolia.json`](https://github.com/oynozan/phinary/blob/main/deployments/unichain-sepolia.json): `marketSchedulers` lists the schedulers in the gatekeeper's order, and `underlyings` lists each price source with its token, oracle and pool. Markets of the earlier hooks in `legacyPredictionHooks` still redeem there with a direct `redeem` call.
 
 ## Contracts
 
 | Contract | Role |
 |---|---|
 | <Source path="src/PredictionHook.sol" /> | Markets, swaps, settlement, redemption and the LP vault ([reference](/contracts/prediction-hook)) |
-| <Source path="src/oracle/UnderlyingOracleHook.sol" /> | Start-of-block price, tick cumulatives and realised variance of the ETH/USDC pool ([reference](/contracts/oracle)) |
-| <Source path="src/MarketScheduler.sol" /> | Opens one market per slot for anyone ([reference](/contracts/scheduler)) |
+| <Source path="src/oracle/UnderlyingOracleHook.sol" /> | Start-of-block price, tick cumulatives and realised variance of one asset/USDC pool, one per asset ([reference](/contracts/oracle)) |
+| <Source path="src/MarketGatekeeper.sol" /> | The hook's owner. Forwards `createMarket` from its schedulers only and records which one opened each market ([reference](/contracts/scheduler)) |
+| <Source path="src/MarketScheduler.sol" /> | One per track. Opens one market per slot for anyone ([reference](/contracts/scheduler#open)) |
 | <Source path="src/OutcomeToken.sol" /> | The YES and NO ERC-20s (6 decimals), minted and burned only by the hook |
+
+## Market tracks
+
+Every market belongs to one of four tracks: ETH or SOL, 1 or 15 minutes long. All of them live on the one hook and share its `marketCount`, so ids of different tracks interleave. Three ways to tell which track a market is on:
+
+- **`gatekeeper.schedulerOf(marketId)`** returns the scheduler that opened it, or `address(0)` for an id the gatekeeper never created. This is the on-chain answer, and one multicall covers a whole list of ids.
+- **The `MarketOpened` event.** Each scheduler emits `MarketOpened(marketId, slot, caller, budget, strikeCents)` right after the hook's `MarketCreated`, in the same transaction. The address that emitted it is the track. Trust it only when that address is in `gatekeeper.schedulers()`: anyone can deploy a copy of `MarketScheduler` behind a fake gatekeeper, and its event would name a real market id ([Events](/integration/events#marketopened)).
+- **The symbol**, matched exactly against `ticker + "UP"` and `ticker + "DOWN"` from each scheduler's `config()`. Never match a prefix (`ETH` is a prefix of `ETH15M`) or an expiry (at a quarter hour all four tracks expire together).
+
+To list a track's recent markets without scanning every id, read `scheduler.marketOfSlot(slot)` for the last few slots, where `slot = block.timestamp / period`. A skipped slot returns 0. `@phinary/swap-sdk` wraps all of this as `readTracks`, `recentTrackMarketIds`, `schedulerOfMarkets` and `classifyBySymbol` (<Source path="packages/swap-sdk/src/tracks.ts" />).
 
 ## Routing
 

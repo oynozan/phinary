@@ -75,10 +75,10 @@ Stack A defaults, and our own addresses become `undefined`. The Stack B router `
 
 ## Tracks
 
-Each MarketScheduler behind the gatekeeper is one track, such as ETH1M or SOL15M.
+Each MarketScheduler behind the gatekeeper is one track, such as ETH (1-minute) or SOL15M.
 - `readTracks(client, deployment)` reads every scheduler's `config()` and `oracle()` into `{scheduler, oracle, ticker,
-  asset, label, period, tenor, window, cutoffBuffer, nSamples, maxBudget, minBudget}`. For example ticker `SOL1M` with
-  period 60 gives asset `SOL` and label `1m`.
+  asset, label, period, tenor, window, cutoffBuffer, nSamples, maxBudget, minBudget}`. For example ticker `SOL15M` with
+  period 900 gives asset `SOL` and label `15m`.
 - `recentTrackMarketIds(client, track, nowSec, k)` returns the market ids of the last `k` slots through
   `marketOfSlot`, newest first.
 - `schedulerOfMarkets(client, gatekeeper, ids)` returns `gatekeeper.schedulerOf(id)` for each id.

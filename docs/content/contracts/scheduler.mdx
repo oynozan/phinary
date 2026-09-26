@@ -1,29 +1,97 @@
 ---
-title: Scheduler
-description: MarketScheduler, the ownerless contract that owns PredictionHook and opens one market per slot.
+title: Scheduler and gatekeeper
+description: MarketGatekeeper owns PredictionHook and runs a fixed set of market tracks, each an ownerless MarketScheduler that opens one market per slot for anyone.
 ---
 
-# Scheduler
+# Scheduler and gatekeeper
 
-<Source path="src/MarketScheduler.sol" /> is the `owner` of `PredictionHook`, which makes it the only account that can call `createMarket`. It has no admin and no setter; every parameter is fixed at construction.
+Markets are opened by two kinds of contract, neither with an admin or a setter:
+
+- <Source path="src/MarketGatekeeper.sol" /> is the `owner` of `PredictionHook`. Its constructor deploys one `MarketScheduler` per **track**, and from then on it forwards `createMarket` to the hook only when one of those schedulers calls. The set of tracks is fixed at deploy.
+- <Source path="src/MarketScheduler.sol" /> runs one track: one asset and one market length. Anyone can call its `open()` once per slot, and every parameter is fixed at construction.
+
+The gatekeeper has no way to call `setKeeper`, so the hook's `keeper` stays `address(0)`. Nobody can open a market outside a track's schedule.
+
+## Live tracks
+
+All four tracks share one hook and one LP vault on Unichain Sepolia.
+
+| Track | Ticker | Tokens | Market length | Settlement window | Price source |
+|---|---|---|---|---|---|
+| ETH, 1 minute | `ETH` | `ETHUP` / `ETHDOWN` | 60 s | 10 s | ETH/USDC pool |
+| ETH, 15 minutes | `ETH15M` | `ETH15MUP` / `ETH15MDOWN` | 900 s | 30 s | ETH/USDC pool |
+| SOL, 1 minute | `SOL` | `SOLUP` / `SOLDOWN` | 60 s | 10 s | SOL/USDC pool |
+| SOL, 15 minutes | `SOL15M` | `SOL15MUP` / `SOL15MDOWN` | 900 s | 30 s | SOL/USDC pool |
+
+Each track reads its own [oracle](/contracts/oracle), a hook on a Uniswap v4 pool of that asset against USDC. The addresses are on the [Integration](/integration) page.
+
+## `MarketGatekeeper`
+
+<Source path="src/MarketGatekeeper.sol" lines="32-66" />
+
+```solidity showLineNumbers{32}
+/// @param tracks One per scheduler, 1 to 8 of them with distinct tickers and nonzero oracles; each scheduler reads
+///        its own track's oracle, and a config the scheduler rejects reverts with its InvalidConfig
+constructor(IPredictionHook hook_, Track[] memory tracks) {
+    uint256 n = tracks.length;
+    if (address(hook_) == address(0) || n == 0 || n > MAX_TRACKS) revert InvalidTracks();
+    for (uint256 i; i < n; ++i) {
+        if (tracks[i].oracle == address(0)) revert InvalidTracks();
+        bytes32 ticker = keccak256(bytes(tracks[i].config.ticker));
+        for (uint256 j; j < i; ++j) {
+            if (keccak256(bytes(tracks[j].config.ticker)) == ticker) revert InvalidTracks();
+        }
+    }
+
+    hook = hook_;
+    schedulerCount = n;
+    address[MAX_TRACKS] memory s;
+    for (uint256 i; i < n; ++i) {
+        s[i] = address(new MarketScheduler(hook_, this, tracks[i].oracle, tracks[i].config));
+    }
+    _s0 = s[0];
+    _s1 = s[1];
+    _s2 = s[2];
+    _s3 = s[3];
+    _s4 = s[4];
+    _s5 = s[5];
+    _s6 = s[6];
+    _s7 = s[7];
+}
+
+/// @inheritdoc IMarketGatekeeper
+function createMarket(IPredictionHook.MarketParams calldata p) external returns (uint256 marketId) {
+    if (!isScheduler(msg.sender)) revert NotScheduler();
+    marketId = hook.createMarket(p);
+    schedulerOf[marketId] = msg.sender;
+}
+```
+
+- **Frozen tracks.** The constructor takes 1 to 8 tracks, each an oracle and a scheduler config, and rejects a repeated ticker. It deploys each scheduler with `new`, so the i-th one lives at `computeCreateAddress(gatekeeper, i + 1)` and `schedulers()` lists them in that order. Nothing can add or remove a track later.
+- **Schedulers only.** `createMarket` reverts `NotScheduler` for every other caller, the deployer included. The hook accepts `createMarket` only from its owner, which is the gatekeeper.
+- **`schedulerOf(marketId)`** records which scheduler opened each market and returns `address(0)` for an id the gatekeeper never created. It is the on-chain way to tell the tracks apart ([Market tracks](/integration#market-tracks)).
+- **No hook call in the constructor.** The hook's constructor needs the gatekeeper's address as its owner, so the gatekeeper lands first and the hook second ([Deployment](#deployment)).
 
 ## `open`
 
-<Source path="src/MarketScheduler.sol" lines="63-102" />
+<Source path="src/MarketScheduler.sol" lines="74-117" />
 
-```solidity showLineNumbers{63}
+```solidity showLineNumbers{74}
+/// @inheritdoc IMarketScheduler
+/// @dev The TooLate check mirrors the hook's own `createMarket` rule, so a late call fails with the slot named
 function open() external returns (uint256 marketId) {
     uint256 slot = block.timestamp / _period;
     if (slot <= lastSlot) revert AlreadyOpened(slot);
+    uint256 expiry = slot * _period + _tenor;
+    if (block.timestamp + _window + _cutoffBuffer >= expiry) revert TooLate(slot);
     lastSlot = slot;
 
     uint256 budget = _budget();
-    uint256 expiry = slot * _period + _tenor;
     uint256 cents = MarketNames.strikeCents(IUnderlyingOracle(oracle).lnSpotSoBWad());
     (string memory yesName, string memory noName, string memory yesSymbol, string memory noSymbol) =
         MarketNames.names(_ticker(), cents, expiry);
 
-    marketId = hook.createMarket(
+    marketId = gatekeeper.createMarket(
         IPredictionHook.MarketParams({
             oracle: oracle,
             lnStrikeWad: MarketNames.lnStrikeWad(cents),
@@ -49,21 +117,50 @@ function open() external returns (uint256 marketId) {
             noSymbol: noSymbol
         })
     );
+    marketOfSlot[slot] = marketId;
 
     emit MarketOpened(marketId, slot, msg.sender, budget, cents);
 }
 ```
 
-- **One market per slot.** A slot is `period` seconds long. The first `open()` in a slot succeeds and later ones revert `AlreadyOpened`, so anyone can call it without creating extra markets.
-- **At-the-money strike.** The strike is the oracle's start-of-block price rounded to whole cents.
-- **Expiry on the grid.** `expiry = slot · period + tenor`, so every market ends on a round time.
-- **Names.** Tokens are named like `ETH > $2684.53 26 Sep 00:48` with symbols `ETHUP` and `ETHDOWN` (<Source path="src/lib/MarketNames.sol" />).
+- **One market per slot.** A slot is `period` seconds of block time (`block.timestamp / period`). The first `open()` in a slot succeeds and later ones revert `AlreadyOpened`, so anyone can call it without creating extra markets.
+- **Back to back.** `expiry = slot · period + tenor`, and the live tracks have `tenor == period`, so each market expires exactly when the next slot starts.
+- **`TooLate`.** The hook refuses a market whose trading would already be over. `open()` checks the same rule first and reverts `TooLate(slot)` from `slot · period + tenor − window − cutoffBuffer` on, which is when trading would stop. A slot nobody opened in time is skipped, and the next slot opens normally.
+- **At-the-money strike.** The strike is the track oracle's start-of-block price, rounded to whole cents.
+- **Names.** The ticker starts every name and symbol: `ETH > $2684.53 26 Sep 00:48` with symbols `ETHUP` and `ETHDOWN`, or `ETH15M > $2684.53 26 Sep 00:45` with `ETH15MUP` and `ETH15MDOWN`. The time is the expiry in UTC (<Source path="src/lib/MarketNames.sol" />).
+- **`marketOfSlot(slot)`** keeps the market each slot opened, 0 for a skipped slot, so a reader can list a track's recent markets without scanning the hook.
+
+**Worked timeline.** On a 1-minute track the slot that starts at 14:34:00 expires at 14:35:00. Trading stops at 14:34:48 (a 10 s window plus a 2 s buffer), so `open()` succeeds from 14:34:00 to 14:34:47 and reverts `TooLate` from 14:34:48. At 14:35:00 the next slot opens. On a 15-minute track the slot that starts at 14:30:00 expires at 14:45:00, and with its 30 s window `TooLate` starts at 14:44:28. At 14:45:00 all four tracks open a market.
+
+## Timing views
+
+<Source path="src/MarketScheduler.sol" lines="135-147" />
+
+```solidity showLineNumbers{135}
+/// @inheritdoc IMarketScheduler
+/// @dev Past the current slot's deadline the next slot's start is returned, since the current one is lost
+function nextOpenTime() external view returns (uint256) {
+    uint256 slot = block.timestamp / _period;
+    if (slot <= lastSlot) slot = lastSlot + 1;
+    else if (block.timestamp >= openDeadline(slot)) slot += 1;
+    return slot * _period;
+}
+
+/// @inheritdoc IMarketScheduler
+function openDeadline(uint256 slot) public view returns (uint256) {
+    return slot * _period + _tenor - _window - _cutoffBuffer;
+}
+```
+
+- `openDeadline(slot)` is the first second at which `open()` for that slot reverts `TooLate`.
+- `nextOpenTime()` is the start of the next slot `open()` can still serve. A value at or before the current block time means a call is due now.
+- `canOpen()` is true when `open()` would succeed now: the slot is free, its deadline has not passed, the vault can pay the minimum budget and the oracle gives a usable price.
 
 ## Budget
 
-<Source path="src/MarketScheduler.sol" lines="150-156" />
+<Source path="src/MarketScheduler.sol" lines="175-181" />
 
-```solidity showLineNumbers{150}
+```solidity showLineNumbers{175}
 /// @return budget `min(maxBudget, hook.vaultIdle() / 2)`; ok whether it clears `minBudget`. Non-reverting form
 ///         of `_budget`, shared with `canOpen()` so the two never disagree.
 function _affordableBudget() internal view returns (uint256 budget, bool ok) {
@@ -73,20 +170,38 @@ function _affordableBudget() internal view returns (uint256 budget, bool ok) {
 }
 ```
 
-Each market gets `min(maxBudget, vaultIdle / 2)`, so one market never takes the whole vault. Below `minBudget`, `open()` reverts and `canOpen()` returns false.
+Each market gets `min(maxBudget, vaultIdle / 2)`, so one market never takes the whole vault. Below `minBudget`, `open()` reverts `InsufficientIdle` and `canOpen()` returns false. Every track draws on the same vault, in the order the `open()` calls land.
+
+**Example.** At 14:45:00 the four markets that expire then still hold 10 USDC each until they are swept. With 150 USDC in the vault, 110 is idle. ETH opens with `min(10, 110 / 2) = 10`, SOL with `min(10, 100 / 2) = 10`, ETH15M with `min(10, 90 / 2) = 10` and SOL15M with `min(10, 80 / 2) = 10`. Budgets start to shrink only when less than 20 USDC is idle for the last open, which happens below a vault of about 90 USDC.
 
 ## Demo configuration
 
-<Source path="script/base/SchedulerPair.sol" lines="35-52" />
+<Source path="script/base/TrackSet.sol" lines="55-62" />
 
-```solidity showLineNumbers{35}
-/// @notice The spec's Unichain Sepolia demo values, the default for every config field
-function demoDefaults() public pure returns (IMarketScheduler.Config memory c) {
-    c.period = 60;
-    c.tenor = 120;
-    c.window = 10;
+```solidity showLineNumbers{55}
+/// @notice The four Unichain Sepolia tracks, in gatekeeper order
+function demoTracks() public pure returns (TrackSpec[] memory t) {
+    t = new TrackSpec[](4);
+    t[0] = TrackSpec(ETH, _demoConfig(ETH, 60, 10));
+    t[1] = TrackSpec(ETH, _demoConfig("ETH15M", 900, 30));
+    t[2] = TrackSpec("SOL", _demoConfig("SOL", 60, 10));
+    t[3] = TrackSpec("SOL", _demoConfig("SOL15M", 900, 30));
+}
+```
+
+<Source path="script/base/TrackSet.sol" lines="83-103" />
+
+```solidity showLineNumbers{83}
+function _demoConfig(string memory ticker, uint32 period, uint32 window)
+    internal
+    pure
+    returns (IMarketScheduler.Config memory c)
+{
+    c.period = period;
+    c.tenor = period;
+    c.window = window;
     c.cutoffBuffer = 2;
-    c.nSamples = 10;
+    c.nSamples = window;
     c.quote = IPredictionHook.QuoteParams({
         h0Wad: 0.02e18,
         gammaSWad: 0.00002e18,
@@ -96,28 +211,60 @@ function demoDefaults() public pure returns (IMarketScheduler.Config memory c) {
     });
     c.maxBudget = 10e6;
     c.minBudget = 1e6;
-    c.ticker = "ETH";
+    c.ticker = ticker;
 }
 ```
 
-| Parameter | Value | Effect |
-|---|---|---|
-| `period` | 60 s | A new market every minute |
-| `tenor` | 120 s | Each market lasts two minutes, so two are always live |
-| `window` | 10 s | Settlement averages the last 10 s |
-| `cutoffBuffer` | 2 s | Trading stops 12 s before expiry |
-| `nSamples` | 10 | Samples in the window for the pricing formula |
-| `h0` | 0.02 | Base half-spread |
-| `gammaS` | 0.00002 | Volatility-scaled spread term |
-| `lambda` | 0.001 | Price impact per whole token of flow in one block |
-| `qEpochMax` | 100 tokens | Max net flow per block |
-| `pMin` | 0.02 | Tradable band 0.02 to 0.98 |
-| `maxBudget`, `minBudget` | 10, 1 USDC | Budget bounds per market |
+| Parameter | 1-minute tracks | 15-minute tracks | Effect |
+|---|---|---|---|
+| `period` | 60 s | 900 s | A new market every minute, or every quarter hour |
+| `tenor` | 60 s | 900 s | Equal to the period, so markets run back to back |
+| `window` | 10 s | 30 s | Settlement averages the last 10 or 30 seconds |
+| `cutoffBuffer` | 2 s | 2 s | Trading stops 12 or 32 seconds before expiry |
+| `nSamples` | 10 | 30 | Samples in the window for the pricing formula |
+| `h0` | 0.02 | 0.02 | Base half-spread |
+| `gammaS` | 0.00002 | 0.00002 | Volatility-scaled spread term |
+| `lambda` | 0.001 | 0.001 | Price impact per whole token of flow in one block |
+| `qEpochMax` | 100 tokens | 100 tokens | Max net flow per block |
+| `pMin` | 0.02 | 0.02 | Tradable band 0.02 to 0.98 |
+| `maxBudget`, `minBudget` | 10, 1 USDC | 10, 1 USDC | Budget bounds per market |
 
 ## Deployment
 
-The hook takes the scheduler as `owner` in its constructor, and the scheduler takes the hook. The deploy script predicts the scheduler's address from the deployer's nonce, mines the hook's CREATE2 salt for the permission bits with that owner, then deploys both (<Source path="script/DeployScheduler.s.sol" />).
+The hook takes the gatekeeper as `owner` in its constructor, and the gatekeeper takes the hook. The deploy script predicts the gatekeeper's address from the deployer's nonce and mines the hook's CREATE2 salt for the permission bits with that owner. It then sends exactly two transactions: the gatekeeper, which deploys every scheduler in its own constructor, and the hook through the CREATE2 factory.
+
+<Source path="script/base/TrackSet.sol" lines="200-224" />
+
+```solidity showLineNumbers{200}
+/// @dev Call inside a broadcast from `deployer`, exactly two transactions
+function _deployTracks(
+    address deployer,
+    address poolManager,
+    address usdc,
+    IMarketGatekeeper.Track[] memory tracks
+) internal returns (Tracks memory t, bytes32 salt) {
+    uint64 nonce = vm.getNonce(deployer);
+    address gatekeeper = vm.computeCreateAddress(deployer, nonce);
+    bytes memory init = abi.encodePacked(
+        vm.getCode("src/PredictionHook.sol:PredictionHook"), abi.encode(poolManager, usdc, gatekeeper)
+    );
+    address hook;
+    (salt, hook) = _mineHookSalt(PREDICTION_FLAGS, init);
+
+    t.gatekeeper = deployCode("src/MarketGatekeeper.sol:MarketGatekeeper", abi.encode(hook, tracks));
+    require(t.gatekeeper == gatekeeper, "gatekeeper address differs from the nonce prediction");
+    _create2(salt, init, hook);
+    t.hook = hook;
+    require(vm.getNonce(deployer) == nonce + 2, "deployer nonce moved by more than the two track transactions");
+    t.schedulers = new address[](tracks.length);
+    for (uint256 i; i < tracks.length; ++i) {
+        t.schedulers[i] = vm.computeCreateAddress(gatekeeper, i + 1);
+    }
+}
+```
+
+Before anything is recorded, the script reads the whole set back from the chain: the hook's owner and empty keeper, the gatekeeper's hook and scheduler list, and each scheduler's hook, gatekeeper, oracle and config (<Source path="script/DeployTracks.s.sol" />). The hook's owner is immutable, so a different set of tracks needs a new gatekeeper, a new hook and a move of the vault.
 
 ## Keeper bot
 
-`open()` needs a transaction every slot. The keeper bot (<Source path="bot/src/keeper.ts" />) sends it, then calls `settle` and `sweep` on the hook when each market is due. Every one of these calls is permissionless, so the bot has no special rights and anyone can replace it.
+`open()` needs a transaction in every slot of every track. One keeper bot (<Source path="bot/src/keeper.ts" />) drives all four. At each boundary it opens the due tracks first, shortest period first, then settles and sweeps every market that is due. Every one of these calls is permissionless, so the bot has no special rights and anyone can replace it ([Keeper calls](/integration/keeper-calls)).

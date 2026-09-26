@@ -43,7 +43,7 @@ await estimateSwapGas(client, { tx, account })   // throws PredictionSwapError (
 await wallet.sendTransaction(tx)
 ```
 
-`minOutWithSlippage(q.amountOut, 100)` allows 1% slippage, which only suits long markets. For two-minute markets use `autoSlippageBps`, which sizes the tolerance to how far the price can move in about 5 seconds at this trade's price, between 1% and 90%.
+`minOutWithSlippage(q.amountOut, 100)` allows 1% slippage, which only suits long markets. For 1-minute and 15-minute markets use `autoSlippageBps`, which sizes the tolerance to how far the price can move in about 5 seconds at this trade's price, between 1% and 90%.
 
 ## Quote
 

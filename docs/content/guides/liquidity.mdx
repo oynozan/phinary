@@ -15,7 +15,7 @@ The dashboard's **Vault** page does this with buttons. This guide uses `cast` fr
 
 ```sh
 export R=https://unichain-sepolia.drpc.org
-export HOOK=0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8
+export HOOK=0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8
 export USDC=0x31d0220469e10c4E71834a79b1f276d740d3768F
 export PK=0x...   # your wallet's private key; never commit it
 ```
@@ -34,7 +34,7 @@ cast call $HOOK "navPlus()(uint256)"   --rpc-url $R
 cast call $HOOK "navMinus()(uint256)"  --rpc-url $R
 ```
 
-`vaultIdle` is USDC not lent to any market. `navPlus` and `navMinus` are the vault's value if every live market ends in its best or worst case. On 26 Sep 2026 they read 73.44, 93.44 and 93.44 USDC: the two NAVs were equal because nobody held tokens in the live markets.
+`vaultIdle` is USDC not lent to any market. `navPlus` and `navMinus` are the vault's value if every live market ends in its best or worst case. On 26 Sep 2026 the previous hook's vault read 73.44, 93.44 and 93.44 USDC: the two NAVs were equal because nobody held tokens in the live markets. One vault backs all four market tracks, ETH and SOL, 1 and 15 minutes.
 
 ### Approve USDC
 
@@ -62,7 +62,7 @@ cast call $HOOK "sharesOf(address)(uint256)" <your address> --rpc-url $R
 cast send $HOOK "withdraw(uint256)" <shares> --rpc-url $R --private-key $PK
 ```
 
-Shares are paid at `navMinus`, the worst case, and only from `vaultIdle`. USDC lent to a live market comes back when that market is swept, a minute or two later.
+Shares are paid at `navMinus`, the worst case, and only from `vaultIdle`. USDC lent to a live market comes back when that market is swept, a few seconds after its expiry: within a minute for a 1-minute market, within 15 minutes for a 15-minute one.
 
 </Steps>
 

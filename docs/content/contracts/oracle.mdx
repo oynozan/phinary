@@ -5,7 +5,7 @@ description: UnderlyingOracleHook, the v4 hook that gives PredictionHook its pri
 
 # Oracle
 
-<Source path="src/oracle/UnderlyingOracleHook.sol" /> is a second v4 hook, attached to one ETH/USDC pool. It is the only thing `PredictionHook` reads from outside itself, through this interface:
+<Source path="src/oracle/UnderlyingOracleHook.sol" /> is a second v4 hook, attached to one pool of an asset against USDC. The live demo runs two, one on an ETH/USDC pool and one on a SOL/USDC pool, and each market reads the oracle of its track. It is the only thing `PredictionHook` reads from outside itself, through this interface:
 
 <Source path="src/interfaces/IUnderlyingOracle.sol" lines="9-31" />
 
@@ -149,4 +149,4 @@ function threshold(int256 lnStrikeWad, int16 decimalsShift, uint32 window) inter
 
 ## Testnet price
 
-The Unichain Sepolia ETH/USDC pool has no arbitrageurs. The mirror bot (<Source path="bot/src/mirror.ts" />) keeps it near the real ETH price through `PriceSteerer` (<Source path="src/demo/PriceSteerer.sol" />). On mainnet, arbitrage does this job.
+The Unichain Sepolia ETH/USDC and SOL/USDC pools have no arbitrageurs. One mirror bot (<Source path="bot/src/mirror.ts" />) keeps both near the real ETH and SOL prices through `PriceSteerer` (<Source path="src/demo/PriceSteerer.sol" />). On mainnet, arbitrage does this job. Both oracles have renounced their ownership, so their variance bounds are fixed.

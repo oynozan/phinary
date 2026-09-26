@@ -7,7 +7,7 @@ description: How a Phinary market gets its result, who triggers it, and how winn
 
 ## The rule
 
-A market's result is the **average ETH price over the last 10 seconds before expiry**, read from the Uniswap v4 ETH/USDC pool.
+A market's result is the **average price over the last seconds before expiry**, read from the Uniswap v4 pool of its asset against USDC: the last 10 seconds for a 1-minute market, the last 30 for a 15-minute one.
 
 - **YES wins** if that average is above the strike.
 - **NO wins** if it is at or below the strike. A tie goes to NO.
@@ -16,7 +16,7 @@ The strike and the result come from the same pool. No external oracle and no ext
 
 ## Why an average of start-of-block prices
 
-The pool's price is recorded once per block, at the **start** of the block, before any swap in it runs. A trade can never move the price recorded for its own block. To move a 10-second average, someone would have to hold the pool away from the market price across many blocks while arbitrageurs trade against them, which gets expensive fast.
+The pool's price is recorded once per block, at the **start** of the block, before any swap in it runs. A trade can never move the price recorded for its own block. To move a 10- or 30-second average, someone would have to hold the pool away from the market price across many blocks while arbitrageurs trade against them, which gets expensive fast.
 
 ## Example
 

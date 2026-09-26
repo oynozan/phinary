@@ -7,11 +7,11 @@ description: Short answers to the questions people ask most about Phinary.
 
 ## Where does the price come from?
 
-From a Uniswap v4 ETH/USDC pool. A second hook on that pool records its start-of-block price, its tick history and its volatility, and `PredictionHook` reads only that. There are no external oracles and no external services ([Oracle](/contracts/oracle)).
+From Uniswap v4 pools: one ETH/USDC pool and one SOL/USDC pool. A second hook on each pool records its start-of-block price, its tick history and its volatility, and `PredictionHook` reads only that. There is no external oracle and no external service ([Oracle](/contracts/oracle)).
 
 ## Who controls the markets?
 
-Nobody. The hook's only owner is `MarketScheduler`, a contract with no admin and no setters. Anyone can open the next market, settle it and sweep it, and nobody can change a live market or choose its outcome.
+Nobody. The hook's only owner is `MarketGatekeeper`, a contract with no admin and no setters that forwards market creation from its four `MarketScheduler`s only. Anyone can open the next market on any track, settle it and sweep it, and nobody can change a live market or choose its outcome.
 
 ## What if the keeper bot stops?
 
@@ -47,7 +47,7 @@ Winning tokens never expire. Their USDC stays in the market until you sell them 
 
 ## Can markets be longer, or on other assets?
 
-Timing and pricing are deployment parameters of the scheduler, so a week-long market needs a new scheduler, not new code. Another asset needs its own oracle hook on a pool of that asset against USDC.
+They already come in two lengths, 1 and 15 minutes, on two assets, ETH and SOL. Timing and pricing are deployment parameters of each scheduler, so a week-long track needs a new scheduler, not new code, and another asset needs its own oracle hook on a pool of that asset against USDC. The hook's owner is fixed, though, so a new track means a new gatekeeper and hook, with the vault moved over.
 
 ## Is it on mainnet?
 

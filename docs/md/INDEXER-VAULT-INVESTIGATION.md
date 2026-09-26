@@ -106,6 +106,7 @@ RPC変更のみ、再試行回数の増加のみ、あるいは先頭 snapshot �
 上記は調査時点の記録。チーム承認後にユーザーから修正の指示を受け、以下を適用した。
 
 - `indexer/src/deployment.ts`: 現行 Sepolia Hook に対する snapshot の安全な下限を63569470に設定。ローカルや別Hookの設定は従来どおりdeployBlockを使用。イベント同期の開始は63569270を維持。整数でない値や安全な下限より前のoverrideを拒否。
+  - 追記: この下限は当時の Hook `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` 用。2026-09-26 のトラック移行で Hook は `0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8` に替わり、`deployBlock` は新 Hook の着地ブロック 63591962 になった。旧 Hook は `legacyPredictionHooks` に移り、indexer の対象外。
 - `indexer/patches/ponder+0.17.12.patch`: 空の先読み応答を拒否し、メモリの空値・失敗を削除、DBの空値を無視してRPCを再取得する。readContract / multicall 両方に適用。正常なキャッシュは維持。
 - 公開最新版も0.17.12だったため、バージョン固定の依存パッチを採用。`npm ci` のpostinstallで自動適用し、適用失敗をエラーにする。
 - 既存の空キャッシュを無視して復旧できるため、元DBの削除・直接修正は行っていない。新たな変更はindexerとテスト・記録に限定。コントラクト、SDKソース、deployments、共有DBは変更なし。

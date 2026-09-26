@@ -12,9 +12,9 @@ export type SchedulerConfig = ContractFunctionReturnType<typeof marketSchedulerA
 export interface Track {
   scheduler: Address
   oracle: Address
-  /** On-chain ticker such as "ETH1M", outcome symbols are `${ticker}UP` and `${ticker}DOWN` */
+  /** On-chain ticker such as "ETH" or "ETH15M", outcome symbols are `${ticker}UP` and `${ticker}DOWN` */
   ticker: string
-  /** Ticker without its window suffix, "SOL1M" gives "SOL" */
+  /** Ticker without its window suffix, "SOL15M" gives "SOL" */
   asset: string
   /** Short period label such as "1m" or "15m" */
   label: string

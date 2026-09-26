@@ -2,11 +2,20 @@
 
 This runbook covers the live demo on Unichain Sepolia (chain 1301): the contracts, the two bots, the two front ends, and what to do when something breaks.
 
-Demo markets are "ETH above K" markets. A new one opens every 60 seconds and each runs for about two minutes:
-- The underlying pool is our own demo WETH/USDC pool with the oracle hook. There is no external oracle: the strike and settlement price both come only from this Uniswap v4 pool. The price mirror keeps it at the real ETH price; it stands in for the arbitrage that would otherwise do this job, since a fresh testnet pool has no organic liquidity or traders to keep it in line on its own.
-- An ownerless `MarketScheduler` owns the hook. Anyone can call its `open()` once per 60-second slot to open the next market, struck at the current price. Slots follow block timestamps (`block.timestamp / 60`), not the wall clock, and the keeper bot is just the account that calls `open()` first in each slot. There is no admin, no setter and no keeper role on the hook itself.
-- Trading stops 12 s before expiry (10 s settlement window plus 2 s buffer).
-- The keeper settles about 1-2 s after expiry. Winners sell the winning token for exactly 1.00 USDC.
+Demo markets ask "ETH above K" or "SOL above K". They run on four **tracks** with two cadences, all on one hook and one LP vault:
+
+| Track | Ticker and tokens | A new market | Trading per market | Settlement window |
+|---|---|---|---|---|
+| ETH, 1 minute | `ETH`: `ETHUP` / `ETHDOWN` | every 60 s | 48 s | 10 s |
+| ETH, 15 minutes | `ETH15M`: `ETH15MUP` / `ETH15MDOWN` | every 900 s, on the quarter hour | 868 s | 30 s |
+| SOL, 1 minute | `SOL`: `SOLUP` / `SOLDOWN` | every 60 s | 48 s | 10 s |
+| SOL, 15 minutes | `SOL15M`: `SOL15MUP` / `SOL15MDOWN` | every 900 s, on the quarter hour | 868 s | 30 s |
+
+- On every track the tenor equals the period, so markets run back to back: a market expires in the second the next one of its track opens.
+- The underlying pools are our own demo WETH/USDC and SOL/USDC pools, each with its own oracle hook. There is no external oracle: the strike and the settlement price both come only from the Uniswap v4 pool of the market's asset. The price mirror keeps both pools at the real prices; it stands in for the arbitrage that would otherwise do this job, since a fresh testnet pool has no organic liquidity or traders to keep it in line on its own.
+- An ownerless `MarketGatekeeper` owns the hook. It deployed the four `MarketScheduler`s in its constructor and forwards `createMarket` from them only. Anyone can call a scheduler's `open()` once per slot until the slot's deadline, after which it reverts `TooLate`. Slots follow block timestamps (`block.timestamp / period`), not the wall clock, and the keeper bot is just the account that calls `open()` first. There is no admin, no setter and no keeper role on the hook itself.
+- Trading stops 12 s before expiry on the 1-minute tracks (10 s window plus 2 s buffer) and 32 s before on the 15-minute tracks (30 s window plus 2 s).
+- The keeper opens the new markets first, then settles and sweeps the ones that just expired, a few seconds after expiry. Winners sell the winning token for exactly 1.00 USDC.
 
 Every command below runs from the repo root. `make` with no target lists all the targets.
 
@@ -14,6 +23,8 @@ Every command below runs from the repo root. `make` with no target lists all the
 |---|---|
 | Practise everything on a private fork | `make local-env`, then `make rehearse` |
 | Deploy to the real Unichain Sepolia | `make deploy-sepolia`, then `make fund-sepolia` |
+| Add a price source (another asset) | `make underlying-sepolia`, `make seed-underlying-sepolia`, `make renounce-underlying-sepolia` (section 3.2) |
+| Move the vault to a new hook and set of tracks | `make tracks-sepolia` inside the sequence of section 3.3 |
 | Run the bots | `make bots` (`make bots-status`, `make bots-logs`, `make bots-stop`) |
 | Show the Uniswap web-app fork | `make vendor-interface`, then run `interface/` (section 5) |
 | Show the backup page | `make backup-app` |
@@ -31,6 +42,7 @@ Every command below runs from the repo root. `make` with no target lists all the
   - `DEPLOYER_PRIVATE_KEY`
   - `DEPLOYER_ADDRESS`
   - `UNICHAIN_SEPOLIA_RPC`, which is optional. It defaults to `https://sepolia.unichain.org`.
+  - `MIRROR_PRIVATE_KEY` and `MIRROR_ADDRESS`, only for `seed-underlying`, which the PriceSteerer's owner must sign (section 3.2).
 
   Forge and the bots read `.env` themselves. No script prints a key.
 
@@ -46,12 +58,12 @@ make local-stop     # CLEAN=1 also deletes logs and deployments/local.json
 
 1. It starts `anvil --fork-url https://sepolia.unichain.org --block-time 1 --port 8545`. The chain id stays 1301, and the real PoolManager, V4Quoter, UniversalRouter 2.0, Permit2 and Circle USDC are all there.
 2. It gives ETH to three accounts: the deployer, a local keeper account and a local mirror account. It also gives the deployer 10,000 Circle USDC by writing the FiatToken balance slot (slot 9).
-3. It runs `script/Deploy.s.sol` at the live Coinbase ETH price, then `script/Fund.s.sol` with 500 USDC. Together they write `deployments/local.json`. As on Unichain Sepolia, the hook is owned by a `MarketScheduler` with the section 3 defaults: a 60 s period, a 120 s tenor and a budget of `min(10 USDC, vaultIdle / 2)`.
-4. It moves the PriceSteerer to the local mirror key, so deployer-signed scripts never race the mirror for nonces. Then it starts the mirror and the keeper, which calls the scheduler's `open()` once per slot and settles and sweeps each market.
+3. It runs `script/Deploy.s.sol` at the live Coinbase ETH and SOL prices, then `script/Fund.s.sol` with 500 USDC. Together they write `deployments/local.json`. As on Unichain Sepolia, the hook is owned by a `MarketGatekeeper` with the four tracks of section 3: ETH and SOL, every 60 s and every 900 s, each market with a budget of `min(10 USDC, vaultIdle / 2)`.
+4. It moves the PriceSteerer to the local mirror key, so deployer-signed scripts never race the mirror for nonces. Then it starts the mirror, which steers both pools, and the keeper, which calls every track's `open()` once per slot and settles and sweeps each market. The summary it prints lists each track with its scheduler.
 
 Logs, pids and forge broadcasts go to `deployments/.run/local/`. They are git-ignored, so local runs never touch `broadcast/`.
 
-Settings you can override: `LOCAL_PORT`, `FORK_URL`, `FORK_BLOCK`, `FUND_USDC`, `DEPLOYER_USDC`, `ETH_PRICE_USD`, and `START_BOTS=0`. The scheduler settings of section 3 (`SCHEDULER_*`, `MARKET_*`, `QUOTE_*`) pass through to the deploy.
+Settings you can override: `LOCAL_PORT`, `FORK_URL`, `FORK_BLOCK`, `FUND_USDC`, `DEPLOYER_USDC`, `ETH_PRICE_USD`, `SOL_PRICE_USD`, and `START_BOTS=0`. The track settings of section 3 (`TRACK_<TICKER>_*`, `TRACKS_ETH_ONLY`) pass through to the deploy.
 
 ### What `make rehearse` checks
 
@@ -87,7 +99,7 @@ Rehearsal options:
 ### Other local helpers
 
 - `make local-status`: shows anvil, the bots, and their last log lines.
-- `make market-local`: creates a one-off market with `script/CreateMarket.s.sol`, calling `createMarket` directly as the deployer. It reads the `MARKET_*` and `QUOTE_*` env names with its own defaults (`MARKET_TENOR_SEC=60`, `MARKET_BUDGET_USDC=10`, `STRIKE_USD` = the oracle spot, and so on). This is a manual tool for an EOA-owned hook; the local fork's hook is owned by the `MarketScheduler` (like Unichain Sepolia), so use `cast send $SCHEDULER "open()"` instead, or wait for the keeper bot.
+- To open a market by hand, call a scheduler: `cast send <scheduler> "open()" --rpc-url http://127.0.0.1:8545 --private-key …`. Any funded key works, and it reverts `AlreadyOpened` if the keeper was first. `script/CreateMarket.s.sol` calls `createMarket` directly, so it only works against a hook with an EOA owner, never behind the gatekeeper.
 - `make local-wallet ADDR=0x… USDC=100`: sets a wallet's balances on the fork to 10 ETH and 100 Circle USDC, for trying the backup page with MetaMask.
 - To point MetaMask at the fork, add `http://127.0.0.1:8545` as an RPC URL of the Unichain Sepolia network (chain 1301) and select it. Switch back afterwards.
 
@@ -95,25 +107,38 @@ Rehearsal options:
 
 **Funding.**
 - ETH on Unichain Sepolia:
-  - The full deploy is about 17M gas, about 0.00002 ETH at the usual 0.001 gwei.
-  - The bots use roughly 0.001 ETH per hour: a steer is about 200k gas and `createMarket` about 1.65M gas.
+  - A fresh full deploy is roughly 30M gas (the gatekeeper, its four schedulers and the hook are about 15.8M, one price source about 5.5M), well under 0.0001 ETH at the usual 0.001 gwei.
+  - The bots use roughly 0.002 ETH per hour at that price: the mirror steers two pools (a steer is about 200k gas), and the keeper opens about 128 markets an hour at about 1.65M gas each, plus a settle and a sweep for each one.
   - Keep 0.02 ETH or more on each signer.
-- Circle USDC comes from the faucet (about 20 USDC per 2 h per address). All of it can go into the vault.
+- Circle USDC comes from the faucet (about 20 USDC per 2 h per address). All of it can go into the vault. Keep the vault at 150 USDC or more (section 4).
 
 ```sh
 make deploy-sepolia                    # script/sepolia.sh deploy
-make fund-sepolia FUND_USDC=40         # vault deposit (default 20)
+make fund-sepolia FUND_USDC=150        # vault deposit (default 20)
 ```
 
 `script/sepolia.sh` guards every broadcast to the real chain.
-- It refuses to run when `CI` is set, without a terminal, or when the RPC is not chain 1301 or is an anvil node.
+- It refuses to run when `CI` is set, without a terminal (unless `CONFIRM=<command>` is set), or when the RPC is not chain 1301 or is an anvil node.
 - Before sending anything it prints:
   - the signer's ETH and USDC balances;
-  - the ETH price it will use, fetched from Coinbase unless `ETH_PRICE_USD` is set;
+  - the price it will use, fetched from Coinbase unless `ETH_PRICE_USD` (or `UNDERLYING_PRICE_USD`) is set;
   - the full forge simulation.
-- It broadcasts only after you type the command name (`deploy`, `fund` or `market`). It uses `--slow`, so transactions go one at a time.
+- It broadcasts only after you type the command name, or with `CONFIRM=<command>` as a non-interactive, explicit opt-in. It uses `--slow`, so transactions go one at a time.
 
-`ALLOW_ANVIL=1 UNICHAIN_SEPOLIA_RPC=http://127.0.0.1:8545 make deploy-sepolia` runs the same flow against the private fork. It writes `deployments/sepolia-rehearsal.json` instead.
+| Command | Make target | What it does |
+|---|---|---|
+| `script/sepolia.sh deploy` | `make deploy-sepolia` | The full stack below, written to a fresh deployments file |
+| `script/sepolia.sh fund` | `make fund-sepolia` | Deposits `FUND_USDC` (default 20) of the deployer's Circle USDC into the vault of `predictionHook` |
+| `script/sepolia.sh withdraw` | | Withdraws every vault share of the deployer from `WITHDRAW_HOOK` (required), which must be drained (`navMinus == vaultIdle`) and be the file's `predictionHook` or one of its `legacyPredictionHooks` |
+| `script/sepolia.sh tracks` | `make tracks-sepolia` | IRREVERSIBLE. A new `MarketGatekeeper` with its four schedulers and the new hook it owns, checked on chain before the file changes (section 3.3) |
+| `script/sepolia.sh underlying` | `make underlying-sepolia` | A new price source for `UNDERLYING_SYMBOL`: demo token, oracle hook and pool (section 3.2) |
+| `script/sepolia.sh seed-underlying` | `make seed-underlying-sepolia` | `demoLiquidity` into that pool through the PriceSteerer, signed by the mirror key |
+| `script/sepolia.sh renounce-underlying` | `make renounce-underlying-sepolia` | IRREVERSIBLE. That oracle loses its owner |
+| `script/sepolia.sh renounce-oracle` | | IRREVERSIBLE. The ETH oracle loses its owner (already done on the live one) |
+
+`script/sepolia.sh market` still runs `script/CreateMarket.s.sol`, which only works against a hook with an EOA owner; the live hook refuses it.
+
+`ALLOW_ANVIL=1 UNICHAIN_SEPOLIA_RPC=http://127.0.0.1:8545 make deploy-sepolia` runs the same flow against the private fork. It writes `deployments/sepolia-rehearsal.json` instead, and every other command rehearses the same way.
 
 Deploy (`script/Deploy.s.sol`) does these steps in order:
 
@@ -121,68 +146,85 @@ Deploy (`script/Deploy.s.sol`) does these steps in order:
 2. Deploys `UnderlyingOracleHook` at a CREATE2 address mined for flags `AFTER_INITIALIZE | BEFORE_SWAP`, through `0x4e59…956C`.
 3. Initialises the dWETH/dUSDC pool (fee 500, tick spacing 10) from the deployer, the oracle owner. The initial price is `ETH_PRICE_USD`, with either token order handled.
 4. Deploys `PriceSteerer` (owner = deployer). It becomes a minter of both demo tokens and seeds full-range liquidity (`DEMO_LIQUIDITY`, default 1e18, about 19k dWETH and 52M dUSDC).
-5. Deploys the `MarketScheduler` / `PredictionHook` pair (`script/base/SchedulerPair.sol`): the hook is mined to flags `0x2AA8` with the scheduler as its `owner`, and the scheduler is deployed ownerless, with no setter, so it is the only account able to call `createMarket`. The hook's `keeper` is never set. `KEEPER_ADDRESS` only names the keeper bot's account in the deployments file; it grants no role, since anyone can call the scheduler's `open()`.
+5. Builds the same stack for SOL: dSOL (18 decimals, faucet 20 per call and 100 per hour), its own oracle hook and a dSOL/dUSDC pool at `SOL_PRICE_USD`, with the steerer as a dSOL minter seeding the same liquidity. `TRACKS_ETH_ONLY=1` skips this step and the two SOL tracks.
+6. Deploys the tracks (`script/base/TrackSet.sol`) in exactly two deployer transactions: the `MarketGatekeeper` at the deployer's next nonce, which deploys the four `MarketScheduler`s in its constructor, then the `PredictionHook` through CREATE2, mined to flags `0x2AA8` with the gatekeeper as its `owner`. The gatekeeper has no owner and no setter and forwards `createMarket` from its schedulers only, so it is the only way to create a market. The hook's `keeper` is never set. `KEEPER_ADDRESS` only names the keeper bot's account in the deployments file; it grants no role, since anyone can call a scheduler's `open()`.
 
 It then checks:
-- both flag masks;
-- the pool binding;
-- the oracle owner and the steerer owner (the deployer), and that the hook's owner is the scheduler with no keeper set;
-- the oracle's start-of-block price against `ETH_PRICE_USD`;
-- that the oracle starts on its warm-up variance.
+- every flag mask;
+- both pool bindings;
+- the oracle owners and the steerer owner (the deployer), and that the hook's owner is the gatekeeper with no keeper set;
+- the gatekeeper's hook and scheduler list, and each scheduler's hook, gatekeeper, oracle and config;
+- each oracle's start-of-block price against its initial price;
+- that the oracles start on their warm-up variance.
 
-An already-deployed EOA-owned hook (predating the scheduler) migrates to a fresh scheduler-owned pair with `script/sepolia.sh scheduler` (`script/DeployScheduler.s.sol`), which replaces `predictionHook` and `marketScheduler` in the deployments file and moves the old hook into `legacyPredictionHooks`. Stop the keeper first: no other signer transaction may land between the scheduler and hook deploys.
+The track configs are frozen in the schedulers. Changing any of them later means a new gatekeeper and hook and a move of the vault (section 3.3).
 
 | Env | Default | Meaning |
 |---|---|---|
-| `ETH_PRICE_USD` | live Coinbase price (the script's own default is 2700) | Initial pool price |
+| `ETH_PRICE_USD` | live Coinbase price (the script's own default is 2700) | Initial ETH pool price |
+| `SOL_PRICE_USD` | 150 (`make local-env` fetches the live price) | Initial SOL pool price |
+| `TRACKS_ETH_ONLY` | 0 | 1 deploys only the two ETH tracks and no SOL stack |
 | `KEEPER_ADDRESS` | deployer | Label only, in the deployments file; grants no role |
-| `DEMO_LIQUIDITY` | 1e18 | Full-range liquidity L of the underlying pool |
-| `UNDERLYING_FEE`, `UNDERLYING_TICK_SPACING` | 500, 10 | Underlying pool key |
+| `DEMO_LIQUIDITY` | 1e18 | Full-range liquidity L of each underlying pool |
+| `UNDERLYING_FEE`, `UNDERLYING_TICK_SPACING` | 500, 10 | Underlying pool keys |
 | `ORACLE_GRID_SECONDS` | 10 | TWAP-return grid H |
 | `ORACLE_N_WINDOWS` | 180 | 30 min lookback |
 | `ORACLE_MIN_WINDOWS` | 30 | 5 min warm-up on the fallback σ |
 | `ORACLE_WINSOR_TICKS` | 100 | About 8 SD of a 10 s window-mean move at 250 % |
 | `ORACLE_SIGMA_MIN`, `ORACLE_SIGMA_MAX`, `ORACLE_SIGMA_FALLBACK` | 0.2, 2.5, 0.6 | Annual σ clamps and warm-up value |
 | `ORACLE_CARDINALITY` | 14400 | Observation ring: 4 h of 1 s writes (at least 7200 is required) |
-| `SCHEDULER_PERIOD_SEC` | 60 | Seconds per slot; `open()` succeeds at most once per slot |
-| `MARKET_TENOR_SEC`, `MARKET_WINDOW_SEC`, `MARKET_CUTOFF_BUFFER_SEC`, `MARKET_N_SAMPLES` | 120, 10, 2, 10 | Each opened market's timing |
-| `QUOTE_H0`, `QUOTE_GAMMA_S`, `QUOTE_LAMBDA`, `QUOTE_Q_EPOCH_MAX`, `QUOTE_P_MIN` | 0.02, 0.00002, 0.001, 100, 0.02 | Pricing parameters passed to every opened market |
-| `MARKET_BUDGET_USDC`, `SCHEDULER_MIN_BUDGET_USDC` | 10, 1 | Max and min per-market budget; `open()` uses `min(MARKET_BUDGET_USDC, vaultIdle / 2)` and reverts `InsufficientIdle` below the minimum |
-| `MARKET_TICKER` | ETH | 1-6 characters, used in every opened market's name |
 | `NETWORK` / `DEPLOYMENTS_FILE` | `unichain-sepolia` | Output `deployments/<NETWORK>.json` |
 | `DEPLOYMENTS_RPC_URL` | `https://sepolia.unichain.org` | `rpcUrl` written into the file for the bots |
+
+Every market setting is per track. Prefix the name with `TRACK_<TICKER>_`, where the ticker is `ETH`, `ETH15M`, `SOL` or `SOL15M`, for example `TRACK_ETH15M_MARKET_BUDGET_USDC=5`. The tickers themselves are fixed in `demoTracks()`.
+
+| Track env (after `TRACK_<TICKER>_`) | 1-minute default | 15-minute default | Meaning |
+|---|---|---|---|
+| `SCHEDULER_PERIOD_SEC` | 60 | 900 | Seconds per slot; `open()` succeeds at most once per slot |
+| `MARKET_TENOR_SEC` | 60 | 900 | Expiry is slot start plus tenor, so equal to the period runs markets back to back. It must exceed window plus cutoff buffer |
+| `MARKET_WINDOW_SEC`, `MARKET_CUTOFF_BUFFER_SEC`, `MARKET_N_SAMPLES` | 10, 2, 10 | 30, 2, 30 | Each opened market's settlement timing |
+| `QUOTE_H0`, `QUOTE_GAMMA_S`, `QUOTE_LAMBDA`, `QUOTE_Q_EPOCH_MAX`, `QUOTE_P_MIN` | 0.02, 0.00002, 0.001, 100, 0.02 | the same | Pricing parameters passed to every opened market |
+| `MARKET_BUDGET_USDC`, `SCHEDULER_MIN_BUDGET_USDC` | 10, 1 | 10, 1 | Max and min per-market budget; `open()` uses `min(MARKET_BUDGET_USDC, vaultIdle / 2)` and reverts `InsufficientIdle` below the minimum |
 
 `deployments/unichain-sepolia.json` is read by:
 - the bots (`bot/src/config.ts`);
 - `packages/swap-sdk` (`loadDeployment`);
 - `vendor-interface.mjs`;
+- the web dashboard (at build time) and the indexer;
 - the backup page (`app/vite.config.ts`).
 
-It is flat:
+Its keys:
 - `chainId`, `rpcUrl`, `explorer`, `deployBlock`, `deployedAt`;
 - `deployer`, `keeper`;
 - `poolManager`, `v4Quoter`, `universalRouter` (2.0), `permit2`, `stateView`, `multicall3`, `usdc`;
-- `predictionHook`, `marketScheduler`, `underlyingOracle`, `priceSteerer`, `demoWeth`, `demoUsdc`;
-- `underlyingPool {currency0, currency1, fee, tickSpacing, hooks}`, `underlyingPoolId`;
-- `initialEthPriceUsd`, `oracleParams`.
+- `predictionHook`, `marketGatekeeper`, and `marketSchedulers`, an array in the gatekeeper's order (ETH, ETH15M, SOL, SOL15M);
+- the ETH price source, flat: `underlyingOracle`, `priceSteerer`, `demoWeth`, `demoUsdc`, `underlyingPool {currency0, currency1, fee, tickSpacing, hooks}`, `underlyingPoolId`, `initialEthPriceUsd`, `oracleParams`;
+- `underlyings`, one entry per price source, `{symbol, token, oracle, pool {currency0, currency1, fee, tickSpacing, hooks}, poolId}`: ETH first, with the same values as the flat keys, then SOL;
+- `legacyPredictionHooks` and `legacyMarketSchedulers`, the earlier hooks and schedulers, oldest first. Their markets stay redeemable through a direct `redeem`; nothing indexes or lists them.
 
-A file migrated by `script/DeployScheduler.s.sol` (moving an existing hook under a new scheduler) also carries `legacyPredictionHooks`, the prior `predictionHook` addresses, oldest first.
+There is no `marketScheduler` key any more, so a reader that was never updated for tracks fails loudly instead of quietly running one track. `deployBlock` is the block the current hook landed in, where the indexer starts.
 
-Commit it together with `broadcast/Deploy.s.sol/1301/run-latest.json`. Addresses are deterministic: the demo tokens come from the deployer's nonce, and both hooks come from CREATE2 over their exact bytecode. A private-fork run from a fresh deployer therefore predicts the real addresses.
+Commit the file together with the forge broadcast of the run. Addresses are deterministic: the demo tokens and the gatekeeper come from the deployer's nonce, the schedulers from the gatekeeper's, and the hooks from CREATE2 over their exact bytecode. A private-fork run from a fresh deployer therefore predicts the real addresses.
 
 **Sanity checks after deploying.** Set these variables from the json first:
 
 ```sh
-R=https://sepolia.unichain.org
-HOOK=$(node -p "require('./deployments/unichain-sepolia.json').predictionHook")
-SCHEDULER=$(node -p "require('./deployments/unichain-sepolia.json').marketScheduler")
-ORACLE=$(node -p "require('./deployments/unichain-sepolia.json').underlyingOracle")
-cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R            # USDC units in the vault
-cast call $HOOK "owner()(address)" --rpc-url $R                # the scheduler; keeper() is always address(0)
-cast call $SCHEDULER "canOpen()(bool)" --rpc-url $R            # true when the next open() would succeed
-cast call $SCHEDULER "nextOpenTime()(uint256)" --rpc-url $R
-cast call $ORACLE "lnSpotSoBWad()(int256)" --rpc-url $R        # ln(ETH price) in WAD
-cast call $ORACLE "varianceE36()(uint256,bool)" --rpc-url $R   # false = still warming up (first 5 min)
+R=https://unichain-sepolia.drpc.org
+D=./deployments/unichain-sepolia.json
+HOOK=$(node -p "require('$D').predictionHook")
+GATEKEEPER=$(node -p "require('$D').marketGatekeeper")
+ORACLE=$(node -p "require('$D').underlyingOracle")
+cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R              # USDC units in the vault
+cast call $HOOK "owner()(address)" --rpc-url $R                  # the gatekeeper; keeper() is always address(0)
+cast call $GATEKEEPER "hook()(address)" --rpc-url $R             # the hook
+cast call $GATEKEEPER "schedulers()(address[])" --rpc-url $R     # equals marketSchedulers, same order
+for S in $(node -p "require('$D').marketSchedulers.join(' ')"); do
+  cast call $S "config()((uint32,uint32,uint32,uint32,uint32,(uint64,uint64,uint128,uint128,uint64),uint256,uint256,string))" --rpc-url $R
+  cast call $S "canOpen()(bool)" --rpc-url $R                    # true when the next open() would succeed
+  cast call $S "nextOpenTime()(uint256)" --rpc-url $R            # at or before now: open() is due
+done
+cast call $ORACLE "lnSpotSoBWad()(int256)" --rpc-url $R          # ln(ETH price) in WAD; the SOL oracle is in underlyings
+cast call $ORACLE "varianceE36()(uint256,bool)" --rpc-url $R     # false = still warming up (first 5 min)
 ```
 
 **Separate bot signers (recommended for demo day).** With one key, the mirror, the keeper and any manual script share a nonce and sometimes collide. They recover on the next loop, but a collision can cost a market.
@@ -193,15 +235,15 @@ cast send $STEERER "transferOwnership(address)" $MIRROR --rpc-url $R --private-k
 # bot/.env: MIRROR_PRIVATE_KEY=..., KEEPER_PRIVATE_KEY=...
 ```
 
-The keeper's signer needs no role: `scheduler.open()` is permissionless, so any funded key can call it. `KEEPER_ADDRESS` only labels the account in the deployments file; pass it to `make deploy-sepolia` if you want a specific address recorded there.
+After this the mirror key owns the PriceSteerer, so anything the steerer does for the owner, such as seeding a new pool (section 3.2), is signed with the mirror key. The keeper's signer needs no role: `open()` on every scheduler is permissionless, so any funded key can call it. `KEEPER_ADDRESS` only labels the account in the deployments file; pass it to `make deploy-sepolia` if you want a specific address recorded there.
 
 **Volatility.**
-- For the first 5 minutes after deploy, the oracle quotes the 60 % fallback σ.
-- After that it quotes the realised σ of the demo pool, clamped to [20 %, 250 %].
-- The mirror only steers on moves of 2 bp or more, so on a quiet market the estimate often sits on the 20 % floor.
-- On that floor, a 2-minute market's price swings hard on each 2-3 bp steer. One standard deviation of ETH over 50 s is only about 3 bp at 20 %.
+- For the first 5 minutes after deploy, an oracle quotes the 60 % fallback σ.
+- After that it quotes the realised σ of its demo pool, clamped to [20 %, 250 %].
+- The mirror only steers on moves of `MIRROR_THRESHOLD_BPS` or more (default 2 bp), so on a quiet market the estimate often sits on the 20 % floor.
+- On that floor, a 1-minute market's price swings hard on each 2-3 bp steer. One standard deviation of ETH over 50 s is only about 3 bp at 20 %.
 
-The live Sepolia oracle's ownership was renounced on 2026-09-26, so its bounds are fixed at [20 %, 250 %] for good. `setVarianceBounds` works only on a fresh oracle (for example the local env) before its owner renounces:
+Both live Sepolia oracles have renounced their ownership (ETH on 2026-09-26, SOL right after its pool was seeded), so their bounds are fixed at [20 %, 250 %] for good. `setVarianceBounds` works only on a fresh oracle (for example the local env) before its owner renounces:
 
 ```sh
 # setVarianceBounds(min, max, fallback), per-second variance at 1e36 = sigma^2 / 31557600 * 1e36
@@ -214,6 +256,105 @@ cast send $ORACLE "setVarianceBounds(uint256,uint256,uint256)" \
 
 The fallback must be at least the new minimum.
 
+### 3.2 Adding a price source (how SOL was added)
+
+Every track reads one oracle, so a new asset first needs its own price source: a demo token, an `UnderlyingOracleHook` and a token/dUSDC pool, built the way Deploy built the ETH one and reusing the file's PoolManager, dUSDC and PriceSteerer. Tracks on it then need a new gatekeeper and hook (section 3.3).
+
+```sh
+UNDERLYING_SYMBOL=SOL make underlying-sepolia               # deployer key: token, oracle, pool, steerer as minter, then record()
+script/bots.sh stop unichain-sepolia mirror                 # the seed signs with the mirror's key
+UNDERLYING_SYMBOL=SOL make seed-underlying-sepolia          # mirror key: demoLiquidity into the pool through the PriceSteerer
+UNDERLYING_SYMBOL=SOL make renounce-underlying-sepolia      # deployer key: the new oracle loses its owner (IRREVERSIBLE)
+RPC_URL=https://unichain-sepolia.drpc.org MIRROR_THRESHOLD_BPS=1 script/bots.sh start unichain-sepolia mirror
+```
+
+1. **`underlying`** (`script/DeployUnderlying.s.sol`) takes `SOL-USD` from Coinbase unless `UNDERLYING_PRICE_USD` is set, then sends four deployer transactions, with no other deployer transaction in between:
+   - the dSOL `DemoToken` (18 decimals, faucet `UNDERLYING_FAUCET_PER_CALL` 20 and `UNDERLYING_FAUCET_PER_HOUR` 100);
+   - the oracle hook at a mined CREATE2 address, with the file's `oracleParams`;
+   - the dSOL/dUSDC pool (fee 500, spacing 10), initialised at that price by the deployer, the oracle's owner;
+   - `setMinter` for the PriceSteerer.
+
+   The run is staged in `unichain-sepolia.underlying.pending.json`. `record()` reads the stack back from the chain and only then appends it to `underlyings`, seeding the ETH entry from the flat keys when the list is missing. A failed step prints what landed and how to finish.
+2. **`seed-underlying`** (`script/SeedUnderlying.s.sol`) adds `demoLiquidity` through the PriceSteerer, so its owner must sign. On the live deployment that owner is the **mirror key** `0x642c…eDAc`, not the deployer. The command therefore signs with `MIRROR_PRIVATE_KEY` (and `MIRROR_ADDRESS`) from `.env` and refuses when the steerer's `owner()` is anyone else. Stop the mirror first, because it signs with the same key and would race the seed for nonces. With `UNDERLYING_PRICE_USD` set, the steerer first moves the still empty pool to that price, which costs nothing.
+3. **`renounce-underlying`** (`script/RenounceUnderlyingOracle.s.sol`) freezes the new oracle's variance bounds at [20 %, 250 %] with the 60 % fallback, as on the ETH oracle. It refuses the ETH oracle, which has its own `renounce-oracle`.
+4. **Restart the mirror.** One mirror process steers every pool in `underlyings` from one account, checking each pool against its oracle's `poolKey()` at start-up. `MIRROR_SYMBOLS=ETH` limits it to the listed symbols.
+
+The live SOL source landed this way on 2026-09-26: dSOL `0x49f3768635A2Db5e4bdcB76A4F191EC48B770417`, oracle `0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080` on pool `0x9453ba24…cde35394`, initialised at 121.325 USD.
+
+### 3.3 Moving the vault to a new hook and set of tracks
+
+The hook's owner is immutable and the gatekeeper's track list is fixed, so any change to the tracks (a new asset, a new length, any config value) means a new gatekeeper, a new hook, and moving the vault's USDC over. This is the sequence that moved the live vault from the single-scheduler hook `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` to the four tracks on 2026-09-26, between 17:36 and 17:41 UTC. Markets paused for about 4 minutes.
+
+```sh
+R=https://unichain-sepolia.drpc.org
+OLD=0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8
+```
+
+1. **Stop the keeper.** The mirror keeps running.
+
+   ```sh
+   script/bots.sh stop unichain-sepolia keeper
+   ```
+
+2. **Settle and sweep the old hook with the keeper key.** The keeper opened its last markets on the old hook at 17:35 and 17:36 (ids 370 and 371, two-minute markets). Once each had expired, `settle` and `sweep` it; both are permissionless.
+
+   ```sh
+   for ID in 370 371; do
+     cast send $OLD "settle(uint256)" $ID --rpc-url $R --private-key $KEEPER_PRIVATE_KEY
+     cast send $OLD "sweep(uint256)" $ID --rpc-url $R --private-key $KEEPER_PRIVATE_KEY
+   done
+   cast call $OLD "navMinus()(uint256)" --rpc-url $R      # drained when it equals vaultIdle()
+   cast call $OLD "vaultIdle()(uint256)" --rpc-url $R
+   ```
+
+   The new keeper cannot do this, since it only drives the hook named in the file, and the file still names the old hook until step 4. If anyone calls the old scheduler's `open()` meanwhile, wait for that market too.
+
+3. **Withdraw** every deployer share from the drained hook.
+
+   ```sh
+   WITHDRAW_HOOK=$OLD CONFIRM=withdraw script/sepolia.sh withdraw
+   ```
+
+   It refuses unless `navMinus == vaultIdle`, and reads `sharesOf` back from the chain afterwards. The live run burned 93,355,145e6 shares for 94.416599 USDC and left 1 unit of dust. From here on the old scheduler `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` reverts `InsufficientIdle`, but a deposit into the old hook would revive it.
+
+4. **Deploy the tracks.** IRREVERSIBLE: the four configs are frozen for good.
+
+   ```sh
+   CONFIRM=tracks script/sepolia.sh tracks          # or make tracks-sepolia
+   ```
+
+   - Exactly two deployer transactions, with nothing else from the deployer in between: the gatekeeper at nonce n, which deploys the schedulers at `computeCreateAddress(gatekeeper, 1..4)`, then the hook through CREATE2 with the gatekeeper as its owner.
+   - The result is staged in `unichain-sepolia.tracks.pending.json`. The script reads the hook's landing block from the broadcast receipt, then `record()` checks the whole set on chain and only then rewrites `deployments/unichain-sepolia.json`: the new `predictionHook`, `marketGatekeeper` and `marketSchedulers`, the old hook appended to `legacyPredictionHooks`, the old `marketScheduler` moved into `legacyMarketSchedulers`, and `deployBlock` 63,591,962, the block the hook landed in.
+   - If a step fails, rerunning the command reports which of the two contracts landed and prints the exact command that finishes the job. `record()` rebuilds the configs from the env, so a recovery needs the same `TRACKS_ETH_ONLY` and `TRACK_*` values as the run.
+
+   Then check, read-only: the new hook's `owner()` is the gatekeeper and its `keeper()` is `0x0`, `gatekeeper.schedulers()` equals `marketSchedulers`, every scheduler's `hook()` and `gatekeeper()` match, and the old scheduler's `canOpen()` is false.
+
+5. **Fund the new vault** with what came out of the old one, topped up from the deployer's other Circle USDC.
+
+   ```sh
+   FUND_USDC=174.99 CONFIRM=fund script/sepolia.sh fund
+   ```
+
+6. **Start the keeper** on the rewritten file.
+
+   ```sh
+   RPC_URL=https://unichain-sepolia.drpc.org script/bots.sh start unichain-sepolia keeper
+   ```
+
+   At start-up it checks the ownership chain and logs one `track scheduled` line per track, and each track whose `canOpen()` is true opens its current slot at once. The first markets opened at 17:40:44 (ETH), 17:40:47 (ETH15M) and 17:40:50 (SOL15M). SOL skipped its first slot with 4 s of trading left (`slot skipped, too little trading time left`) and opened at 17:41:04.
+
+7. **Point the front ends at the new hook.**
+
+   ```sh
+   make vendor-interface
+   ```
+
+   This rewrites the Uniswap app fork's `deployment.generated.ts`. Then regenerate `interface-patches/prediction-fork.patch`, rebuild the web dashboard (it imports the deployments file at build time), restart the backup page, and re-sync the indexer on a fresh schema from the new `deployBlock`.
+
+**Rollback before step 6.** `git checkout deployments/unichain-sepolia.json`, withdraw from the new hook, fund the old one, and restart the keeper build that drives the old scheduler. The old scheduler can open again as soon as the old vault's idle USDC is 2 or more.
+
+**Old markets.** Winning tokens of the old hook stay redeemable with a direct `redeem` on that hook: a sweep only returns what winners cannot claim, and a withdrawal only pays idle USDC. The web dashboard and the app fork list only the current hook.
+
 ## 4. Running the bots
 
 ```sh
@@ -225,31 +366,39 @@ DRY_RUN=1 make bots                # compute and log, send nothing
 KEEPER_POLL_MS=1000 make bots      # any bot setting passes through, see bot/.env.example
 ```
 
-`script/bots.sh` runs `bot/src/mirror.ts` and `bot/src/keeper.ts` with `nohup`, using `DEPLOYMENTS_FILE=deployments/<NETWORK>.json`. Logs and pids go to `deployments/.run/<NETWORK>/`.
+`script/bots.sh` runs `bot/src/mirror.ts` and `bot/src/keeper.ts` with `nohup`, using `DEPLOYMENTS_FILE=deployments/<NETWORK>.json`. Logs and pids go to `deployments/.run/<NETWORK>/`. Its arguments are `start|stop|status|logs <network> [mirror|keeper|sealed|all]`, so one bot restarts with, for example, `script/bots.sh stop unichain-sepolia keeper`.
 
 **Keys.**
 - The mirror uses `MIRROR_PRIVATE_KEY`, else `DEPLOYER_PRIVATE_KEY`. It must own the PriceSteerer.
-- The keeper uses `KEEPER_PRIVATE_KEY`, else `DEPLOYER_PRIVATE_KEY`. `scheduler.open()` is permissionless, so any funded key works; the keeper's own key just needs ETH for gas.
+- The keeper uses `KEEPER_PRIVATE_KEY`, else `DEPLOYER_PRIVATE_KEY`. Every scheduler's `open()` is permissionless, so any funded key works; the keeper's own key just needs ETH for gas.
 - Keys are read from the environment, `bot/.env` or `.env`.
 
+**One keeper for every track.** A single keeper process drives all four schedulers. Two keepers would both settle and sweep the shared hook, and would collide on `keeper.pid` and `keeper.log`.
+- At start-up it reads every scheduler's `config()` and exits if a read fails. It also exits unless the hook's owner is `marketGatekeeper`, the gatekeeper's hook is `predictionHook`, `gatekeeper.schedulers()` equals `marketSchedulers`, and every scheduler's `hook()` and `gatekeeper()` match.
+- Each tick opens the due tracks first, shortest period first (at a quarter hour ETH and SOL, then ETH15M and SOL15M), then settles and sweeps every market that is due.
+- It skips a slot with less than `KEEPER_MIN_TRADE_SEC` (default 5) of trading left, and a `TooLate` revert skips the slot the same way. Each skip logs one `slot skipped` line, then the track waits for its next slot.
+
 **Healthy logs look like this:**
-- the mirror logs `steered … devBps=…` whenever ETH has moved 2 bp or more;
-- the keeper logs, every minute:
-  - `market opened market=N slot=… budget=… strikeCents=… …`;
-  - `settled market=N-1 yesWon=…`;
-  - `swept market=N-1 usdc=…`.
+- the mirror logs `steered symbol=ETH …` and `steered symbol=SOL …` whenever a price has moved `MIRROR_THRESHOLD_BPS` or more;
+- at start-up the keeper logs a `track track=… scheduler=… periodSec=… tenorSec=…` line and a `track scheduled` line per track;
+- every minute it logs:
+  - `market opened track=ETH market=N slot=… budget=… strikeCents=… …` and the same for `track=SOL`;
+  - `settled market=… track=… yesWon=…` and `swept market=… track=… usdc=…` for the markets that just expired;
+- every quarter hour it adds the same lines for `ETH15M` and `SOL15M`, opened right after the 1-minute tracks.
 
 **Budget sizing.**
 - A market's budget is the most its LPs can lose. It also caps trade size: a buy of `x` USDC at price `p` needs `budget + x ≥ x / p`, so near 0.5 a single buy is capped at about the budget.
-- Each opened market's budget is `min(MARKET_BUDGET_USDC, vaultIdle / 2)`, decided by the scheduler itself; `open()` reverts `InsufficientIdle` below `SCHEDULER_MIN_BUDGET_USDC`, and about two markets hold budget at once.
+- Each opened market's budget is `min(maxBudget, vaultIdle / 2)`, decided by its scheduler, with `maxBudget` 10 USDC and `minBudget` 1 USDC on every live track. `open()` reverts `InsufficientIdle` below the minimum.
+- All four tracks draw on the one vault, in the order the keeper opens them. One market per track trades at a time, but at a boundary the keeper opens before it sweeps, so the markets that just expired still hold their budgets. At a quarter hour that is 40 USDC; ETH then takes `min(10, idle / 2)`, then SOL, ETH15M and SOL15M from what is left. All four get the full 10 USDC while the vault holds about 90 USDC or more.
+- **Keep the vault at 150 USDC or more.** That leaves room for a run of losing markets before any budget shrinks. The live tracks started with 174.99 USDC.
 
-`MARKET_BUDGET_USDC` and `SCHEDULER_MIN_BUDGET_USDC` are read only when the scheduler is deployed; the live scheduler is fixed at 10 USDC and 1 USDC. With the live vault (about 93 USDC), two overlapping markets hold 20 USDC, and demo trades of 2-5 USDC fit comfortably. While the vault is too short to afford `SCHEDULER_MIN_BUDGET_USDC`, `open()` reverts `InsufficientIdle`. The keeper logs `open() refused … error=InsufficientIdle(…)` once per slot as a warning and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded. An oracle revert inside `open()`, such as the sealed oracle's `StaleSpot`, is logged the same way.
+The budgets are fixed in the schedulers; `MARKET_BUDGET_USDC` and `SCHEDULER_MIN_BUDGET_USDC` (with their `TRACK_<TICKER>_` prefix) are read only when the tracks are deployed. While the vault is too short to afford the minimum, `open()` reverts `InsufficientIdle`. The keeper logs `open() refused track=… slot=… error=InsufficientIdle(…)` once per slot as a warning and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded. An oracle revert inside `open()`, such as the sealed oracle's `StaleSpot`, is logged the same way.
 
 ## 5. Front ends
 
 ### Uniswap web-app fork (`interface/`)
 
-1. Run `make vendor-interface` (this is `NETWORK=unichain-sepolia`). It copies `packages/swap-sdk` into the fork and writes `deployment.generated.ts` from `deployments/unichain-sepolia.json`. If the dev server is running, Vite hot-reloads.
+1. Run `make vendor-interface` (this is `NETWORK=unichain-sepolia`). It copies `packages/swap-sdk` into the fork and writes `deployment.generated.ts` from `deployments/unichain-sepolia.json`, including the gatekeeper and the schedulers. If the dev server is running, Vite hot-reloads.
 2. Start the fork as in `interface/PREDICTION_README.md` §1:
    - bun 1.3.14 and node 22.22.2 on `PATH`;
    - `cd interface && SKIP_CONFIG_PULL=true bun web dev`;
@@ -259,7 +408,7 @@ KEEPER_POLL_MS=1000 make bots      # any bot setting passes through, see bot/.en
    - use a plain EOA, not a smart account and not an anvil default account (those are 7702-delegated on 1301);
    - turn on Settings → Testnet mode, and do not disconnect afterwards;
    - select Unichain Sepolia.
-4. Deep link: `http://localhost:3000/swap?chain=unichain_sepolia&inputCurrency=0x31d0220469e10c4E71834a79b1f276d740d3768F&outputCurrency=<YES>`. Or use the token picker's "Prediction markets" section.
+4. Deep link: `http://localhost:3000/swap?chain=unichain_sepolia&inputCurrency=0x31d0220469e10c4E71834a79b1f276d740d3768F&outputCurrency=<YES>`. Or use the token picker, which lists USDC once and then one section per track: "ETH 1-minute", "ETH 15-minute", "SOL 1-minute" and "SOL 15-minute". Outcome tokens show their full symbol, such as `ETH15MDOWN`.
 5. To swap the hook without a rebuild, run `localStorage.setItem('prediction.hook', '0x…')` in the browser console.
 
 On the private fork, the web-app fork reads chain 1301 only through the hard-coded drpc URL. It therefore always shows the real chain, and cannot show the anvil fork. Rehearse the fork against the real deployment, and use the backup page for the anvil fork.
@@ -278,27 +427,27 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 ## 6. Demo day
 
 ### The day before
-- [ ] `make deploy-sepolia`, then `make fund-sepolia`.
+- [ ] `make deploy-sepolia`, then `make fund-sepolia FUND_USDC=150` or more.
 - [ ] Set up separate mirror and keeper signers (section 3).
-- [ ] Run `make bots` and leave them running for at least 2 hours. This builds oracle history and gives σ a real estimate, and it proves the keeper's cadence.
+- [ ] Run `make bots` and leave them running for at least 2 hours. This builds oracle history and gives σ a real estimate on both pools, and it proves the keeper's cadence on all four tracks.
 - [ ] Do one full run each in the web-app fork and in the backup page: buy YES, buy NO, sell, wait for settlement, redeem at 1.00.
 - [ ] Record a screen capture of a good run as the last fallback.
 - [ ] `make local-env && make rehearse` passes on the laptop you will present from.
 
 ### One hour before
-- [ ] `make bots-status`: both bots are running, and the keeper logged `market opened` within the last minute.
-- [ ] Vault idle is at least 3 × `MARKET_BUDGET_USDC` (`cast call $HOOK "vaultIdle()(uint256)"`). Top up with `make fund-sepolia`.
+- [ ] `make bots-status`: both bots are running, and the keeper logged `market opened` for `track=ETH` and `track=SOL` within the last minute.
+- [ ] Vault idle is at least 150 USDC (`cast call $HOOK "vaultIdle()(uint256)"`). Top up with `make fund-sepolia`.
 - [ ] ETH on the mirror, keeper and deployer is at least 0.01 each (`cast balance <addr> --ether --rpc-url $R`).
 - [ ] The demo wallet holds 20 USDC or more and a little ETH. Faucet if needed.
-- [ ] The mirror tracks Coinbase: the pool price in its log is within a few bp of `feed=`.
+- [ ] The mirror tracks Coinbase: the pool prices in its log are within a few bp of `feed=`, for ETH and for SOL.
 - [ ] Start the web-app fork and load the swap page once (the warm-up takes 30-40 s). Testnet mode is on, slippage is on Auto.
 - [ ] Open the backup page in a second tab, and the explorer (`https://sepolia.uniscan.xyz`) in a third.
 
 ### On stage
-1. Open the newest market as soon as it appears, at the start of the minute. Trade in the first 30 s, because the cutoff is at T-12 s.
-2. Buy YES with 2-5 USDC. Point at the quote refreshing every second and the price moving with ETH.
+1. Open the newest 1-minute market as soon as it appears, at the start of the minute. Trade in the first 30 s: the cutoff is 12 s before expiry, 48 s after the open. For a slower demo use a 15-minute market, which trades until 32 s before its quarter hour.
+2. Buy YES with 2-5 USDC. Point at the quote refreshing every second and the price moving with ETH (or SOL).
 3. Optionally sell part of it back.
-4. At expiry the keeper settles within about 2 s.
+4. At expiry the keeper opens the next market, then settles this one within a few seconds.
 5. If YES won, sell YES → USDC in the same swap box: exactly 1.00 each. Show the swap on the explorer: UniversalRouter → PoolManager → hook.
 
 ### Fallbacks
@@ -307,11 +456,12 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 |---|---|
 | Web-app fork will not load, or Uniswap's gateway or bot check fails | Switch to the backup page (`make backup-app`, or the prebuilt `app/dist`) |
 | Public RPC slow or failing | Bots: `RPC_URL=https://unichain-sepolia.drpc.org make bots` (after `make bots-stop`). Backup page: `?rpc=https://unichain-sepolia.drpc.org` |
-| No new markets | `make bots-status` and `make bots-logs`. The usual causes are vault idle below budget, the keeper out of ETH, or nonce errors. Restart with `make bots-stop bots`. For one market by hand, run `make market-sepolia` |
+| No new markets | `make bots-status` and `make bots-logs`. The usual causes are vault idle below budget, the keeper out of ETH, or nonce errors. Restart with `make bots-stop bots`. To open one market by hand, `cast send <scheduler> "open()" --rpc-url $R --private-key …` with any funded key; past the slot's deadline it reverts `TooLate`, so wait for the next slot |
+| One track has no new markets | `make bots-logs` and look for `open() refused track=…` or `slot skipped track=…`. A refusal names the error; skips are normal only right after a keeper restart |
 | A market is past expiry but not settled | `cast send $HOOK "settle(uint256)" <id> --rpc-url $R --private-key …`. Settlement is permissionless after expiry |
-| Vault idle stuck low | Sweep settled markets with `cast send $HOOK "sweep(uint256)" <id> …` (permissionless) or fund more. Each market's budget already shrinks to `vaultIdle / 2`, and the scheduler's maximum is fixed at deploy |
-| Mirror feed errors | It falls back from Coinbase to Kraken to Binance.US. If all are down, the pool holds its last price, and markets still trade and settle |
-| Swap reverts with `V4TooLittleReceived` | Keep slippage on Auto, trade earlier in the minute, trade less |
+| Vault idle stuck low | Sweep settled markets with `cast send $HOOK "sweep(uint256)" <id> …` (permissionless) or fund more. Each market's budget already shrinks to `vaultIdle / 2`, and every scheduler's maximum is fixed at deploy |
+| Mirror feed errors | It falls back from Coinbase to Kraken to Binance.US, per asset. If all are down, the pool holds its last price, and markets still trade and settle |
+| Swap reverts with `V4TooLittleReceived` | Keep slippage on Auto, trade earlier in the market, trade less |
 | "No routes found" on a normal size | The trade hits the band, the per-block cap or solvency. Trade 1-2 USDC |
 | `nonce too low` in bot logs | Two processes share a key. Use separate signers (section 3) |
 | Everything on the real chain is down | `make local-env`, `make rehearse` and `make backup-app NETWORK=local` on the laptop, then the screen recording |
@@ -320,13 +470,16 @@ make backup-app NETWORK=local     # against the anvil fork (VITE_RPC_URL=http://
 
 | Path | What |
 |---|---|
-| `script/Deploy.s.sol`, `script/Fund.s.sol` | Forge scripts. Shared helpers are in `script/base/ScriptBase.sol` and `script/base/SchedulerPair.sol` |
-| `script/DeployScheduler.s.sol` | Migrates an EOA-owned hook to a new `MarketScheduler` pair, or verifies an existing one |
-| `script/RenounceOracle.s.sol` | Renounces the `UnderlyingOracleHook`'s owner once the scheduler and hook are verified |
-| `script/CreateMarket.s.sol` | Manual one-off market creation as an EOA; only works against an EOA-owned hook, not a scheduler-owned one |
+| `script/Deploy.s.sol`, `script/Fund.s.sol` | Forge scripts for a fresh stack and a vault deposit. Shared helpers are in `script/base/ScriptBase.sol`, `script/base/Underlyings.sol` and `script/base/TrackSet.sol` |
+| `script/base/TrackSet.sol` | The four demo tracks (`demoTracks()`), their `TRACK_<TICKER>_*` env overrides, the two-transaction gatekeeper and hook deploy, and the on-chain check of the whole set |
+| `script/DeployTracks.s.sol` | A new gatekeeper, its schedulers and the hook it owns on an existing deployment, then `record()` (section 3.3) |
+| `script/Withdraw.s.sol` | Every vault share of the signer out of a drained `WITHDRAW_HOOK` |
+| `script/DeployUnderlying.s.sol`, `script/SeedUnderlying.s.sol`, `script/RenounceUnderlyingOracle.s.sol` | A new price source: deploy and record, seed through the PriceSteerer, renounce (section 3.2) |
+| `script/RenounceOracle.s.sol` | Renounces the ETH `UnderlyingOracleHook`'s owner once a recorded scheduler reads it |
+| `script/CreateMarket.s.sol` | Manual one-off market creation as an EOA; only works against an EOA-owned hook, never behind the gatekeeper |
 | `script/local-env.sh`, `script/local-env-stop.sh` | Private anvil fork: bring-up and teardown |
 | `script/bots.sh` | Start, stop, status and logs of the bots for a network |
-| `script/sepolia.sh` | Guarded deploy, fund and market on the real chain |
+| `script/sepolia.sh` | Guarded broadcasts to the real chain: deploy, fund, withdraw, tracks, underlying, seed-underlying and the renounce commands |
 | `script/rehearsal/` | Scripted rehearsal (`rehearse.ts`), the sealed-oracle end to end run (`sealed-e2e.ts`), their helpers and unit tests |
 | `deployments/<network>.json` | Addresses for bots, SDK and front ends. `local.json` is git-ignored |
 | `deployments/.run/<network>/` | Logs, pids and local broadcasts (git-ignored) |
@@ -357,7 +510,7 @@ It needs Node 24 and `npm ci` in `bot/` and `script/rehearsal/` (section 1). It 
 2. **Contracts.** It deploys:
    - a PoolManager, a demo USDC, and a hookless native ETH/USDC pool (fee 500, spacing 10, full-range liquidity at $2700);
    - `SealedPoolOracle` on that pool, with the parameters of the mainnet fork test;
-   - the `MarketScheduler` that owns a `PredictionHook` reading that oracle. The hook's salt is mined for flags `0x2AA8`, as `script/base/SchedulerPair.sol` does.
+   - the `MarketScheduler` that owns a `PredictionHook` reading that oracle. The hook's salt is mined for flags `0x2AA8` with the scheduler as its owner.
 
    The vault gets 200 USDC.
 3. **Random swaps.** The sealed bot runs in-process. A trader swaps random sizes through v4-core's `PoolSwapTest` every one to three blocks, so most pokes cannot seal and the bot proves the gaps. The frontier must stay within 16 blocks of the head.
@@ -458,17 +611,25 @@ All three pass live against the real pool. Without `UNICHAIN_RPC_URL` they are s
 
 ---
 
-## Live deployment notes (Unichain Sepolia, 2026-09-26)
+## Live deployment notes (Unichain Sepolia)
 
-Redeployed on 2026-09-26 with the scheduler. No key holds an admin role: the hook's only owner is the scheduler, its keeper slot is empty, and the oracle's owner is the zero address.
+The four tracks went live on 2026-09-26 at 17:40 UTC (27 Sep in Japan), after the vault moved over as in section 3.3. No key holds an admin role: the hook's only owner is the gatekeeper, its keeper slot is empty, and both oracles' owners are the zero address.
 
 | Item | Value |
 |---|---|
-| Deployment | `deployments/unichain-sepolia.json` (block 63,569,270) |
-| MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` (period 60 s, tenor 120 s, window 10 s, h0 0.02, gammaS 0.00002, budget 10 USDC, min 1 USDC) |
-| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` (owner: the scheduler; vault funded with 93.36 USDC moved from the old hook) |
-| Legacy PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` (all markets settled and swept, vault empty; old tokens stay redeemable there) |
-| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` (ownership renounced) |
+| Deployment | `deployments/unichain-sepolia.json` (`deployBlock` 63,591,962, the block the hook landed in) |
+| MarketGatekeeper | `0x755dBc10AB4b9BFDB8c46939702dC08B8F3e607A` (the hook's owner; no owner of its own, no setter) |
+| PredictionHook | `0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8` (keeper unset; vault funded with 174.99 USDC) |
+| MarketScheduler `ETH` | `0x8f1b371e41FeCBb825d0baAB19f906E645C760e0` (period and tenor 60 s, window 10 s, 10 samples) |
+| MarketScheduler `ETH15M` | `0x02f0B250120c817A45C6ba580FE68eB461E0A10e` (period and tenor 900 s, window 30 s, 30 samples) |
+| MarketScheduler `SOL` | `0x067180DE54F4a800C88C3dC9EDa8b106f7126b83` (period and tenor 60 s, window 10 s, 10 samples) |
+| MarketScheduler `SOL15M` | `0x950eEDA8303253b76f0d47f4a3eD33aA7fF54E74` (period and tenor 900 s, window 30 s, 30 samples) |
+| Every track | cutoff buffer 2 s, h0 0.02 (a 2 cent half-spread), gammaS 0.00002, lambda 0.001, qEpochMax 100, pMin 0.02, budget `min(10 USDC, vaultIdle / 2)`, min 1 USDC |
+| UnderlyingOracleHook, ETH | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` on the dWETH/dUSDC pool (ownership renounced) |
+| UnderlyingOracleHook, SOL | `0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080` on the dSOL/dUSDC pool `0x9453ba24…cde35394` (ownership renounced) |
+| dSOL | `0x49f3768635A2Db5e4bdcB76A4F191EC48B770417` |
+| Legacy PredictionHooks | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` and `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` (drained, vaults empty; their tokens stay redeemable there) |
+| Legacy MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` (owns `0xE678…`; `open()` reverts `InsufficientIdle` while that vault is empty) |
 | PriceSteerer owner (mirror signer) | `0x642c95Ad042C32289687152EE838D14BC219eDAc` |
 | Keeper signer (no role; any key works) | `0x7B7675a09801049C1D3296d76A29D69913Da3dF0` |
 
@@ -479,8 +640,9 @@ Redeployed on 2026-09-26 with the scheduler. No key holds an admin role: the hoo
   RPC_URL=https://unichain-sepolia.drpc.org MIRROR_THRESHOLD_BPS=1 script/bots.sh start unichain-sepolia
   ```
 
-  - Market settings live in the scheduler, so `MARKET_*` and `QUOTE_*` no longer affect the bots. The keeper reads the scheduler's period on chain and warns if `KEEPER_PERIOD_SEC` differs.
-  - Demo markets last 2 minutes and a new one opens every minute. Markets overlap, so one is always open with at least ~45 s of trading left. Each market settles every minute.
+  Append `mirror` or `keeper` to start only one of them, for example after `script/bots.sh stop unichain-sepolia keeper`.
+  - Market settings live in the schedulers, so `MARKET_*` and `QUOTE_*` do not affect the bots. The keeper reads every scheduler's `config()` at start-up and exits if one fails.
+  - Each track runs its markets back to back: a 1-minute market trades for 48 s, then 12 s pass without trading on that track until the next one opens. A 15-minute market trades for 868 s, then 32 s pass. At every quarter hour all four tracks settle and open together.
   - The spread is h0 = 2¢ plus a gamma term that widens toward the cutoff.
 - **Real-chain smoke test:**
 
@@ -488,5 +650,5 @@ Redeployed on 2026-09-26 with the scheduler. No key holds an admin role: the hoo
   cd script/rehearsal && SMOKE_USDC=1 node smoke-real.ts
   ```
 
-  It buys YES with the deployer's USDC and sells half back through UniversalRouter 2.0, and prints uniscan links. It passed on 2026-09-26.
-- **Gas:** the mirror and keeper each started with 0.015 ETH. At 0.0015 gwei that lasts about a day of continuous running. Top them up from the deployer with `cast send <addr> --value 0.01ether`.
+  It buys YES with the deployer's USDC and sells half back through UniversalRouter 2.0, and prints uniscan links. It last passed on 2026-09-26, against the previous hook.
+- **Gas:** the mirror and keeper each started with 0.015 ETH. With two pools to steer and four tracks to open, plan on topping them up at least daily from the deployer with `cast send <addr> --value 0.01ether`.

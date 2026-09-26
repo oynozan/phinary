@@ -10,17 +10,19 @@ description: Every term used in the Phinary docs and contracts, with a short exa
 | Term | Meaning |
 |---|---|
 | **Market** | One question, such as "ETH above 2,688.81 USD at 15:25 UTC?", with a YES and a NO token and two Uniswap v4 pools (YES/USDC and NO/USDC) |
-| **Strike** | The price in the question. Set to the current ETH price, rounded to cents, when the market opens |
+| **Track** | One asset and one market length, run by its own scheduler. The demo has four: ETH and SOL, 1 and 15 minutes. Each track's ticker (`ETH`, `ETH15M`, `SOL`, `SOL15M`) starts its token names and symbols |
+| **Strike** | The price in the question. Set to the asset's current price, rounded to cents, when the market opens |
 | **Expiry** | The time the question refers to, for example 15:25:00 UTC |
-| **Tenor** | How long a market lives: 120 s in the demo |
-| **Period, slot** | Markets open once per period (60 s). Each 60-second slot can open at most one market |
-| **Cutoff** | When trading stops: expiry minus the window minus a 2 s buffer, so 12 s before expiry in the demo |
-| **Window** | The last 10 s before expiry, over which the ETH price is averaged for the result |
-| **YES, `ETHUP`** | Pays 1 USDC if the window's average ETH price is above the strike |
-| **NO, `ETHDOWN`** | Pays 1 USDC if it is at or below the strike |
+| **Tenor** | How long a market lives: 60 s or 900 s in the demo, equal to the period, so each track's markets run back to back |
+| **Period, slot** | A track opens once per period (60 s or 900 s). Each slot can open at most one market, and only until its trading would close |
+| **Cutoff** | When trading stops: expiry minus the window minus a 2 s buffer, so 12 s (1-minute tracks) or 32 s (15-minute tracks) before expiry |
+| **Window** | The last 10 s (1-minute tracks) or 30 s (15-minute tracks) before expiry, over which the price is averaged for the result |
+| **YES, `ETHUP`** | Pays 1 USDC if the window's average price is above the strike. Also `ETH15MUP`, `SOLUP`, `SOL15MUP` |
+| **NO, `ETHDOWN`** | Pays 1 USDC if it is at or below the strike. Also `ETH15MDOWN`, `SOLDOWN`, `SOL15MDOWN` |
 | **Outcome token** | YES or NO. A 6-decimal ERC-20 that only the hook can mint or burn |
 | **Complete set** | One YES plus one NO. Always worth exactly 1 USDC, because exactly one of them pays |
-| **Scheduler** | `MarketScheduler`, the contract with no admin that opens one market per slot for anyone who calls it |
+| **Scheduler** | `MarketScheduler`, the contract with no admin that runs one track and opens one market per slot for anyone who calls it |
+| **Gatekeeper** | `MarketGatekeeper`, the hook's owner. It deployed the four schedulers and forwards `createMarket` from them only |
 | **Keeper** | Any account that opens, settles and sweeps markets. The demo runs a bot for it, but every call is open to everyone |
 
 ## Prices
@@ -60,7 +62,7 @@ description: Every term used in the Phinary docs and contracts, with a short exa
 |---|---|
 | **Vault** | The pool of LP USDC inside the hook that takes the other side of every trade |
 | **Idle** | Vault USDC not lent to any market. Withdrawals are paid from it |
-| **Budget** | What a new market borrows from the vault: `min(10 USDC, idle / 2)` in the demo |
+| **Budget** | What a new market borrows from the vault: `min(10 USDC, idle / 2)` in the demo, on every track |
 | **Bucket, reserve** | The USDC a market holds: its budget plus what buyers paid minus what sellers received |
 | **Outstanding** | YES or NO tokens held by traders (`outYes`, `outNo`) |
 | **Inventory** | Tokens traders sold back, held by the hook and reused before minting new ones |

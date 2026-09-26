@@ -30,10 +30,12 @@ Put USDC in the **Sell** box and open the token picker in the **Buy** box.
 
 ![The token picker lists open markets first and settled markets below](/screenshots/uniswap/token-picker.png)
 
-- **Prediction markets** lists the YES and NO tokens of the newest markets that are still open.
+- **Prediction markets** lists USDC, then one section per track: **ETH 1-minute**, **ETH 15-minute**, **SOL 1-minute** and **SOL 15-minute**, each with the YES and NO tokens of its markets that are still open.
 - **Settled prediction markets (sell to redeem)** lists markets that already have a result.
 
-A token name is the whole question. `ETH > $2688.81 26 Sep 15:25` is the YES token (`ETHUP`): it pays 1 USDC if ETH is above 2,688.81 USD at 15:25 UTC. The matching `ETH < …` token (`ETHDOWN`) pays if it is not.
+Outcome tokens show their full symbol, such as `ETH15MDOWN`, so the tracks never look alike.
+
+A token name is the whole question. `ETH > $2688.81 26 Sep 15:25` is the YES token (`ETHUP`): it pays 1 USDC if ETH is above 2,688.81 USD at 15:25 UTC. The matching `ETH < …` token (`ETHDOWN`) pays if it is not. On the 15-minute track the name starts with `ETH15M` and the symbols are `ETH15MUP` and `ETH15MDOWN`; SOL works the same way.
 
 ### Read the market card
 
@@ -60,7 +62,7 @@ In the screenshot, 5 USDC buys 6.08285 ETHUP, an average of 0.822 per token. Tha
 
 ![Max slippage set to Auto](/screenshots/uniswap/slippage.png)
 
-A two-minute market moves fast: its price can shift by 10 to 16 cents during a wallet confirmation. **Auto** sizes the tolerance for each quote. A fixed 1 to 5% makes most swaps in short markets revert with `V4TooLittleReceived` after you have signed.
+A 1-minute market moves fast: its price can shift by 10 to 16 cents during a wallet confirmation. **Auto** sizes the tolerance for each quote. A fixed 1 to 5% makes most swaps in short markets revert with `V4TooLittleReceived` after you have signed.
 
 ### Review
 
@@ -84,7 +86,7 @@ The price keeps moving while you confirm. In the run below the first quote was 1
 
 ### Sell early, or hold
 
-Until trading closes you can sell back at the bid, by putting the token in **Sell** and USDC in **Buy**. After the cutoff the card says **Closed, awaiting settlement** and no swap is possible until the result is in, about 14 seconds later.
+Until trading closes you can sell back at the bid, by putting the token in **Sell** and USDC in **Buy**. After the cutoff the card says **Closed, awaiting settlement** and no swap is possible until the result is in, about 14 seconds later on a 1-minute market and about 34 seconds on a 15-minute one.
 
 ![The market closed for trading, 8 seconds before expiry, with the ETHUP balance shown](/screenshots/uniswap/closed.png)
 
@@ -99,12 +101,12 @@ The losing token is worth nothing and cannot be sold.
 </Steps>
 
 <Callout type="important">
-Trade early in a market's life. Trading stops 12 seconds before expiry, and near the end a small ETH move swings the price a lot.
+Trade early in a market's life. Trading stops 12 seconds before expiry (32 on the 15-minute tracks), and near the end a small price move swings the price a lot.
 </Callout>
 
 ## A real run
 
-The review, wallet, closed-market and redemption screenshots come from this run on Unichain Sepolia on 26 Sep 2026, made in the Uniswap app with a test wallet.
+The review, wallet, closed-market and redemption screenshots come from this run on Unichain Sepolia on 26 Sep 2026, made in the Uniswap app with a test wallet. It predates the tracks: markets then lasted two minutes and a new one opened every minute.
 
 | Time (UTC) | Action | Result |
 |---|---|---|
