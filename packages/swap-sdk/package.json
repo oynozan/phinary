@@ -1,5 +1,5 @@
 {
-  "name": "@prediction/swap-sdk",
+  "name": "@phinary/swap-sdk",
   "version": "0.1.0",
   "private": true,
   "description": "Quote and swap PredictionHook YES/NO markets on Unichain Sepolia through V4Quoter and UniversalRouter 2.0.",

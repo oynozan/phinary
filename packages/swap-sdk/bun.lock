@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@prediction/swap-sdk",
+      "name": "@phinary/swap-sdk",
       "dependencies": {
         "viem": "2.49.0",
       },

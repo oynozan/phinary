@@ -1,4 +1,4 @@
-# @prediction/swap-sdk
+# @phinary/swap-sdk
 
 This package quotes and trades PredictionHook YES/NO markets on Unichain Sepolia (chain 1301) through the official Uniswap
 contracts: **V4Quoter** for prices and **UniversalRouter 2.0** (`0xf70536b3…6be5d`, 5-field `ExactInputSingleParams`) for
@@ -15,8 +15,8 @@ import { unichainSepolia } from 'viem/chains'
 import {
   buildPermitSingle, buildSwap, estimateSwapGas, findPredictionRoute, listMarkets, minOutWithSlippage, permitTypedData,
   quoteExactIn, readAllowances, erc20ApproveTx, requireHook, UNICHAIN_SEPOLIA, UNICHAIN_SEPOLIA_RPC_URL,
-} from '@prediction/swap-sdk'
-import { loadDeployment } from '@prediction/swap-sdk/node' // Node only: reads <repo>/deployments/unichain-sepolia.json
+} from '@phinary/swap-sdk'
+import { loadDeployment } from '@phinary/swap-sdk/node' // Node only: reads <repo>/deployments/unichain-sepolia.json
 
 // `account` is the trader's address and `wallet` a viem WalletClient for it.
 const client = createPublicClient({ chain: unichainSepolia, transport: http(UNICHAIN_SEPOLIA_RPC_URL) })

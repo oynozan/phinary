@@ -1,5 +1,5 @@
 {
-  "name": "uniswap-prediction-bot",
+  "name": "phinary-bot",
   "version": "0.1.0",
   "private": true,
   "description": "Demo bots for the Unichain Sepolia deployment: ETH price mirror and 1-minute market keeper",

@@ -1,4 +1,4 @@
-# Demo runbook
+# Phinary demo runbook
 
 This runbook covers the live demo on Unichain Sepolia (chain 1301): the contracts, the two bots, the two front ends, and what to do when something breaks.
 

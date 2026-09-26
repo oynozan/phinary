@@ -1,66 +1,49 @@
-## Foundry
+# Phinary
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Phinary runs binary prediction markets on ETH through a Uniswap v4 hook. Each market asks a question like "ETH > $2,684.53 at 00:48?". It is priced with Black-Scholes, not with a liquidity curve, and it trades through ordinary Uniswap v4 swaps.
 
-Foundry consists of:
+Each market has two tokens, `ETHUP` and `ETHDOWN`. Each costs between $0.00 and $1.00, and a winning token redeems for exactly $1.00.
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## How it works
 
-## Documentation
+- **PredictionHook** is a Uniswap v4 hook that prices every YES/NO swap itself. It uses a Black-Scholes binary price in its settlement-matched average-price form, and Uniswap's liquidity curve is never used.
+- **UnderlyingOracleHook** records the start-of-block ETH/USDC price and its volatility from a Uniswap v4 pool. Swaps earlier in the same block cannot move the price it reports.
+- **Settlement** uses the pool's average price over the final window of each market. Anyone can call `settle()`, and ties resolve DOWN.
+- **The LP vault** underwrites every market. Complete-set accounting means every winning token is always backed by 1 USDC.
 
-https://book.getfoundry.sh/
+## Live on Unichain Sepolia (chain 1301)
 
-## Usage
+| Contract | Address |
+|---|---|
+| PredictionHook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` |
+| UnderlyingOracleHook | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
+| PriceSteerer (demo price mirror) | `0x21C55279188072E6BfeF14c4920eA1cEFEd358a3` |
+| USDC (Circle, testnet) | `0x31d0220469e10c4E71834a79b1f276d740d3768F` |
 
-### Build
+Every address is in `deployments/unichain-sepolia.json`.
 
-```shell
-$ forge build
+## Repository
+
+| Path | What it holds |
+|---|---|
+| `src/` | Solidity: the hooks, the pricing math (`src/math`), outcome tokens, demo contracts |
+| `test/` | Foundry tests: math, oracle, hook, integration, security and attack cases |
+| `script/` | Deploy, fund and market scripts, the local fork environment and the rehearsal |
+| `bot/` | The price-mirror and market-keeper bots |
+| `packages/swap-sdk/` | `@phinary/swap-sdk`: V4Quoter quotes, UniversalRouter encoding, revert decoding |
+| `web/` | The Phinary dashboard (Next.js) |
+| `app/` | The backup swap page |
+| `interface-patches/` | The Uniswap web app fork, as a patch |
+| `sim/`, `formal/` | Reference math, test vectors, z3 lemmas and monotonicity certificates |
+| `docs/` | Plan, spec, runbook, dashboard spec and research |
+
+## Quick start
+
+```sh
+make build && make test     # contracts and tests
+make local-env              # local fork of Unichain Sepolia with everything deployed and the bots running
+make rehearse               # scripted buy, sell, settle and redeem on that fork
+cd web && npm install && npm run dev   # dashboard at http://localhost:3100
 ```
 
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+The live demo and deployment are covered in [docs/RUNBOOK.md](docs/RUNBOOK.md), the design in [docs/PLAN.md](docs/PLAN.md) and [docs/SPEC.md](docs/SPEC.md), and the dashboard in [docs/DASHBOARD.md](docs/DASHBOARD.md).

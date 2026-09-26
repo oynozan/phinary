@@ -1,4 +1,4 @@
-# Dashboard: a prediction-market front end for the PredictionHook
+# Phinary dashboard: the prediction-market front end for the PredictionHook
 
 **Status: draft for review, 2026-09-26.** Section 4 (architecture) was presented in chat; the other sections have not been reviewed yet. No dashboard code gets written until you approve this document. After approval, the next step is a step-by-step implementation plan.
 

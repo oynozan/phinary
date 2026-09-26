@@ -1,4 +1,4 @@
-export const BRAND_NAME = "Binary";
+export const BRAND_NAME = "Phinary";
 
 /** Market times (questions, token names) are shown in this zone, matching the on-chain token names. */
 export const DISPLAY_TIMEZONE = "UTC";

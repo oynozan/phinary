@@ -1,4 +1,4 @@
-# Implementation spec (hackathon build)
+# Phinary implementation spec (hackathon build)
 
 This is the normative spec for the code. The plan lives in [PLAN.md](PLAN.md). The research is in [research/00-SUMMARY.md](research/00-SUMMARY.md) and [research/gaps/](research/gaps/).
 

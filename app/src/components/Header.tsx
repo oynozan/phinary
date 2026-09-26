@@ -68,7 +68,7 @@ export function Header(p: Props) {
         <div className="brand">
           <BrandMark />
           <div>
-            <div className="brand-name">ETH Binary Markets</div>
+            <div className="brand-name">Phinary</div>
             <div className="brand-sub">Black-Scholes priced YES/NO on a Uniswap v4 hook</div>
           </div>
         </div>

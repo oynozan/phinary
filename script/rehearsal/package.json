@@ -1,5 +1,5 @@
 {
-  "name": "uniswap-prediction-rehearsal",
+  "name": "phinary-rehearsal",
   "version": "0.1.0",
   "private": true,
   "description": "Scripted demo rehearsal on the local anvil fork: trades through V4Quoter, Permit2 and UniversalRouter 2.0 via packages/swap-sdk",

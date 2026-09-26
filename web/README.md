@@ -1,6 +1,6 @@
-# Dashboard
+# Phinary dashboard
 
-Next.js 16 front end for the PredictionHook markets. Data is mocked in `src/lib/mock` behind the hooks in `src/lib/data`.
+Next.js 16 front end for the Phinary markets (PredictionHook). Data is mocked in `src/lib/mock` behind the hooks in `src/lib/data`.
 
 ```bash
 npm install
