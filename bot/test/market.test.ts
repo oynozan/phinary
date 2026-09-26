@@ -41,7 +41,7 @@ const TEMPLATE: MarketTemplate = {
   kernel: 0,
   timeZone: "UTC",
   ticker: "ETH",
-  nameTemplate: "{ticker} > ${strike} {date} {hhmm}",
+  nameTemplate: "{ticker} {cmp} ${strike} {date} {hhmm}",
   symbolTemplate: "{ticker}{side}",
 };
 
@@ -73,11 +73,16 @@ test("clock and templates", () => {
   assert.equal(formatDate(1790380800n, "UTC"), "26 Sep");
   assert.equal(formatDate(1790346660n + 10n * 3600n, "Asia/Tokyo"), "26 Sep");
   assert.equal(formatDate(1791244800n, "UTC"), "6 Oct");
-  const v = { side: "UP" as const, ticker: "ETH", strike: "2701.35", clock: "14:31:00", date: "25 Sep" };
+  const v = { side: "UP" as const, cmp: ">", ticker: "ETH", strike: "2701.35", clock: "14:31:00", date: "25 Sep" };
   assert.equal(renderTemplate("{ticker}{side}", v), "ETHUP");
   assert.equal(renderTemplate("{ticker}{side}", { ...v, side: "DOWN" }), "ETHDOWN");
   assert.equal(renderTemplate("{ticker} > ${strike} {date} {hhmm}", v), "ETH > $2701.35 25 Sep 14:31");
   assert.equal(renderTemplate("{side}-{strike}-{hhmmss} {time}", { ...v, side: "DOWN" }), "DOWN-2701.35-143100 14:31:00");
+  assert.equal(renderTemplate("{ticker} {cmp} ${strike} {date} {hhmm}", v), "ETH > $2701.35 25 Sep 14:31");
+  assert.equal(
+    renderTemplate("{ticker} {cmp} ${strike} {date} {hhmm}", { ...v, side: "DOWN", cmp: "<" }),
+    "ETH < $2701.35 25 Sep 14:31",
+  );
 });
 
 test("expiry is open + tenor, optionally aligned up", () => {
@@ -113,7 +118,7 @@ test("buildMarketParams produces the 1-minute demo market", () => {
     kernel: 0,
     yesName: "ETH > $2701.35 25 Sep 14:31",
     yesSymbol: "ETHUP",
-    noName: "ETH > $2701.35 25 Sep 14:31",
+    noName: "ETH < $2701.35 25 Sep 14:31",
     noSymbol: "ETHDOWN",
   });
 });

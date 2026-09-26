@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {CreateMarket} from "../../script/CreateMarket.s.sol";
+import {IPredictionHook} from "../../src/interfaces/IPredictionHook.sol";
 
 contract CreateMarketHarness is CreateMarket {
     function date(uint256 t) external pure returns (string memory) {
@@ -14,7 +15,8 @@ contract CreateMarketHarness is CreateMarket {
     }
 }
 
-/// Token names from CreateMarket.s.sol match the keeper bot's ("ETH > $2701.35 25 Sep 14:31", bot/test/market.test.ts).
+/// Token names from CreateMarket.s.sol match the keeper bot's: YES "ETH > $2701.35 25 Sep 14:31", NO
+/// "ETH < $2701.35 25 Sep 14:31" (bot/test/market.test.ts).
 contract CreateMarketNamesTest is Test {
     CreateMarketHarness internal h = new CreateMarketHarness();
 
@@ -29,5 +31,16 @@ contract CreateMarketNamesTest is Test {
         assertEq(h.date(1767225599), "31 Dec");
         assertEq(h.date(1767225600), "1 Jan");
         assertEq(h.date(1709164800), "29 Feb");
+    }
+
+    /// YES uses ">", NO uses "<"; otherwise identical, matching the keeper bot's buildMarketParams.
+    function test_yesAndNoNamesUseOppositeComparisons() public {
+        vm.warp(1790346600);
+        vm.setEnv("STRIKE_USD", "2701.35");
+        IPredictionHook.MarketParams memory p = h.params(address(0));
+        assertEq(p.yesName, "ETH > $2701.35 25 Sep 14:31");
+        assertEq(p.noName, "ETH < $2701.35 25 Sep 14:31");
+        assertEq(p.yesSymbol, "ETHUP");
+        assertEq(p.noSymbol, "ETHDOWN");
     }
 }

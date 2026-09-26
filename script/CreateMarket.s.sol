@@ -9,7 +9,7 @@ import {ScriptBase} from "./base/ScriptBase.sol";
 
 /// @title CreateMarket
 /// @notice One-off "ETH above K at T" market, with the keeper bot's env names and defaults (bot/.env.example): tickers
-///         ETHUP / ETHDOWN and the name "ETH > $2684.00 26 Sep 14:31" (UTC).
+///         ETHUP / ETHDOWN and the names "ETH > $2684.00 26 Sep 14:31" (YES) / "ETH < $2684.00 26 Sep 14:31" (NO), UTC.
 /// @dev STRIKE_USD defaults to the oracle's start-of-block price rounded half up to the cent. The signer must be the
 ///      hook owner or keeper, and the vault must hold MARKET_BUDGET_USDC idle.
 contract CreateMarket is ScriptBase {
@@ -75,9 +75,9 @@ contract CreateMarket is ScriptBase {
         p.kernel = 0;
 
         string memory ticker = vm.envOr("MARKET_TICKER", string("ETH"));
-        string memory name = string.concat(ticker, " > $", _formatUnits(cents, 2, 2), " ", _date(expiry), " ", _hhmm(expiry));
-        p.yesName = name;
-        p.noName = name;
+        string memory suffix = string.concat("$", _formatUnits(cents, 2, 2), " ", _date(expiry), " ", _hhmm(expiry));
+        p.yesName = string.concat(ticker, " > ", suffix);
+        p.noName = string.concat(ticker, " < ", suffix);
         p.yesSymbol = string.concat(ticker, "UP");
         p.noSymbol = string.concat(ticker, "DOWN");
     }

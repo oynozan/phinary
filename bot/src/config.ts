@@ -315,7 +315,7 @@ export function loadMarketTemplate(env: Env): MarketTemplate {
     kernel: envInt(env, "KERNEL", 0, 0, 255),
     timeZone: envString(env, "MARKET_TIMEZONE", "UTC"),
     ticker: envString(env, "MARKET_TICKER", "ETH"),
-    nameTemplate: envString(env, "MARKET_NAME_TEMPLATE", "{ticker} > ${strike} {date} {hhmm}"),
+    nameTemplate: envString(env, "MARKET_NAME_TEMPLATE", "{ticker} {cmp} ${strike} {date} {hhmm}"),
     symbolTemplate: envString(env, "MARKET_SYMBOL_TEMPLATE", "{ticker}{side}"),
   };
   validateTemplate(template);

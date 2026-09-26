@@ -120,6 +120,8 @@ export type Side = "UP" | "DOWN";
 
 export interface TemplateValues {
   side: Side;
+  /** ">" for UP, "<" for DOWN. */
+  cmp: string;
   ticker: string;
   strike: string;
   /** HH:MM:SS */
@@ -128,10 +130,11 @@ export interface TemplateValues {
   date: string;
 }
 
-/** Fills {side} {ticker} {strike} {date} {time} (HH:MM:SS) {hhmm} (HH:MM) {hhmmss} (HHMMSS) placeholders. */
+/** Fills {side} {cmp} {ticker} {strike} {date} {time} (HH:MM:SS) {hhmm} (HH:MM) {hhmmss} (HHMMSS) placeholders. */
 export function renderTemplate(template: string, v: TemplateValues): string {
   return template
     .replaceAll("{side}", v.side)
+    .replaceAll("{cmp}", v.cmp)
     .replaceAll("{ticker}", v.ticker)
     .replaceAll("{strike}", v.strike)
     .replaceAll("{date}", v.date)
@@ -175,6 +178,7 @@ export function validateTemplate(t: MarketTemplate): void {
   if (!/^[A-Za-z0-9]{1,6}$/.test(t.ticker)) fail("ticker must be 1-6 letters or digits");
   const longest = renderTemplate(t.symbolTemplate, {
     side: "DOWN",
+    cmp: "<",
     ticker: t.ticker,
     strike: "99999.99",
     clock: "23:59:59",
@@ -215,10 +219,10 @@ export function buildMarketParams(oracle: Address, lnSpotWad: bigint, blockTimes
       sigmaMode: t.sigmaMode,
       fixedVarE36: t.sigmaMode === 1 ? t.fixedVarE36 : 0n,
       kernel: t.kernel,
-      yesName: renderTemplate(t.nameTemplate, { ...names, side: "UP" }),
-      yesSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "UP" }),
-      noName: renderTemplate(t.nameTemplate, { ...names, side: "DOWN" }),
-      noSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "DOWN" }),
+      yesName: renderTemplate(t.nameTemplate, { ...names, side: "UP", cmp: ">" }),
+      yesSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "UP", cmp: ">" }),
+      noName: renderTemplate(t.nameTemplate, { ...names, side: "DOWN", cmp: "<" }),
+      noSymbol: renderTemplate(t.symbolTemplate, { ...names, side: "DOWN", cmp: "<" }),
     },
   };
 }
