@@ -205,6 +205,16 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const now = (await c.publicClient.getBlock()).timestamp;
     const id = await keeper.createMarket(now);
     assert.equal(id, 0n);
+    // `now` is read before open()'s transaction, which can land a block later, so openTime is derived from the
+    // block that actually mined the MarketOpened event rather than from that pre-read clock.
+    const [openedLog] = await c.publicClient.getContractEvents({
+      address: scheduler,
+      abi: marketSchedulerAbi,
+      eventName: "MarketOpened",
+      args: { marketId: id },
+      fromBlock: 0n,
+    });
+    const openBlock = await c.publicClient.getBlock({ blockNumber: openedLog!.blockNumber });
     const cents = strikeCentsFromLnSpot(lnSpot);
     const stored = await read<{
       oracle: Address;
@@ -226,8 +236,9 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     }>(c, hook, a.hook.abi, "marketParams", [0n]);
     assert.equal(stored.oracle, oracle);
     assert.equal(stored.lnStrikeWad, lnStrikeWadFromCents(cents), "strike is the scheduler's own MarketNames rounding");
-    assert.equal(stored.openTime, now);
-    assert.equal(stored.expiry, now + 60n);
+    assert.equal(stored.openTime, openBlock.timestamp, "openTime is the block that mined open()'s transaction");
+    // period=1 so slot === openTime; expiry = slot * period + tenor.
+    assert.equal(stored.expiry, stored.openTime + 60n);
     assert.equal(stored.window, 10);
     assert.equal(stored.cutoffBuffer, 2);
     assert.equal(stored.nSamples, 10);
@@ -240,7 +251,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(stored.noSymbol, "ETHDOWN");
     assert.ok(stored.yesName.startsWith(`ETH > $${formatRational({ num: cents, den: 100n }, 2)}`), stored.yesName);
     const info0 = await read<{ expiry: bigint; status: number }>(c, hook, predictionHookAbi as Abi, "marketInfo", [0n]);
-    assert.equal(info0.expiry, now + 60n);
+    assert.equal(info0.expiry, stored.openTime + 60n);
     assert.equal(keeper.tracked.has(0n), true);
 
     await keeper.settleAndSweep(now);
