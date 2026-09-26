@@ -23,14 +23,52 @@ export const marketSchedulerAbi = parseAbi([
   "function open() returns (uint256 marketId)",
   "function canOpen() view returns (bool)",
   "function nextOpenTime() view returns (uint256)",
+  "function openDeadline(uint256 slot) view returns (uint256)",
   "function lastSlot() view returns (uint256)",
+  "function marketOfSlot(uint256 slot) view returns (uint256)",
   "function hook() view returns (address)",
+  "function gatekeeper() view returns (address)",
   "function oracle() view returns (address)",
   "function config() view returns ((uint32 period, uint32 tenor, uint32 window, uint32 cutoffBuffer, uint32 nSamples, (uint64 h0Wad, uint64 gammaSWad, uint128 lambdaWad, uint128 qEpochMax, uint64 pMinWad) quote, uint256 maxBudget, uint256 minBudget, string ticker) c)",
   "error AlreadyOpened(uint256 slot)",
+  "error TooLate(uint256 slot)",
   "error InsufficientIdle(uint256 budget, uint256 minBudget)",
   "error InvalidConfig()",
   "event MarketOpened(uint256 indexed marketId, uint256 indexed slot, address indexed caller, uint256 budget, uint256 strikeCents)",
+]);
+
+/** Subset of src/interfaces/IMarketGatekeeper.sol, the hook's owner that forwards `createMarket` from its schedulers */
+export const marketGatekeeperAbi = parseAbi([
+  "function hook() view returns (address)",
+  "function schedulers() view returns (address[])",
+  "function schedulerCount() view returns (uint256)",
+  "function isScheduler(address account) view returns (bool)",
+  "function schedulerOf(uint256 marketId) view returns (address)",
+  "error NotScheduler()",
+  "error InvalidTracks()",
+]);
+
+/** PredictionHook's custom errors, so a revert inside `open()` or a stale-RPC `NotSettled` on sweep decodes by name */
+export const predictionHookErrorsAbi = parseAbi([
+  "error Unauthorized()",
+  "error InvalidParams()",
+  "error UnsupportedKernel()",
+  "error UnknownMarket()",
+  "error UnknownPool()",
+  "error NotTradable()",
+  "error MarketClosed()",
+  "error NotSettled()",
+  "error TooEarly()",
+  "error OracleAvailable()",
+  "error OutOfBand()",
+  "error EpochCapExceeded()",
+  "error Insolvent()",
+  "error ZeroAmount()",
+  "error InsufficientIdle()",
+  "error InsufficientShares()",
+  "error ForeignInitialize()",
+  "error LiquidityDisabled()",
+  "error DonateDisabled()",
 ]);
 
 /** PredictionHook views outside the frozen interface (owner/keeper roles, the settleInvalid grace period). */

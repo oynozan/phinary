@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Abi, AbiParameter } from "viem";
 import {
+  marketGatekeeperAbi,
   marketSchedulerAbi,
   poolManagerAbi,
   predictionHookAbi,
   predictionHookAdminAbi,
+  predictionHookErrorsAbi,
   priceSteererAbi,
   sealedPoolOracleAbi,
   sealedPoolOracleImplAbi,
@@ -48,6 +50,7 @@ test("TypeScript ABIs match the Solidity sources (forge artifacts)", (t) => {
     assertSubset(priceSteererAbi, "PriceSteerer.sol", "PriceSteerer"),
     assertSubset(poolManagerAbi, "PoolManager.sol", "PoolManager"),
     assertSubset(marketSchedulerAbi, "IMarketScheduler.sol", "IMarketScheduler"),
+    assertSubset(marketGatekeeperAbi, "IMarketGatekeeper.sol", "IMarketGatekeeper"),
     assertSubset(sealedPoolOracleAbi, "ISealedPoolOracle.sol", "ISealedPoolOracle"),
     assertSubset(sealedPoolOracleImplAbi, "SealedPoolOracle.sol", "SealedPoolOracle"),
   ];
@@ -57,6 +60,7 @@ test("TypeScript ABIs match the Solidity sources (forge artifacts)", (t) => {
 test("implementation-only ABIs match PredictionHook and UnderlyingOracleHook when they are built", (t) => {
   const checked = [
     assertSubset(predictionHookAdminAbi, "PredictionHook.sol", "PredictionHook"),
+    assertSubset(predictionHookErrorsAbi, "PredictionHook.sol", "PredictionHook"),
     assertSubset(underlyingOracleHookAbi, "UnderlyingOracleHook.sol", "UnderlyingOracleHook"),
     assertSubset(underlyingOracleHookAbi, "MockSobHook.sol", "MockSobHook"),
   ];

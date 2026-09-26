@@ -15,6 +15,7 @@ import {
   parseDeployments,
   readPrivateKey,
   requireAddress,
+  requireSchedulers,
 } from "../src/config.ts";
 
 const EXAMPLE = resolve(BOT_DIR, "config", "unichain-sepolia.example.json");
@@ -100,9 +101,35 @@ test("bot configs need a key unless dry-running", () => {
   assert.throws(() => loadMirrorConfig({ ...env, DRY_RUN: "1", MIRROR_SOURCES: "ftx" }), /unknown sources: ftx/);
   const k = loadKeeperConfig({ ...env, KEEPER_PRIVATE_KEY: KEY, DEPLOYER_PRIVATE_KEY: `0x${"cd".repeat(32)}` });
   assert.equal(k.privateKey?.source, "KEEPER_PRIVATE_KEY");
-  assert.equal(k.periodSec, 60);
+  assert.equal(k.minTradeSec, 5);
+  assert.equal(loadKeeperConfig({ ...env, DRY_RUN: "1", KEEPER_MIN_TRADE_SEC: "0" }).minTradeSec, 0);
+  assert.throws(() => loadKeeperConfig({ ...env, DRY_RUN: "1", KEEPER_MIN_TRADE_SEC: "-1" }), /KEEPER_MIN_TRADE_SEC/);
   assert.equal(k.alignToPeriod, true);
   assert.equal(k.invalidAfterSec, 3601, "past PredictionHook.GRACE (1 h)");
+});
+
+test("marketGatekeeper and the marketSchedulers array, each with its env override", () => {
+  const S1 = getAddress("0x5c00000000000000000000000000000000000001");
+  const S2 = getAddress("0x5c00000000000000000000000000000000000002");
+  const G = getAddress("0x6a00000000000000000000000000000000000001");
+  const d = parseDeployments({ marketGatekeeper: G, marketSchedulers: [S1.toLowerCase(), S2] });
+  assert.equal(requireAddress(d, "marketGatekeeper"), G);
+  assert.deepEqual(requireSchedulers(d), [S1, S2], "checksummed, in the file's (gatekeeper) order");
+
+  const env = parseDeployments({ marketSchedulers: [S1, S2] }, { MARKET_GATEKEEPER: S1, MARKET_SCHEDULERS: ` ${S2} , ${S1},` });
+  assert.equal(env.marketGatekeeper, S1);
+  assert.deepEqual(env.marketSchedulers, [S2, S1], "MARKET_SCHEDULERS is a comma list that replaces the file's");
+  assert.deepEqual(parseDeployments({ marketSchedulers: [S1] }, { MARKET_SCHEDULERS: " " }).marketSchedulers, [S1], "blank is unset");
+
+  const none = parseDeployments({});
+  assert.deepEqual(none.marketSchedulers, []);
+  assert.throws(() => requireSchedulers(none), /marketSchedulers is empty.*MARKET_SCHEDULERS/);
+  assert.throws(() => requireAddress(none, "marketGatekeeper"), /not deployed.*MARKET_GATEKEEPER/);
+  assert.throws(() => parseDeployments({ marketSchedulers: S1 }, {}), /marketSchedulers must be an array/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [S1, "0x12"] }), /marketSchedulers\[1\] is not an address/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [zeroAddress] }), /marketSchedulers\[0\] is the zero address/);
+  assert.throws(() => parseDeployments({ marketSchedulers: [S1, S1.toLowerCase()] }), /lists an address twice/);
+  assert.equal((parseDeployments({ marketScheduler: S1 }) as Record<string, unknown>).marketScheduler, undefined, "the single key is gone");
 });
 
 test("loadEnvFiles never overrides variables that are already set", () => {

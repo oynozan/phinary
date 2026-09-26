@@ -43,7 +43,7 @@ const ADDRESS_KEYS = [
   "stateView",
   "usdc",
   "predictionHook",
-  "marketScheduler",
+  "marketGatekeeper",
   "underlyingOracle",
   "priceSteerer",
   "demoWeth",
@@ -61,7 +61,7 @@ const ADDRESS_ENV: Record<AddressKey, string> = {
   stateView: "STATE_VIEW",
   usdc: "USDC",
   predictionHook: "PREDICTION_HOOK",
-  marketScheduler: "MARKET_SCHEDULER",
+  marketGatekeeper: "MARKET_GATEKEEPER",
   underlyingOracle: "UNDERLYING_ORACLE",
   priceSteerer: "PRICE_STEERER",
   demoWeth: "DEMO_WETH",
@@ -85,12 +85,27 @@ export type Deployments = Record<AddressKey, Address> & {
   underlyingPoolExplicit: boolean;
   /** The `underlyings` list, or undefined when the file only has the flat single-ETH keys. */
   underlyings?: Underlying[];
+  /** The gatekeeper's schedulers in its own order, one per track, empty when not deployed */
+  marketSchedulers: Address[];
 };
 
 function asAddress(v: unknown, what: string): Address {
   if (v === undefined || v === null || v === "") return zeroAddress;
   if (typeof v !== "string" || !isAddress(v, { strict: false })) throw new Error(`${what} is not an address`);
   return getAddress(v);
+}
+
+/** Distinct nonzero addresses from a JSON array, missing is empty */
+export function asAddressList(v: unknown, what: string): Address[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new Error(`${what} must be an array of addresses`);
+  const list = v.map((x, i) => {
+    const a = asAddress(x, `${what}[${i}]`);
+    if (a === zeroAddress) throw new Error(`${what}[${i}] is the zero address`);
+    return a;
+  });
+  if (new Set(list).size !== list.length) throw new Error(`${what} lists an address twice`);
+  return list;
 }
 
 function asInt(v: unknown, what: string): number {
@@ -149,6 +164,12 @@ export function parseUnderlyings(v: unknown): Underlying[] {
   });
 }
 
+/** A comma-separated env value as a list, undefined when unset or blank */
+function commaList(v: string | undefined): string[] | undefined {
+  const items = v?.split(",").map((s) => s.trim()).filter((s) => s !== "");
+  return items && items.length > 0 ? items : undefined;
+}
+
 /** Parses a deployments file; addresses may be flat or under "contracts", and missing ones are zero. */
 export function parseDeployments(json: unknown, env: Env = {}): Deployments {
   const root = asObject(json, "deployments");
@@ -183,6 +204,7 @@ export function parseDeployments(json: unknown, env: Env = {}): Deployments {
     underlyingPool: pool,
     underlyingPoolExplicit: explicit,
     underlyings: flat.underlyings === undefined || flat.underlyings === null ? undefined : parseUnderlyings(flat.underlyings),
+    marketSchedulers: asAddressList(commaList(env.MARKET_SCHEDULERS) ?? flat.marketSchedulers, "marketSchedulers"),
   };
 }
 
@@ -197,6 +219,13 @@ export function requireAddress(d: Deployments, key: AddressKey): Address {
   const a = d[key];
   if (a === zeroAddress) throw new Error(`${key} is not deployed: set it in the deployments file or ${ADDRESS_ENV[key]}`);
   return a;
+}
+
+export function requireSchedulers(d: Deployments): Address[] {
+  if (d.marketSchedulers.length === 0) {
+    throw new Error("marketSchedulers is empty: set it in the deployments file or MARKET_SCHEDULERS (comma-separated)");
+  }
+  return d.marketSchedulers;
 }
 
 /* Env parsing */
@@ -392,8 +421,9 @@ export function loadMirrorConfig(env: Env = process.env): MirrorConfig {
 
 export interface KeeperConfig extends CommonConfig {
   pollMs: number;
-  periodSec: number;
   alignToPeriod: boolean;
+  /** A slot with fewer seconds of trading left than this is skipped instead of opened */
+  minTradeSec: number;
   create: boolean;
   settle: boolean;
   scanBack: number;
@@ -405,8 +435,8 @@ export function loadKeeperConfig(env: Env = process.env): KeeperConfig {
   return {
     ...common,
     pollMs: envInt(env, "KEEPER_POLL_MS", 2000, 200),
-    periodSec: envInt(env, "KEEPER_PERIOD_SEC", 60, 1),
     alignToPeriod: envBool(env, "KEEPER_ALIGN", true),
+    minTradeSec: envInt(env, "KEEPER_MIN_TRADE_SEC", 5, 0),
     create: envBool(env, "KEEPER_CREATE", true),
     settle: envBool(env, "KEEPER_SETTLE", true),
     scanBack: envInt(env, "KEEPER_SCAN_BACK", 50, 1),
