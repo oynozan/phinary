@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Guarded broadcasts to the real Unichain Sepolia (chain 1301): deploy, fund the vault, create a one-off market, deploy
-# the scheduler-owned hook, renounce the oracle, or add another underlying price source.
+# the gatekeeper-owned hook and its market tracks, withdraw from a drained hook, renounce the oracle, or add another
+# underlying price source.
 #
 #   script/sepolia.sh deploy               Deploy.s.sol -> deployments/unichain-sepolia.json
 #   script/sepolia.sh fund                 Fund.s.sol, FUND_USDC (default 20) of the deployer's Circle USDC into the vault
 #   script/sepolia.sh market               CreateMarket.s.sol with the keeper defaults (MARKET_* and QUOTE_* env)
-#   script/sepolia.sh scheduler            DeployScheduler.s.sol, a MarketScheduler and the new PredictionHook it owns,
-#                                          then record() checks both on-chain and only then updates the deployments file
+#   script/sepolia.sh withdraw             Withdraw.s.sol, every vault share of the signer out of WITHDRAW_HOOK (required),
+#                                          which must be drained (navMinus == vaultIdle)
+#   script/sepolia.sh tracks               DeployTracks.s.sol, a MarketGatekeeper with its track schedulers and the new
+#                                          PredictionHook it owns (IRREVERSIBLE configs, TRACKS_ETH_ONLY=1 for ETH only),
+#                                          then record() checks them on-chain and only then updates the deployments file
 #   script/sepolia.sh renounce-oracle      RenounceOracle.s.sol, the UnderlyingOracleHook loses its owner (IRREVERSIBLE)
 #   script/sepolia.sh underlying           DeployUnderlying.s.sol, UNDERLYING_SYMBOL's demo token, oracle and pool at
 #                                          UNDERLYING_PRICE_USD (default the Coinbase spot), then record() appends it
@@ -45,36 +49,59 @@ json_field() {
   sed -nE "s/.*\"$1\": \"([^\"]+)\".*/\1/p" "$2" | head -n 1
 }
 
-# After a failed scheduler broadcast or record, says what is on chain and how to finish, then exits
-scheduler_recovery() {
-  local what="$1" log="$2" pending="${DEPLOYMENTS%.json}.pending.json"
+# Block of the transaction that created $1, found in forge's DeployTracks broadcast record
+landing_block() {
+  local dir="${FOUNDRY_BROADCAST:-$ROOT/broadcast}" file hash
+  if [[ "$ANVIL" == 1 ]]; then dir="$RUN/broadcast"; fi
+  file="$dir/DeployTracks.s.sol/$CHAIN_ID/run-latest.json"
+  [[ -f "$file" ]] || return 1
+  hash="$(node -e '
+    const d = require(process.argv[1]);
+    const t = (d.transactions || []).find((x) => (x.contractAddress || "").toLowerCase() === process.argv[2].toLowerCase());
+    if (!t || !t.hash) process.exit(1);
+    console.log(t.hash);' "$file" "$1")" || return 1
+  cast receipt "$hash" blockNumber --rpc-url "$RPC" 2>/dev/null
+}
+
+# After a failed tracks broadcast or record, says what is on chain and how to finish, then exits
+tracks_recovery() {
+  local what="$1" log="$2" pending="${DEPLOYMENTS%.json}.tracks.pending.json"
   local rpc_hint='--rpc-url "$UNICHAIN_SEPOLIA_RPC"'
-  local rec="NETWORK=$NETWORK DEPLOYMENTS_FILE= forge script $SCRIPT --sig 'record()' $rpc_hint"
   echo >&2
   echo "$what. $DEPLOYMENTS is unchanged." >&2
-  [[ -f "$pending" ]] || die "no staged pair at $pending, so nothing was deployed. Fix the error above and rerun script/sepolia.sh scheduler"
-  local s h pm usdc salt s_code h_code
-  s="$(json_field marketScheduler "$pending")"
+  [[ -f "$pending" ]] || die "no staged tracks at $pending, so nothing was deployed. Fix the error above and rerun script/sepolia.sh tracks"
+  local g h pm usdc salt g_code h_code landed
+  g="$(json_field marketGatekeeper "$pending")"
   h="$(json_field predictionHook "$pending")"
   pm="$(json_field poolManager "$pending")"
   usdc="$(json_field usdc "$pending")"
   salt="$(sed -nE 's/.*hook salt: (0x[0-9a-fA-F]{64}).*/\1/p' "$log" 2>/dev/null | tail -n 1)"
-  s_code="$(cast code "$s" --rpc-url "$RPC" 2>/dev/null)" || s_code=unknown
+  g_code="$(cast code "$g" --rpc-url "$RPC" 2>/dev/null)" || g_code=unknown
   h_code="$(cast code "$h" --rpc-url "$RPC" 2>/dev/null)" || h_code=unknown
+  landed="$(landing_block "$h" || true)"
+  local block="<block>" at="<timestamp>"
+  if [[ "$landed" =~ ^[0-9]+$ ]]; then
+    block="$landed"
+    at="$(cast block "$landed" --field timestamp --rpc-url "$RPC" 2>/dev/null)" || at="<timestamp>"
+  fi
+  local rec="NETWORK=$NETWORK DEPLOYMENTS_FILE= TRACKS_ETH_ONLY=${TRACKS_ETH_ONLY:-0} TRACKS_DEPLOY_BLOCK=$block TRACKS_DEPLOYED_AT=$at forge script $SCRIPT --sig 'record()' $rpc_hint"
   echo "Staged in $pending (UNICHAIN_SEPOLIA_RPC below is the RPC this run used):" >&2
-  echo "  marketScheduler $s code $([[ "$s_code" == 0x ]] && echo none || echo "${s_code:0:10}...")" >&2
-  echo "  predictionHook  $h code $([[ "$h_code" == 0x ]] && echo none || echo "${h_code:0:10}...")" >&2
-  echo "  hook salt       ${salt:-not found, see the 'hook salt' line in $log}" >&2
-  if [[ "$s_code" == unknown || "$h_code" == unknown ]]; then
-    die "could not read the contract code, check both addresses by hand, then follow the matching case in script/sepolia.sh scheduler_recovery"
-  elif [[ "$s_code" != 0x && "$h_code" != 0x ]]; then
+  echo "  marketGatekeeper $g code $([[ "$g_code" == 0x ]] && echo none || echo "${g_code:0:10}...")" >&2
+  echo "  predictionHook   $h code $([[ "$h_code" == 0x ]] && echo none || echo "${h_code:0:10}...")" >&2
+  echo "  hook salt        ${salt:-not found, see the 'hook salt' line in $log}" >&2
+  echo "  hook landed in   ${landed:-unknown block, take it from the CREATE2 transaction of the hook (cast receipt <hash> blockNumber)}" >&2
+  echo "record() rebuilds the tracks from the env, so keep TRACKS_ETH_ONLY and every TRACK_* override of this run." >&2
+  echo "TRACKS_DEPLOYED_AT is that block's timestamp (cast block <block> --field timestamp)." >&2
+  if [[ "$g_code" == unknown || "$h_code" == unknown ]]; then
+    die "could not read the contract code, check both addresses by hand, then follow the matching case in script/sepolia.sh tracks_recovery"
+  elif [[ "$g_code" != 0x && "$h_code" != 0x ]]; then
     die "both contracts are on chain. Fix what the log reports if anything, then from $ROOT with the same env run: $rec"
-  elif [[ "$s_code" == 0x && "$h_code" == 0x ]]; then
-    die "neither contract is on chain. Delete $pending, check the signer nonce is settled, then rerun script/sepolia.sh scheduler"
-  elif [[ "$s_code" != 0x ]]; then
-    die "only the scheduler landed. Deploy its hook through the CREATE2 factory from $ROOT (any signer): cast send $CREATE2_FACTORY \"\$(cast concat-hex $salt \"\$(forge inspect src/PredictionHook.sol:PredictionHook bytecode)\" \"\$(cast abi-encode 'f(address,address,address)' $pm $usdc $s)\")\" --private-key \"\$DEPLOYER_PRIVATE_KEY\" $rpc_hint, check that $h now has code, then run: $rec"
+  elif [[ "$g_code" == 0x && "$h_code" == 0x ]]; then
+    die "neither contract is on chain. Delete $pending, check the signer nonce is settled, then rerun script/sepolia.sh tracks"
+  elif [[ "$g_code" != 0x ]]; then
+    die "only the gatekeeper landed. Deploy its hook (owner = the gatekeeper) through the CREATE2 factory from $ROOT (any signer): cast send $CREATE2_FACTORY \"\$(cast concat-hex $salt \"\$(forge inspect src/PredictionHook.sol:PredictionHook bytecode)\" \"\$(cast abi-encode 'f(address,address,address)' $pm $usdc $g)\")\" --private-key \"\$DEPLOYER_PRIVATE_KEY\" $rpc_hint, check that $h now has code, take <block> from that transaction, then run: $rec"
   else
-    die "only the hook landed and its owner $s can never be deployed now, so it is unusable. Delete $pending and rerun script/sepolia.sh scheduler"
+    die "only the hook landed and its owner $g can never be deployed now, so it is unusable. Delete $pending and rerun script/sepolia.sh tracks"
   fi
 }
 
@@ -104,12 +131,13 @@ case "$CMD" in
   deploy) SCRIPT=script/Deploy.s.sol:Deploy ;;
   fund) SCRIPT=script/Fund.s.sol:Fund ;;
   market) SCRIPT=script/CreateMarket.s.sol:CreateMarket ;;
-  scheduler) SCRIPT=script/DeployScheduler.s.sol:DeployScheduler ;;
+  withdraw) SCRIPT=script/Withdraw.s.sol:Withdraw ;;
+  tracks) SCRIPT=script/DeployTracks.s.sol:DeployTracks ;;
   renounce-oracle) SCRIPT=script/RenounceOracle.s.sol:RenounceOracle ;;
   underlying) SCRIPT=script/DeployUnderlying.s.sol:DeployUnderlying ;;
   seed-underlying) SCRIPT=script/SeedUnderlying.s.sol:SeedUnderlying ;;
   renounce-underlying) SCRIPT=script/RenounceUnderlyingOracle.s.sol:RenounceUnderlyingOracle ;;
-  *) sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,/^[^#]/p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'; exit 2 ;;
 esac
 
 [[ -z "${CI:-}" ]] || die "refusing to broadcast to Unichain Sepolia from CI"
@@ -172,10 +200,24 @@ case "$CMD" in
   market)
     [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
     ;;
-  scheduler)
+  withdraw)
     [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
-    echo "  replaces predictionHook $(sed -nE 's/.*"predictionHook": "([^"]+)".*/\1/p' "$DEPLOYMENTS") (moves to legacyPredictionHooks)"
-    echo "  note     stop the keeper first, no other signer transaction may land between the scheduler and the hook"
+    [[ -n "${WITHDRAW_HOOK:-}" ]] || die "set WITHDRAW_HOOK to the drained PredictionHook to withdraw from"
+    export WITHDRAW_HOOK
+    SHARES="$(cast call "$WITHDRAW_HOOK" 'sharesOf(address)(uint256)' "$SIGNER" --rpc-url "$RPC" | awk '{print $1}')" ||
+      die "cannot read sharesOf on $WITHDRAW_HOOK"
+    NAV="$(cast call "$WITHDRAW_HOOK" 'navMinus()(uint256)' --rpc-url "$RPC" | awk '{print $1}')"
+    IDLE="$(cast call "$WITHDRAW_HOOK" 'vaultIdle()(uint256)' --rpc-url "$RPC" | awk '{print $1}')"
+    echo "  withdraw all $SHARES shares of $SIGNER from $WITHDRAW_HOOK"
+    echo "  vault    navMinus $(awk -v x="$NAV" 'BEGIN { printf "%.6f", x / 1e6 }') USDC, vaultIdle $(awk -v x="$IDLE" 'BEGIN { printf "%.6f", x / 1e6 }') USDC (must be equal)"
+    ;;
+  tracks)
+    [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
+    [[ ! -f "${DEPLOYMENTS%.json}.tracks.pending.json" ]] || tracks_recovery "Staged tracks await record()" "$RUN/tracks.broadcast.log"
+    echo "  replaces predictionHook $(json_field predictionHook "$DEPLOYMENTS") (moves to legacyPredictionHooks)"
+    echo "  tracks   ETH ETH15M$([[ "${TRACKS_ETH_ONLY:-0}" == 1 ]] || echo " SOL SOL15M"), configs frozen for good (IRREVERSIBLE)"
+    echo "  note     stop the keeper and drain and withdraw the old hook first, no other signer transaction may land"
+    echo "           between the gatekeeper and the hook"
     ;;
   renounce-oracle)
     [[ -f "$DEPLOYMENTS" ]] || die "missing $DEPLOYMENTS, deploy first"
@@ -233,10 +275,10 @@ fi
 
 cd "$ROOT"
 if [[ "$ANVIL" == 1 ]]; then export FOUNDRY_BROADCAST="$RUN/broadcast"; fi
-if [[ "$CMD" == scheduler ]]; then
-  BLOG="$RUN/scheduler.broadcast.log"
+if [[ "$CMD" == tracks ]]; then
+  BLOG="$RUN/tracks.broadcast.log"
   forge script "$SCRIPT" --rpc-url "$RPC" --broadcast --slow 2>&1 | tee "$BLOG" ||
-    scheduler_recovery "The scheduler broadcast failed" "$BLOG"
+    tracks_recovery "The tracks broadcast failed" "$BLOG"
 elif [[ "$CMD" == underlying ]]; then
   forge script "$SCRIPT" --rpc-url "$RPC" --broadcast --slow 2>&1 | tee "$RUN/underlying.broadcast.log" ||
     underlying_recovery "The underlying broadcast failed"
@@ -247,21 +289,45 @@ if [[ "$CMD" == deploy ]]; then
   echo
   echo "Next: make fund-sepolia FUND_USDC=<amount>, then make bots and node packages/swap-sdk/scripts/vendor-interface.mjs"
 fi
-if [[ "$CMD" == scheduler ]]; then
-  # The deployments file changes only once record() has read the pair back from the chain
+if [[ "$CMD" == withdraw ]]; then
+  # forge checks the shares only in its local simulation, so read them back from the chain
+  for attempt in 1 2 3 4 5 6; do
+    LEFT="$(cast call "$WITHDRAW_HOOK" 'sharesOf(address)(uint256)' "$SIGNER" --rpc-url "$RPC" 2>/dev/null | awk '{print $1}')"
+    if [[ "$LEFT" == 0 ]]; then break; fi
+    if [[ "$attempt" == 6 ]]; then die "$SIGNER still holds ${LEFT:-unknown} shares in $WITHDRAW_HOOK on chain after the broadcast"; fi
+    sleep 5
+  done
+  USDC_RAW="$(cast call "$USDC" "balanceOf(address)(uint256)" "$SIGNER" --rpc-url "$RPC" | awk '{print $1}')"
   echo
-  echo "Recording: checking the pair on-chain before $DEPLOYMENTS changes ..."
-  REC="$RUN/scheduler.record.log"
+  echo "Checked on chain: $SIGNER holds no shares in $WITHDRAW_HOOK and $(awk -v x="$USDC_RAW" 'BEGIN { printf "%.6f", x / 1e6 }') Circle USDC"
+  echo "Next: CONFIRM=tracks script/sepolia.sh tracks, then FUND_USDC=<withdrawn USDC> script/sepolia.sh fund"
+fi
+if [[ "$CMD" == tracks ]]; then
+  # The file changes only once record() has read the set back, with deployBlock at the hook's landing block
+  PENDING="${DEPLOYMENTS%.json}.tracks.pending.json"
+  HOOK="$(json_field predictionHook "$PENDING")"
+  for attempt in 1 2 3 4 5 6; do
+    LANDED="$(landing_block "$HOOK" || true)"
+    if [[ "$LANDED" =~ ^[0-9]+$ ]]; then break; fi
+    if [[ "$attempt" == 6 ]]; then tracks_recovery "Could not read the block the hook $HOOK landed in" "$BLOG"; fi
+    sleep 5
+  done
+  LANDED_AT="$(cast block "$LANDED" --field timestamp --rpc-url "$RPC")" ||
+    tracks_recovery "Could not read the timestamp of block $LANDED" "$BLOG"
+  export TRACKS_DEPLOY_BLOCK="$LANDED" TRACKS_DEPLOYED_AT="$LANDED_AT"
+  echo
+  echo "Recording: the hook landed in block $LANDED, checking the set on-chain before $DEPLOYMENTS changes ..."
+  REC="$RUN/tracks.record.log"
   for attempt in 1 2 3 4 5 6; do
     if forge script "$SCRIPT" --sig 'record()' --rpc-url "$RPC" >"$REC" 2>&1; then break; fi
     if [[ "$attempt" == 6 ]]; then
       tail -n 30 "$REC" >&2
-      scheduler_recovery "record() failed (log $REC)" "$BLOG"
+      tracks_recovery "record() failed (log $REC)" "$BLOG"
     fi
     sleep 5
   done
   sed -n '/== Logs ==/,/^$/p' "$REC"
-  echo "Next: settle and sweep the old hook's markets, move the vault USDC into the new hook, then script/sepolia.sh renounce-oracle"
+  echo "Next: FUND_USDC=<USDC withdrawn from the old hook> script/sepolia.sh fund, then restart the keeper on $DEPLOYMENTS"
 fi
 if [[ "$CMD" == underlying ]]; then
   # The deployments file changes only once record() has read the stack back from the chain

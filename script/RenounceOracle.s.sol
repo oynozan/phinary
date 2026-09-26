@@ -9,7 +9,8 @@ import {ScriptBase} from "./base/ScriptBase.sol";
 
 /// @title RenounceOracle
 /// @notice Renounces the deployment's UnderlyingOracleHook ownership, freezing its variance bounds. IRREVERSIBLE.
-/// @dev Signed by the oracle owner, and only once the pool is bound and the file records a scheduler on this oracle.
+/// @dev Signed by the oracle owner, and only once the pool is bound and one of the file's `marketSchedulers` (or the
+///      older single `marketScheduler`) reads this oracle.
 contract RenounceOracle is ScriptBase {
     function run() external {
         _renounce(_deploymentsPath());
@@ -27,8 +28,7 @@ contract RenounceOracle is ScriptBase {
             revert("oracle pool is not bound");
         }
         require(info.lastWriteTime != 0, "oracle pool is not bound");
-        IMarketScheduler scheduler = IMarketScheduler(_jsonContract(json, "marketScheduler"));
-        require(scheduler.oracle() == address(oracle), "marketScheduler reads a different oracle");
+        address scheduler = _schedulerOn(json, address(oracle));
 
         address signer = _startBroadcast();
         require(signer == owner, "signer is not the oracle owner");
@@ -43,9 +43,25 @@ contract RenounceOracle is ScriptBase {
         _log("pool", vm.toString(PoolId.unwrap(info.poolId)));
         _log("last write time", vm.toString(info.lastWriteTime));
         _log("observations", vm.toString(info.observationCount));
-        _log("marketScheduler", address(scheduler));
+        _log("scheduler on it", scheduler);
         _log("frozen varMinE36", vm.toString(oracle.varMinE36()));
         _log("frozen varMaxE36", vm.toString(oracle.varMaxE36()));
         _log("frozen fallbackVarE36", vm.toString(oracle.fallbackVarE36()));
+    }
+
+    /// @dev The first recorded scheduler reading `oracle`, from `marketSchedulers` or else the older `marketScheduler`
+    function _schedulerOn(string memory json, address oracle) internal view returns (address) {
+        address[] memory list;
+        if (vm.keyExistsJson(json, ".marketSchedulers")) {
+            list = vm.parseJsonAddressArray(json, ".marketSchedulers");
+        } else {
+            list = new address[](1);
+            list[0] = _jsonContract(json, "marketScheduler");
+        }
+        for (uint256 i; i < list.length; ++i) {
+            if (list[i].code.length == 0) revert(string.concat("market scheduler has no code at ", vm.toString(list[i])));
+            if (IMarketScheduler(list[i]).oracle() == oracle) return list[i];
+        }
+        revert("no recorded market scheduler reads this oracle");
     }
 }

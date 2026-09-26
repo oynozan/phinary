@@ -8,8 +8,8 @@ REHEARSAL := script/rehearsal
 SHELL_SCRIPTS := script/local-env.sh script/local-env-stop.sh script/bots.sh script/sepolia.sh
 
 .DEFAULT_GOAL := help
-.PHONY: help build test test-scripts test-all local-env local-stop local-status local-wallet rehearse market-local \
-	deploy-sepolia fund-sepolia market-sepolia underlying-sepolia seed-underlying-sepolia renounce-underlying-sepolia bots bots-stop bots-status bots-logs vendor-interface backup-app
+.PHONY: help build test test-scripts test-all local-env local-stop local-status local-wallet rehearse \
+	deploy-sepolia fund-sepolia tracks-sepolia underlying-sepolia seed-underlying-sepolia renounce-underlying-sepolia bots bots-stop bots-status bots-logs vendor-interface backup-app
 
 help: ## List the targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN { FS = ":.*## " } { printf "  %-18s %s\n", $$1, $$2 }'
@@ -61,10 +61,6 @@ local-wallet: ## Set ADDR's balances on the local fork to 10 ETH and USDC (defau
 	@echo "$(ADDR): $$(cast balance $(ADDR) --ether --rpc-url $(LOCAL_RPC)) ETH, \
 	$$(cast call 0x31d0220469e10c4E71834a79b1f276d740d3768F 'balanceOf(address)(uint256)' $(ADDR) --rpc-url $(LOCAL_RPC)) USDC units"
 
-market-local: ## One-off market on the local env (CreateMarket.s.sol, MARKET_* and QUOTE_* env)
-	NETWORK=local DEPLOYMENTS_FILE= FOUNDRY_BROADCAST=deployments/.run/local/broadcast \
-		forge script script/CreateMarket.s.sol:CreateMarket --rpc-url $(LOCAL_RPC) --broadcast
-
 # Unichain Sepolia (real network, every target asks for a typed confirmation and refuses in CI)
 
 deploy-sepolia: ## GUARDED deploy of the full stack to Unichain Sepolia -> deployments/unichain-sepolia.json
@@ -73,8 +69,8 @@ deploy-sepolia: ## GUARDED deploy of the full stack to Unichain Sepolia -> deplo
 fund-sepolia: ## GUARDED vault deposit of FUND_USDC (default 20) Circle USDC
 	script/sepolia.sh fund
 
-market-sepolia: ## GUARDED one-off market on Unichain Sepolia
-	script/sepolia.sh market
+tracks-sepolia: ## GUARDED IRREVERSIBLE gatekeeper, 4 track schedulers and the new hook they own (TRACKS_ETH_ONLY=1)
+	script/sepolia.sh tracks
 
 underlying-sepolia: ## GUARDED new price source UNDERLYING_SYMBOL (token, oracle, pool at UNDERLYING_PRICE_USD)
 	script/sepolia.sh underlying

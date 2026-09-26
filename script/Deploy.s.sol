@@ -9,9 +9,10 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId} from "v4-core/src/types/PoolId.sol";
 import {FixedPointMathLib as F} from "solady/utils/FixedPointMathLib.sol";
-import {IMarketScheduler} from "../src/interfaces/IMarketScheduler.sol";
+import {LibString} from "solady/utils/LibString.sol";
+import {IMarketGatekeeper} from "../src/interfaces/IMarketGatekeeper.sol";
 import {IUnderlyingOracle} from "../src/interfaces/IUnderlyingOracle.sol";
-import {SchedulerPair} from "./base/SchedulerPair.sol";
+import {TrackSet} from "./base/TrackSet.sol";
 
 interface IDemoToken {
     function setMinter(address account, bool allowed) external;
@@ -30,13 +31,15 @@ interface IOracleHookView {
 /// @title Deploy
 /// @notice Deploys the demo stack on Unichain Sepolia (1301) or an anvil fork of it and writes deployments/<NETWORK>.json:
 ///         demo WETH/USDC, the UnderlyingOracleHook at a mined CREATE2 address, the owner-initialised underlying pool,
-///         a PriceSteerer seeding full-range liquidity, and the MarketScheduler with the PredictionHook it owns
-///         (flags 0x2AA8, no keeper).
+///         a PriceSteerer seeding full-range liquidity, the same oracle stack for demo SOL, and the MarketGatekeeper
+///         with its four track schedulers and the PredictionHook it owns (flags 0x2AA8, no keeper).
 /// @dev forge script script/Deploy.s.sol --rpc-url <rpc> --broadcast. Every parameter has an env override, see
-///      docs/md/RUNBOOK.md and SchedulerPair. A run without --broadcast writes <NETWORK>.dry-run.json instead.
-///      KEEPER_ADDRESS only names the keeper bot's account in the file, the hook grants it no role.
-contract Deploy is SchedulerPair {
+///      docs/md/RUNBOOK.md and TrackSet. TRACKS_ETH_ONLY=1 skips the SOL stack and its two tracks. A run without
+///      --broadcast writes <NETWORK>.dry-run.json instead. KEEPER_ADDRESS only names the keeper bot's account in the
+///      file, the hook grants it no role.
+contract Deploy is TrackSet {
     uint160 internal constant ORACLE_FLAGS = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG);
+    string internal constant SOL = "SOL";
 
     struct OracleConfig {
         uint32 gridSeconds;
@@ -58,13 +61,17 @@ contract Deploy is SchedulerPair {
         address demoUsdc;
         address underlyingOracle;
         address priceSteerer;
-        address marketScheduler;
+        address marketGatekeeper;
         address predictionHook;
         PoolKey underlyingPool;
         uint160 sqrtPriceX96;
         uint256 ethPriceWad;
         uint128 liquidity;
         uint256 deployBlock;
+        address[] marketSchedulers;
+        Underlying sol;
+        uint160 solSqrtPriceX96;
+        uint256 solPriceWad;
     }
 
     function run() external returns (Deployment memory d) {
@@ -78,18 +85,29 @@ contract Deploy is SchedulerPair {
         uint24 fee = uint24(vm.envOr("UNDERLYING_FEE", uint256(500)));
         int24 spacing = int24(int256(vm.envOr("UNDERLYING_TICK_SPACING", uint256(10))));
         require(d.ethPriceWad >= 1e18 && d.ethPriceWad <= 1e24, "ETH_PRICE_USD out of range");
-        IMarketScheduler.Config memory sc = schedulerConfig();
-        _checkConfig(sc);
+        TrackSpec[] memory specs = trackSpecs();
+        _checkTracks(specs);
+        bool withSol = _needs(specs, SOL);
+        if (withSol) {
+            d.sol.symbol = SOL;
+            d.solPriceWad = _envUnits("SOL_PRICE_USD", "150", 18);
+            require(d.solPriceWad >= 0.01e18 && d.solPriceWad <= 1e24, "SOL_PRICE_USD out of range");
+        }
 
         d.deployer = _startBroadcast();
         d.keeper = _envAddress("KEEPER_ADDRESS", d.deployer);
         _deployUnderlying(d, oc, fee, spacing);
-        _deployPredictionHook(d, sc);
+        if (withSol) _deploySol(d, oc, fee, spacing);
+        IMarketGatekeeper.Track[] memory tracks = _resolve(specs, _symbols(), _oracles(d));
+        (Tracks memory t,) = _deployTracks(d.deployer, d.poolManager, d.usdc, tracks);
         vm.stopBroadcast();
+        d.marketGatekeeper = t.gatekeeper;
+        d.predictionHook = t.hook;
+        d.marketSchedulers = t.schedulers;
 
-        _verify(d, oc, sc);
+        _verify(d, oc, tracks);
         _write(d, oc);
-        _logConfig(sc);
+        _logTracks(tracks, specs, t.schedulers);
     }
 
     /// @notice Oracle parameters for 1-minute demo markets: 10 s grid, 30 min lookback, 5 min warm-up, >= 2 h of history
@@ -114,6 +132,13 @@ contract Deploy is SchedulerPair {
         require(PERMIT2.code.length != 0 && UNIVERSAL_ROUTER_1301.code.length != 0, "Permit2 or UniversalRouter missing");
     }
 
+    function _needs(TrackSpec[] memory specs, string memory symbol) internal pure returns (bool) {
+        for (uint256 i; i < specs.length; ++i) {
+            if (LibString.eq(specs[i].underlying, symbol)) return true;
+        }
+        return false;
+    }
+
     function _deployUnderlying(Deployment memory d, OracleConfig memory oc, uint24 fee, int24 spacing) internal {
         d.demoWeth = deployCode(
             "src/demo/DemoToken.sol:DemoToken",
@@ -123,13 +148,41 @@ contract Deploy is SchedulerPair {
             "src/demo/DemoToken.sol:DemoToken",
             abi.encode("Demo USD Coin", "dUSDC", uint8(6), 10_000e6, 50_000e6, d.deployer)
         );
+        (d.underlyingOracle, d.underlyingPool, d.sqrtPriceX96) =
+            _deployOracleAndPool(d, d.demoWeth, d.ethPriceWad, oc, fee, spacing);
 
+        d.priceSteerer = deployCode("src/demo/PriceSteerer.sol:PriceSteerer", abi.encode(d.poolManager, d.deployer));
+        IDemoToken(d.demoWeth).setMinter(d.priceSteerer, true);
+        IDemoToken(d.demoUsdc).setMinter(d.priceSteerer, true);
+        IPriceSteerer(d.priceSteerer).addLiquidityFullRange(d.underlyingPool, d.liquidity);
+    }
+
+    /// @dev The ETH stack again for demo SOL, faucet limits as DeployUnderlying's defaults
+    function _deploySol(Deployment memory d, OracleConfig memory oc, uint24 fee, int24 spacing) internal {
+        d.sol.token = deployCode(
+            "src/demo/DemoToken.sol:DemoToken",
+            abi.encode("Demo Wrapped SOL", "dSOL", uint8(18), 20 ether, 100 ether, d.deployer)
+        );
+        (d.sol.oracle, d.sol.pool, d.solSqrtPriceX96) =
+            _deployOracleAndPool(d, d.sol.token, d.solPriceWad, oc, fee, spacing);
+        IDemoToken(d.sol.token).setMinter(d.priceSteerer, true);
+        IPriceSteerer(d.priceSteerer).addLiquidityFullRange(d.sol.pool, d.liquidity);
+    }
+
+    function _deployOracleAndPool(
+        Deployment memory d,
+        address token,
+        uint256 priceWad,
+        OracleConfig memory oc,
+        uint24 fee,
+        int24 spacing
+    ) internal returns (address oracle, PoolKey memory pool, uint160 sqrtPriceX96) {
         bytes memory init = abi.encodePacked(
             vm.getCode("src/oracle/UnderlyingOracleHook.sol:UnderlyingOracleHook"),
             abi.encode(
                 d.poolManager,
                 d.demoUsdc,
-                Currency.wrap(d.demoWeth),
+                Currency.wrap(token),
                 oc.gridSeconds,
                 oc.nWindows,
                 oc.minWindows,
@@ -141,44 +194,58 @@ contract Deploy is SchedulerPair {
                 d.deployer
             )
         );
-        (bytes32 salt, address oracle) = _mineHookSalt(ORACLE_FLAGS, init);
+        bytes32 salt;
+        (salt, oracle) = _mineHookSalt(ORACLE_FLAGS, init);
         _create2(salt, init, oracle);
-        d.underlyingOracle = oracle;
 
-        bool wethIs0 = d.demoWeth < d.demoUsdc;
-        (address c0, address c1) = wethIs0 ? (d.demoWeth, d.demoUsdc) : (d.demoUsdc, d.demoWeth);
-        d.underlyingPool = PoolKey(Currency.wrap(c0), Currency.wrap(c1), fee, spacing, IHooks(oracle));
-        d.sqrtPriceX96 = _sqrtPriceX96(d.ethPriceWad, wethIs0);
+        bool tokenIs0 = token < d.demoUsdc;
+        (address c0, address c1) = tokenIs0 ? (token, d.demoUsdc) : (d.demoUsdc, token);
+        pool = PoolKey(Currency.wrap(c0), Currency.wrap(c1), fee, spacing, IHooks(oracle));
+        sqrtPriceX96 = _sqrtPriceX96(priceWad, tokenIs0);
         // The oracle binds only a pool initialised by its owner, so this call must come from the deployer
-        IPoolManager(d.poolManager).initialize(d.underlyingPool, d.sqrtPriceX96);
-
-        d.priceSteerer = deployCode("src/demo/PriceSteerer.sol:PriceSteerer", abi.encode(d.poolManager, d.deployer));
-        IDemoToken(d.demoWeth).setMinter(d.priceSteerer, true);
-        IDemoToken(d.demoUsdc).setMinter(d.priceSteerer, true);
-        IPriceSteerer(d.priceSteerer).addLiquidityFullRange(d.underlyingPool, d.liquidity);
+        IPoolManager(d.poolManager).initialize(pool, sqrtPriceX96);
     }
 
-    function _deployPredictionHook(Deployment memory d, IMarketScheduler.Config memory sc) internal {
-        (Pair memory p,) = _deployPair(d.deployer, d.poolManager, d.usdc, d.underlyingOracle, sc);
-        d.marketScheduler = p.scheduler;
-        d.predictionHook = p.hook;
+    function _symbols() internal pure returns (string[] memory s) {
+        s = new string[](2);
+        s[0] = ETH;
+        s[1] = SOL;
     }
 
-    function _verify(Deployment memory d, OracleConfig memory oc, IMarketScheduler.Config memory sc) internal view {
-        _verifyPair(Pair(d.marketScheduler, d.predictionHook), d.poolManager, d.usdc, d.underlyingOracle, sc);
-        require(uint160(d.underlyingOracle) & Hooks.ALL_HOOK_MASK == ORACLE_FLAGS, "oracle hook flags");
-        require(PoolId.unwrap(IOracleHookView(d.underlyingOracle).poolId()) == PoolId.unwrap(_poolId(d.underlyingPool)), "oracle not bound");
-        require(IOracleHookView(d.underlyingOracle).owner() == d.deployer, "oracle owner");
+    function _oracles(Deployment memory d) internal pure returns (address[] memory o) {
+        o = new address[](2);
+        o[0] = d.underlyingOracle;
+        o[1] = d.sol.oracle;
+    }
+
+    function _verify(Deployment memory d, OracleConfig memory oc, IMarketGatekeeper.Track[] memory tracks)
+        internal
+        view
+    {
+        _verifyTracks(Tracks(d.marketGatekeeper, d.predictionHook, d.marketSchedulers), d.poolManager, d.usdc, tracks);
+        _verifyOracle(d, _ethUnderlying(d), d.ethPriceWad, oc);
+        if (d.sol.oracle != address(0)) _verifyOracle(d, d.sol, d.solPriceWad, oc);
         require(IPriceSteerer(d.priceSteerer).owner() == d.deployer, "steerer owner");
-        int256 lnSpot = IUnderlyingOracle(d.underlyingOracle).lnSpotSoBWad();
-        int256 diff = lnSpot - F.lnWad(int256(d.ethPriceWad));
-        require(diff < 1e12 && diff > -1e12, "oracle spot differs from ETH_PRICE_USD");
-        (uint256 v, bool warm) = IUnderlyingOracle(d.underlyingOracle).varianceE36();
-        require(!warm && v == oc.fallbackVarE36, "oracle should start on the fallback variance");
     }
 
-    function _poolId(PoolKey memory k) internal pure returns (PoolId) {
-        return PoolId.wrap(keccak256(abi.encode(k)));
+    function _verifyOracle(Deployment memory d, Underlying memory u, uint256 priceWad, OracleConfig memory oc)
+        internal
+        view
+    {
+        require(uint160(u.oracle) & Hooks.ALL_HOOK_MASK == ORACLE_FLAGS, string.concat(u.symbol, " oracle hook flags"));
+        require(
+            PoolId.unwrap(IOracleHookView(u.oracle).poolId()) == PoolId.unwrap(_poolId(u.pool)),
+            string.concat(u.symbol, " oracle not bound")
+        );
+        require(IOracleHookView(u.oracle).owner() == d.deployer, string.concat(u.symbol, " oracle owner"));
+        int256 diff = IUnderlyingOracle(u.oracle).lnSpotSoBWad() - F.lnWad(int256(priceWad));
+        require(diff < 1e12 && diff > -1e12, string.concat(u.symbol, " oracle spot differs from ", u.symbol, "_PRICE_USD"));
+        (uint256 v, bool warm) = IUnderlyingOracle(u.oracle).varianceE36();
+        require(!warm && v == oc.fallbackVarE36, string.concat(u.symbol, " oracle should start on the fallback variance"));
+    }
+
+    function _ethUnderlying(Deployment memory d) internal pure returns (Underlying memory) {
+        return Underlying(ETH, d.demoWeth, d.underlyingOracle, d.underlyingPool);
     }
 
     /* Output */
@@ -201,7 +268,8 @@ contract Deploy is SchedulerPair {
         vm.serializeAddress(o, "multicall3", MULTICALL3);
         vm.serializeAddress(o, "usdc", d.usdc);
         vm.serializeAddress(o, "predictionHook", d.predictionHook);
-        vm.serializeAddress(o, "marketScheduler", d.marketScheduler);
+        vm.serializeAddress(o, "marketGatekeeper", d.marketGatekeeper);
+        vm.serializeAddress(o, "marketSchedulers", d.marketSchedulers);
         vm.serializeAddress(o, "underlyingOracle", d.underlyingOracle);
         vm.serializeAddress(o, "priceSteerer", d.priceSteerer);
         vm.serializeAddress(o, "demoWeth", d.demoWeth);
@@ -211,7 +279,7 @@ contract Deploy is SchedulerPair {
         vm.serializeString(o, "initialEthPriceUsd", _formatUnits(d.ethPriceWad, 18, 2));
         vm.serializeString(o, "initialSqrtPriceX96", vm.toString(d.sqrtPriceX96));
         vm.serializeString(o, "demoLiquidity", vm.toString(d.liquidity));
-        string memory json = vm.serializeString(o, "oracleParams", _oracleJson(oc));
+        string memory json = _withUnderlyings(vm.serializeString(o, "oracleParams", _oracleJson(oc)), _list(d));
 
         string memory path = _deploymentsPath();
         if (_isDryRun()) path = string.concat(vm.replace(path, ".json", ""), ".dry-run.json");
@@ -225,11 +293,24 @@ contract Deploy is SchedulerPair {
         _log("demoUsdc (dUSDC)", d.demoUsdc);
         _log("underlyingOracle", d.underlyingOracle);
         _log("priceSteerer", d.priceSteerer);
-        _log("predictionHook", d.predictionHook);
-        _log("marketScheduler", d.marketScheduler);
         _log("underlying pool", vm.toString(PoolId.unwrap(_poolId(d.underlyingPool))));
         _log("initial ETH price", _formatUnits(d.ethPriceWad, 18, 2));
+        if (d.sol.oracle != address(0)) {
+            _log("demo SOL (dSOL)", d.sol.token);
+            _log("SOL oracle", d.sol.oracle);
+            _log("SOL pool", vm.toString(PoolId.unwrap(_poolId(d.sol.pool))));
+            _log("initial SOL price", _formatUnits(d.solPriceWad, 18, 2));
+        }
+        _log("predictionHook", d.predictionHook);
+        _log("marketGatekeeper", d.marketGatekeeper);
         _log("written", path);
+    }
+
+    /// @dev The `underlyings` list, ETH first
+    function _list(Deployment memory d) internal pure returns (Underlying[] memory list) {
+        list = new Underlying[](d.sol.oracle == address(0) ? 1 : 2);
+        list[0] = _ethUnderlying(d);
+        if (list.length == 2) list[1] = d.sol;
     }
 
     function _poolJson(PoolKey memory k) internal returns (string memory) {

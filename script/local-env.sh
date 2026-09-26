@@ -3,14 +3,14 @@
 #
 #   1. anvil --fork-url $FORK_URL --block-time 1 --port $LOCAL_PORT (log and pid in deployments/.run/local/)
 #   2. gives the deployer and local keeper and mirror accounts ETH, and the deployer Circle USDC (FiatToken balance slot)
-#   3. forge script Deploy (at the live ETH price, with the MarketScheduler that owns the hook) and Fund ($FUND_USDC
-#      into the hook vault) -> deployments/local.json
+#   3. forge script Deploy (ETH and SOL oracle stacks at the live prices, the MarketGatekeeper with its four track
+#      schedulers and the hook it owns) and Fund ($FUND_USDC into the hook vault) -> deployments/local.json
 #   4. hands the PriceSteerer to the local mirror key, then starts the mirror and the keeper, which calls open()
 #
 # Stop everything with script/local-env-stop.sh. Nothing is sent to the real network: every transaction goes to anvil.
-# Settings: LOCAL_PORT (8545), FORK_URL, FORK_BLOCK, FUND_USDC (500), DEPLOYER_USDC (10000), ETH_PRICE_USD (live
-# Coinbase/Kraken price, else 2700), START_BOTS (1). The scheduler's SCHEDULER_*, MARKET_* and QUOTE_* settings pass
-# through to Deploy (docs/md/RUNBOOK.md section 3).
+# Settings: LOCAL_PORT (8545), FORK_URL, FORK_BLOCK, FUND_USDC (500), DEPLOYER_USDC (10000), ETH_PRICE_USD and
+# SOL_PRICE_USD (live Coinbase/Kraken prices, else 2700 and 150), START_BOTS (1). TRACKS_ETH_ONLY=1 and the per-track
+# TRACK_<TICKER>_* settings pass through to Deploy (script/base/TrackSet.sol).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -122,14 +122,26 @@ fi
 [[ "$PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || PRICE=2700
 log "initial ETH price $PRICE USD"
 
+SOL_PRICE="${SOL_PRICE_USD:-}"
+if [[ -z "$SOL_PRICE" ]]; then
+  SOL_PRICE="$(curl -fsS -m 5 https://api.coinbase.com/v2/prices/SOL-USD/spot 2>/dev/null |
+    sed -nE 's/.*"amount":"([0-9]+(\.[0-9]+)?)".*/\1/p')" || true
+fi
+if [[ -z "$SOL_PRICE" ]]; then
+  SOL_PRICE="$(curl -fsS -m 5 'https://api.kraken.com/0/public/Ticker?pair=SOLUSD' 2>/dev/null |
+    sed -nE 's/.*"c":\["([0-9]+(\.[0-9]+)?)".*/\1/p')" || true
+fi
+[[ "$SOL_PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || SOL_PRICE=150
+log "initial SOL price $SOL_PRICE USD"
+
 log "forge build (log: $RUN/build.log)"
 (cd "$ROOT" && forge build) >"$RUN/build.log" 2>&1 || die "forge build failed, see $RUN/build.log"
 
 log "deploying (log: $RUN/deploy.log)"
 (
   cd "$ROOT"
-  NETWORK=local DEPLOYMENTS_FILE='' DEPLOYMENTS_RPC_URL="$RPC" ETH_PRICE_USD="$PRICE" KEEPER_ADDRESS="$KEEPER" \
-    FOUNDRY_BROADCAST="$RUN/broadcast" forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC" --broadcast
+  NETWORK=local DEPLOYMENTS_FILE='' DEPLOYMENTS_RPC_URL="$RPC" ETH_PRICE_USD="$PRICE" SOL_PRICE_USD="$SOL_PRICE" \
+    KEEPER_ADDRESS="$KEEPER" FOUNDRY_BROADCAST="$RUN/broadcast" forge script script/Deploy.s.sol:Deploy --rpc-url "$RPC" --broadcast
 ) >"$RUN/deploy.log" 2>&1 || die "Deploy failed, see $RUN/deploy.log"
 [[ -f "$DEPLOYMENTS" ]] || die "Deploy did not write $DEPLOYMENTS"
 [[ "$(json deployer | tr 'A-F' 'a-f')" == "$(echo "$DEPLOYER" | tr 'A-F' 'a-f')" ]] ||
@@ -144,16 +156,21 @@ log "funding the vault with $FUND_USDC USDC (log: $RUN/fund.log)"
 
 HOOK="$(json predictionHook)"
 IDLE="$(cast call "$HOOK" "vaultIdle()(uint256)" --rpc-url "$RPC" | awk '{print $1}')"
-SCHEDULER="$(json marketScheduler)"
-# config() is (period, tenor, window, cutoffBuffer, nSamples, (quote), maxBudget, minBudget, ticker)
-SCHEDULER_CONFIG="$(cast call "$SCHEDULER" \
-  "config()((uint32,uint32,uint32,uint32,uint32,(uint64,uint64,uint128,uint128,uint64),uint256,uint256,string))" \
-  --rpc-url "$RPC")" || die "MarketScheduler config() read failed"
-read -r PERIOD TENOR _ _ _ MAX_BUDGET MIN_BUDGET _ < <(
-  sed -E 's/ \[[^]]*\]//g; s/, \([^()]*\)//' <<<"$SCHEDULER_CONFIG" | tr -d '()"' | tr ',' ' '
-)
+GATEKEEPER="$(json marketGatekeeper)"
+TRACKS=""
+for SCHEDULER in $(node -e 'console.log(require(process.argv[1]).marketSchedulers.join(" "))' "$DEPLOYMENTS"); do
+  # config() is (period, tenor, window, cutoffBuffer, nSamples, (quote), maxBudget, minBudget, ticker)
+  SCHEDULER_CONFIG="$(cast call "$SCHEDULER" \
+    "config()((uint32,uint32,uint32,uint32,uint32,(uint64,uint64,uint128,uint128,uint64),uint256,uint256,string))" \
+    --rpc-url "$RPC")" || die "MarketScheduler $SCHEDULER config() read failed"
+  read -r PERIOD TENOR _ _ _ MAX_BUDGET MIN_BUDGET TICKER < <(
+    sed -E 's/ \[[^]]*\]//g; s/, \([^()]*\)//' <<<"$SCHEDULER_CONFIG" | tr -d '()"' | tr ',' ' '
+  )
+  TRACKS+="$(printf '  %-17s %s, a market every %s s expiring %s s after its slot starts, budget %s to %s USDC' \
+    "$TICKER" "$SCHEDULER" "$PERIOD" "$TENOR" "$(usdc "$MIN_BUDGET")" "$(usdc "$MAX_BUDGET")")"$'\n'
+done
 
-# The mirror gets its own signer so deployer-signed scripts (make market-local) never race it for nonces
+# The mirror gets its own signer so deployer-signed scripts never race it for nonces
 STEERER="$(json priceSteerer)"
 cast rpc anvil_impersonateAccount "$DEPLOYER" --rpc-url "$RPC" >/dev/null
 cast send "$STEERER" "transferOwnership(address)" "$MIRROR" --unlocked --from "$DEPLOYER" --rpc-url "$RPC" >/dev/null
@@ -178,8 +195,10 @@ Local environment is up
   RPC               $RPC (chain 1301, anvil pid $(cat "$RUN/anvil.pid"), 1 s blocks)
   deployments       $DEPLOYMENTS
   PredictionHook    $HOOK (vault idle $(usdc "$IDLE") USDC)
-  MarketScheduler   $SCHEDULER (owns the hook, no admin, open() is permissionless)
-  UnderlyingOracle  $(json underlyingOracle)
+  MarketGatekeeper  $GATEKEEPER (owns the hook, no admin, forwards createMarket from its schedulers only)
+  UnderlyingOracle  $(json underlyingOracle) (ETH)$(node -e '
+    const u = (require(process.argv[1]).underlyings || []).find((x) => x.symbol === "SOL");
+    if (u) console.log(", SOL at " + u.oracle);' "$DEPLOYMENTS")
   PriceSteerer      $(json priceSteerer)
   demo WETH, USDC   $(json demoWeth), $(json demoUsdc)
   deployer          $DEPLOYER (oracle owner, LP)
@@ -187,8 +206,8 @@ Local environment is up
   mirror            $MIRROR (local-only key, PriceSteerer owner)
   logs              $RUN/{anvil,deploy,fund,mirror,keeper}.log
 
-The keeper calls the scheduler's open() once per $PERIOD s slot of block time. Each market expires $TENOR s after its
-slot starts, with a budget of min($(usdc "$MAX_BUDGET") USDC, vault idle / 2), and open() refuses below $(usdc "$MIN_BUDGET") USDC.
+Tracks (the keeper calls each scheduler's permissionless open() once per slot of block time, budget min(max, idle / 2))
+${TRACKS}
   script/bots.sh status local     bot state and last log lines
   script/bots.sh logs local       follow the bot logs
   make rehearse                   scripted Alice/Bob demo through UniversalRouter 2.0
