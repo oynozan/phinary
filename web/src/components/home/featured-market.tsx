@@ -49,8 +49,8 @@ function FeaturedCard({ market: m }: { market: Market }) {
         <section aria-label="Featured market" className={CARD}>
             <motion.div
                 key={m.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ y: 6 }}
+                animate={{ y: 0 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
             >
                 <div className={TOP}>

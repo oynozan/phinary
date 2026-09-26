@@ -80,9 +80,9 @@ export function PositionPanel({ market, onSell }: { market: Market; onSell: (sid
                 <motion.section
                     key="position"
                     aria-labelledby="position-heading"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
+                    initial={{ y: 8 }}
+                    animate={{ y: 0 }}
+                    exit={{ y: 8 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                 >
                     <Panel flush className="divide-y">

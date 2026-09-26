@@ -17,8 +17,7 @@ export function VaultHeading({ vault }: { vault: VaultState | undefined }) {
             {vault ? (
                 <>
                     <Money value={vault.navMinus} dimCents />
-                    <span aria-hidden className="h-0.5 w-5 shrink-0 rounded-full bg-primary sm:w-9" />
-                    <span className="sr-only"> to </span>
+                    <span className="font-secondary text-xl text-muted-foreground sm:text-3xl">to</span>
                     <Money value={vault.navPlus} dimCents />
                 </>
             ) : (
