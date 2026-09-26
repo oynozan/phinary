@@ -26,6 +26,7 @@ export const marketSchedulerAbi = parseAbi([
   "function lastSlot() view returns (uint256)",
   "function hook() view returns (address)",
   "function oracle() view returns (address)",
+  "function config() view returns ((uint32 period, uint32 tenor, uint32 window, uint32 cutoffBuffer, uint32 nSamples, (uint64 h0Wad, uint64 gammaSWad, uint128 lambdaWad, uint128 qEpochMax, uint64 pMinWad) quote, uint256 maxBudget, uint256 minBudget, string ticker) c)",
   "error AlreadyOpened(uint256 slot)",
   "error InsufficientIdle(uint256 budget, uint256 minBudget)",
   "error InvalidConfig()",

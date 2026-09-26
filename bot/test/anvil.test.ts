@@ -18,7 +18,7 @@ import {
 import { marketSchedulerAbi, predictionHookAbi } from "../src/abi.ts";
 import { makeClients, readSlot0, type Clients } from "../src/chain.ts";
 import { loadMirrorConfig } from "../src/config.ts";
-import { invalidAfterFor, isAlreadyOpened, Keeper, keeperTick } from "../src/keeper.ts";
+import { invalidAfterFor, isAlreadyOpened, Keeper, keeperTick, schedulerPeriodFor } from "../src/keeper.ts";
 import { createLogger } from "../src/log.ts";
 import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from "../src/market.ts";
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
@@ -188,6 +188,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     const scheduler = await deploy(c, a.scheduler, [hook, oracle, CONFIG]);
     assert.equal(scheduler, predicted, "scheduler landed at the predicted nonce address");
     assert.equal(await read<Address>(c, hook, a.hook.abi, "owner"), scheduler, "hook owner is the scheduler");
+    assert.equal(await schedulerPeriodFor(c.publicClient, scheduler, 60), 1, "the keeper reads the scheduler's own period");
 
     const keeper = new Keeper({
       clients: c,

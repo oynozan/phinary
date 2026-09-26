@@ -53,11 +53,34 @@ export function isRevert(e: unknown): boolean {
   return e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError) !== null;
 }
 
-/** True when a simulated `open()` reverted because this slot is already open (someone else's call landed first). */
-export function isAlreadyOpened(e: unknown): boolean {
-  if (!(e instanceof BaseError)) return false;
+/** The slot of a simulated `open()` that reverted AlreadyOpened, or undefined for any other failure */
+export function alreadyOpenedSlot(e: unknown): bigint | undefined {
+  if (!(e instanceof BaseError)) return undefined;
   const revert = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
-  return revert?.data?.errorName === "AlreadyOpened";
+  if (revert?.data?.errorName !== "AlreadyOpened") return undefined;
+  const [slot] = revert.data.args ?? [];
+  return typeof slot === "bigint" ? slot : undefined;
+}
+
+/** True when a simulated `open()` reverted because its slot is already open */
+export function isAlreadyOpened(e: unknown): boolean {
+  return alreadyOpenedSlot(e) !== undefined;
+}
+
+/** The slot a create due at `wallSec` targets, the later of the wall clock's and the latest block's */
+export function targetSlot(chainNow: bigint, wallSec: number, periodSec: number): bigint {
+  const now = BigInt(wallSec) > chainNow ? BigInt(wallSec) : chainNow;
+  return now / BigInt(periodSec);
+}
+
+/** The scheduler's own slot length, or `configured` when its config cannot be read */
+export async function schedulerPeriodFor(publicClient: PublicClient, scheduler: Address, configured: number): Promise<number> {
+  try {
+    const c = await publicClient.readContract({ address: scheduler, abi: marketSchedulerAbi, functionName: "config" });
+    return Number(c.period);
+  } catch {
+    return configured;
+  }
 }
 
 /** Seconds after expiry from which settleInvalid can succeed: past the hook's GRACE, and at least `configured`. */
@@ -228,24 +251,23 @@ export class Keeper {
     }
   }
 
-  /**
-   * Calls the scheduler's permissionless `open()` for the current slot. Returns the opened market's id, if known.
-   * `onSubmitted` runs once the transaction is sent (or simulated in a dry run); `AlreadyOpened` counts as
-   * submitted too, since the slot is done either way (another caller's `open()` landed first) and there is
-   * nothing to retry until the next one. Any other failure leaves `onSubmitted` uncalled, so the caller can retry.
-   */
-  async createMarket(now: bigint, onSubmitted?: () => void): Promise<bigint | undefined> {
+  /** Calls `open()` and returns the market id, `onSubmitted` also runs on AlreadyOpened for the targeted slot or later */
+  async createMarket(now: bigint, onSubmitted?: () => void, wallSec = Math.floor(Date.now() / 1000)): Promise<bigint | undefined> {
     const { log, scheduler } = this.opts;
     let outcome: { result: unknown; hash?: Hash; receipt?: TransactionReceipt };
     try {
       outcome = await this.send(scheduler, marketSchedulerAbi, { functionName: "open", args: [] }, onSubmitted);
     } catch (e) {
-      if (isAlreadyOpened(e)) {
-        log.debug("scheduler slot already opened, nothing to do", { now });
+      const opened = alreadyOpenedSlot(e);
+      if (opened === undefined) throw e;
+      const target = targetSlot(now, wallSec, this.opts.periodSec);
+      if (opened >= target) {
+        log.debug("scheduler slot already opened, nothing to do", { now, slot: opened });
         onSubmitted?.();
-        return undefined;
+      } else {
+        log.debug("latest block is still in an earlier slot, retrying", { now, opened, target });
       }
-      throw e;
+      return undefined;
     }
     const { result, hash, receipt } = outcome;
     let id = typeof result === "bigint" ? result : undefined;
@@ -289,18 +311,18 @@ export class Keeper {
   }
 }
 
-/**
- * One poll: settle and sweep, then open the period's market if due by calling the scheduler. A call that fails
- * before its transaction is sent (RPC error, a revert other than AlreadyOpened) is retried on the next poll.
- */
-export async function keeperTick(keeper: Keeper, cfg: Pick<KeeperConfig, "create" | "settle">): Promise<void> {
+/** Settles and sweeps, then opens the due slot's market, and a call that fails before sending retries next poll */
+export async function keeperTick(
+  keeper: Keeper,
+  cfg: Pick<KeeperConfig, "create" | "settle">,
+  wallSec = Math.floor(Date.now() / 1000),
+): Promise<void> {
   const { publicClient } = keeper.opts.clients;
   await keeper.refresh();
   if (cfg.settle) await keeper.settleAndSweep((await publicClient.getBlock({ blockTag: "latest" })).timestamp);
-  const wall = Math.floor(Date.now() / 1000);
-  if (cfg.create && keeper.isCreateDue(wall)) {
+  if (cfg.create && keeper.isCreateDue(wallSec)) {
     const block = await publicClient.getBlock({ blockTag: "latest" });
-    await keeper.createMarket(block.timestamp, () => keeper.scheduleNextCreate(wall));
+    await keeper.createMarket(block.timestamp, () => keeper.scheduleNextCreate(wallSec), wallSec);
   }
 }
 
@@ -313,11 +335,18 @@ async function main(): Promise<void> {
   const hook = requireAddress(cfg.deployments, "predictionHook");
   const scheduler = requireAddress(cfg.deployments, "marketScheduler");
   const invalidAfterSec = await invalidAfterFor(clients.publicClient, hook, cfg.invalidAfterSec);
+  const periodSec = await schedulerPeriodFor(clients.publicClient, scheduler, cfg.periodSec);
+  if (periodSec !== cfg.periodSec) {
+    log.warn("KEEPER_PERIOD_SEC differs from the scheduler's period, following the scheduler", {
+      configured: cfg.periodSec,
+      scheduler: periodSec,
+    });
+  }
   const keeper = new Keeper({
     clients,
     hook,
     scheduler,
-    periodSec: cfg.periodSec,
+    periodSec,
     alignToPeriod: cfg.alignToPeriod,
     scanBack: cfg.scanBack,
     invalidAfterSec,
@@ -330,7 +359,7 @@ async function main(): Promise<void> {
     keyFrom: cfg.privateKey?.source,
     hook,
     scheduler,
-    periodSec: cfg.periodSec,
+    periodSec,
     invalidAfterSec,
     create: cfg.create,
     settle: cfg.settle,
