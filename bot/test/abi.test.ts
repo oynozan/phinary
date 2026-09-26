@@ -7,6 +7,8 @@ import {
   predictionHookAbi,
   predictionHookAdminAbi,
   priceSteererAbi,
+  sealedPoolOracleAbi,
+  sealedPoolOracleImplAbi,
   underlyingOracleAbi,
   underlyingOracleHookAbi,
 } from "../src/abi.ts";
@@ -46,6 +48,8 @@ test("TypeScript ABIs match the Solidity sources (forge artifacts)", (t) => {
     assertSubset(priceSteererAbi, "PriceSteerer.sol", "PriceSteerer"),
     assertSubset(poolManagerAbi, "PoolManager.sol", "PoolManager"),
     assertSubset(marketSchedulerAbi, "IMarketScheduler.sol", "IMarketScheduler"),
+    assertSubset(sealedPoolOracleAbi, "ISealedPoolOracle.sol", "ISealedPoolOracle"),
+    assertSubset(sealedPoolOracleImplAbi, "SealedPoolOracle.sol", "SealedPoolOracle"),
   ];
   if (checked.some((c) => !c)) t.skip("run `forge build` in the repo root to check every ABI");
 });

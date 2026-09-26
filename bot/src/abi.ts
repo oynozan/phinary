@@ -69,4 +69,39 @@ export const priceSteererAbi = parseAbi([
 
 export const poolManagerAbi = parseAbi(["function extsload(bytes32 slot) view returns (bytes32)"]);
 
+/** Subset of src/interfaces/ISealedPoolOracle.sol used by the sealed bot */
+export const sealedPoolOracleAbi = parseAbi([
+  "struct BlockProof { bytes header; bytes[] accountProof; bytes[] slotProof; }",
+  "function poke() returns (bool sealedRun)",
+  "function prove(BlockProof p)",
+  "function proveMany(BlockProof[] ps)",
+  "function frontier() view returns (uint256)",
+  "function snapshot() view returns (uint64 blockNumber, uint160 sqrtPriceX96, uint256 fg0, uint256 fg1, uint128 liquidity)",
+  "function queueLength() view returns (uint256)",
+  "function blockTimeOf(uint256 n) view returns (uint32)",
+  "function oldestObservationTime() view returns (uint32)",
+  "error NotNextBlock(uint256 expected, uint256 got)",
+  "error BadTimestamp(uint256 expected, uint256 got)",
+  "error StaleSpot(uint256 frontier, uint256 blockNumber)",
+  "error NotStarted()",
+  "error InvalidPool()",
+  "event Sealed(uint256 fromBlock, uint256 toBlock, int24 normTick)",
+  "event Queued(uint256 fromBlock, uint256 toBlock)",
+  "event Proven(uint256 blockNumber, int24 normTick)",
+]);
+
+/** SealedPoolOracle outside the interface, its pool, the BlockHashes checkpoints and the proof errors */
+export const sealedPoolOracleImplAbi = parseAbi([
+  "function poolManager() view returns (address)",
+  "function poolId() view returns (bytes32)",
+  "function blockHashOf(uint256 n) view returns (bytes32 hash)",
+  "function checkpointHeaders(bytes[] headersNewestFirst)",
+  "error UnknownBlockHash(uint256 n)",
+  "error BadHeader()",
+  "error BadAccountProof()",
+  "error BadStorageProof()",
+  "error BlockTimeOutOfRange(uint256 n)",
+  "event HeadersCheckpointed(uint256 oldest, uint256 newest)",
+]);
+
 export const MarketStatus = { None: 0, Trading: 1, Settled: 2, Invalid: 3 } as const;

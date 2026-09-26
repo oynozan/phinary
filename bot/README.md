@@ -100,6 +100,24 @@ Log format (values illustrative):
 - Market ids are scanned from `marketCount()` and work whether the hook numbers markets from 0 or 1. On start-up the last
   `KEEPER_SCAN_BACK` markets are picked up, so a restarted keeper settles what it missed.
 
+### Sealed-oracle bot
+
+`npm run sealed` (or `script/bots.sh start <network> sealed`) keeps a `SealedPoolOracle`'s history complete. It needs no
+role: the contract verifies every seal and proof, so a faulty bot can stall the oracle but never corrupt it.
+
+- Every `SEALED_POLL_MS` it pokes once per new block, unless `snapshot()` already comes from the latest block. A poke
+  that finds the pool untouched since the last one seals every block in between.
+- When the frontier is still below the block before its poke, it proves `frontier() + 1` onwards with `proveMany`, up to
+  `SEALED_BATCH` blocks per transaction and 4 transactions per round, then pokes again. While behind it does not wait
+  between rounds.
+- Headers are rebuilt from `eth_getBlockByNumber` (`src/header.ts`, the 21 Isthmus fields) and must hash to the block
+  hash before anything is sent. `eth_getProof` of the PoolManager's `slot0` slot (`src/proof.ts`) must start at the
+  header's state root. Refusals are retried with backoff, then on `SEALED_RPC_FALLBACKS`.
+- A block hash comes from `BLOCKHASH` for 256 blocks, then from EIP-2935 for 8,191. Past those, and 32 blocks early to
+  leave time to land, it first stores the missing hashes with `checkpointHeaders`, walking back from the oldest block a
+  window still serves.
+- Gas is estimated before every transaction; a `proveMany` whose estimate exceeds half the block gas limit is halved.
+
 ## Seeding the underlying pool
 
 The deploy script owns this, but by hand with `cast` it is:
@@ -136,7 +154,12 @@ npm test              # unit tests + an anvil end-to-end test
   `lnWad` against mpmath, parameter building and names, sweep amounts, config and env parsing, feed parsers
   with fallback, and (with a fake RPC client) the keeper's retry of failed market reads and failed creations.
 - `test/abi.test.ts` checks the TypeScript ABIs against the forge artifacts of `IPredictionHook`,
-  `IUnderlyingOracle`, `PriceSteerer` and `PoolManager`.
+  `IUnderlyingOracle`, `PriceSteerer`, `PoolManager`, `ISealedPoolOracle` and `SealedPoolOracle`.
+- `test/header.test.ts` rebuilds the Task 6 fixture header offline and, unless `OFFLINE=1`, 5 recent Unichain mainnet
+  and Sepolia headers from their public RPCs. `test/sealed.test.ts` checks proof building on the same fixture, then on
+  anvil runs the sealed bot against a hookless pool with a swap every 3 blocks, a 300-block outage (caught up through
+  EIP-2935) and the same outage with EIP-2935 blanked (caught up through `checkpointHeaders`), comparing every applied
+  tick with the pool's end-of-block tick.
 - `test/anvil.test.ts` starts anvil, deploys the real `PoolManager`, `DemoToken` and `PriceSteerer`, and runs the
   mirror in both token orderings through a pool hooked by `test/demo/mocks/MockSobHook.sol` (oracle flags, CREATE2-mined
   address), including the `poolKey()` lookup, a pinned-key mismatch and the gas padding. It then drives the keeper

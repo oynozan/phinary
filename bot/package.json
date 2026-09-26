@@ -2,7 +2,7 @@
   "name": "phinary-bot",
   "version": "0.1.0",
   "private": true,
-  "description": "Demo bots for the Unichain Sepolia deployment: ETH price mirror and 1-minute market keeper",
+  "description": "Demo bots for the Unichain Sepolia deployment (ETH price mirror, 1-minute market keeper) and the sealed-oracle poker and prover",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -10,6 +10,7 @@
   "scripts": {
     "mirror": "node src/mirror.ts",
     "keeper": "node src/keeper.ts",
+    "sealed": "node src/sealed.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test"

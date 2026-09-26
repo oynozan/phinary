@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   concatHex,
   createTestClient,
   encodeAbiParameters,
-  getAddress,
   getContractAddress,
   http,
   keccak256,
@@ -27,42 +24,8 @@ import { lnStrikeWadFromCents, strikeCentsFromLnSpot, varE36FromAnnualVol } from
 import { formatRational, lnWad, type Rational } from "../src/math.ts";
 import { mirrorTick, setupMirror, steerGasLimit } from "../src/mirror.ts";
 import { orientationFor, sqrtPriceX96FromPrice, priceFromSqrtPriceX96, type PoolKey } from "../src/pricing.ts";
+import { ANVIL_KEY, deploy, findAnvil, read, send, startAnvil } from "./helpers/anvil.ts";
 import { loadArtifact, type Artifact } from "./helpers/artifacts.ts";
-
-/** Anvil's first default account (public test key). */
-const ANVIL_KEY: Hex = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-
-function findAnvil(): string | undefined {
-  const dirs = [process.env.ANVIL_BIN ? resolve(process.env.ANVIL_BIN, "..") : "", resolve(homedir(), ".foundry", "bin")];
-  dirs.push(...(process.env.PATH ?? "").split(":"));
-  return dirs.map((d) => resolve(d, "anvil")).find((p) => existsSync(p));
-}
-
-function freePort(): Promise<number> {
-  return new Promise((res, rej) => {
-    const srv = createServer();
-    srv.once("error", rej);
-    srv.listen(0, "127.0.0.1", () => {
-      const addr = srv.address();
-      srv.close(() => (typeof addr === "object" && addr ? res(addr.port) : rej(new Error("no port"))));
-    });
-  });
-}
-
-async function waitForRpc(url: string): Promise<void> {
-  for (let i = 0; i < 100; i++) {
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
-      });
-      if (r.ok) return;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error("anvil did not start");
-}
 
 const ARTIFACTS = {
   poolManager: ["PoolManager.sol", "PoolManager"],
@@ -95,23 +58,6 @@ async function deployHook(c: Clients, art: Artifact, args: Hex, flags: bigint): 
   }
 }
 
-async function deploy(c: Clients, art: Artifact, args: readonly unknown[]): Promise<Address> {
-  const hash = await c.walletClient!.deployContract({ abi: art.abi, bytecode: art.bytecode, args } as never);
-  const receipt = await c.publicClient.waitForTransactionReceipt({ hash });
-  assert.ok(receipt.contractAddress);
-  return getAddress(receipt.contractAddress);
-}
-
-async function send(c: Clients, address: Address, abi: Abi, functionName: string, args: readonly unknown[]): Promise<void> {
-  const hash = await c.walletClient!.writeContract({ address, abi, functionName, args } as never);
-  const receipt = await c.publicClient.waitForTransactionReceipt({ hash });
-  assert.equal(receipt.status, "success", functionName);
-}
-
-function read<T>(c: Clients, address: Address, abi: Abi, functionName: string, args: readonly unknown[] = []): Promise<T> {
-  return c.publicClient.readContract({ address, abi, functionName, args } as never) as Promise<T>;
-}
-
 const price = (s: string): Rational => {
   const [i, f = ""] = s.split(".");
   return { num: BigInt(`${i}${f}`), den: 10n ** BigInt(f.length) };
@@ -128,11 +74,7 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     return;
   }
   const a = arts as Record<keyof typeof ARTIFACTS, Artifact>;
-  const port = await freePort();
-  const proc = spawn(anvil, ["--port", String(port), "--silent", "--disable-code-size-limit"], { stdio: "ignore" });
-  t.after(() => proc.kill());
-  const url = `http://127.0.0.1:${port}`;
-  await waitForRpc(url);
+  const url = await startAnvil(t, anvil, ["--disable-code-size-limit"]);
 
   const c = makeClients({ rpcUrl: url, chainId: 31337, privateKey: { key: ANVIL_KEY, source: "test" } });
   const me = c.account!.address;

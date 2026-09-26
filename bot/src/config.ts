@@ -50,6 +50,7 @@ const ADDRESS_KEYS = [
   "priceSteerer",
   "demoWeth",
   "demoUsdc",
+  "sealedOracle",
 ] as const;
 
 export type AddressKey = (typeof ADDRESS_KEYS)[number];
@@ -67,6 +68,7 @@ const ADDRESS_ENV: Record<AddressKey, string> = {
   priceSteerer: "PRICE_STEERER",
   demoWeth: "DEMO_WETH",
   demoUsdc: "DEMO_USDC",
+  sealedOracle: "SEALED_ORACLE",
 };
 
 export type Deployments = Record<AddressKey, Address> & {
@@ -334,5 +336,33 @@ export function loadKeeperConfig(env: Env = process.env): KeeperConfig {
     settle: envBool(env, "KEEPER_SETTLE", true),
     scanBack: envInt(env, "KEEPER_SCAN_BACK", 50, 1),
     invalidAfterSec: envInt(env, "KEEPER_INVALID_AFTER_SEC", 3601, 0),
+  };
+}
+
+export interface SealedConfig extends CommonConfig {
+  /** SEALED_ORACLE, else the deployments file's `sealedOracle` */
+  oracle: Address;
+  /** Most proofs per proveMany, each about 0.72M gas */
+  batch: number;
+  pollMs: number;
+  /** Read-only RPCs tried after RPC_URL for headers and proofs */
+  fallbackRpcUrls: string[];
+}
+
+export function loadSealedConfig(env: Env = process.env): SealedConfig {
+  const common = loadCommon(env, ["SEALED_KEY", "KEEPER_PRIVATE_KEY"]);
+  const fallbackRpcUrls = envString(env, "SEALED_RPC_FALLBACKS", "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+  for (const url of fallbackRpcUrls) {
+    if (!/^https?:\/\//.test(url)) throw new Error("SEALED_RPC_FALLBACKS must be comma-separated http(s) URLs");
+  }
+  return {
+    ...common,
+    oracle: requireAddress(common.deployments, "sealedOracle"),
+    batch: envInt(env, "SEALED_BATCH", 16, 1, 64),
+    pollMs: envInt(env, "SEALED_POLL_MS", 500, 100),
+    fallbackRpcUrls,
   };
 }

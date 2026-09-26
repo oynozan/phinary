@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Starts, stops and inspects the demo bots (bot/src/mirror.ts, bot/src/keeper.ts) for one deployments file.
+# Starts, stops and inspects the bots (bot/src/mirror.ts, bot/src/keeper.ts, bot/src/sealed.ts) for one deployments file.
 #
-#   script/bots.sh start  <network> [mirror|keeper|all]   background processes, logs in deployments/.run/<network>/
-#   script/bots.sh stop   <network> [mirror|keeper|all]
+#   script/bots.sh start  <network> [mirror|keeper|sealed|all]   background processes, logs in deployments/.run/<network>/
+#   script/bots.sh stop   <network> [mirror|keeper|sealed|all]
 #   script/bots.sh status <network>
-#   script/bots.sh logs   <network>                        tail -f both logs
+#   script/bots.sh logs   <network>                               tail -f the logs
 #
-# <network> selects deployments/<network>.json (local, unichain-sepolia). Keys come from the environment or from
-# bot/.env and the repo .env (DEPLOYER_PRIVATE_KEY, MIRROR_PRIVATE_KEY, KEEPER_PRIVATE_KEY); they are never printed.
-# Every other bot setting (RPC_URL, MARKET_BUDGET_USDC, ...) passes through from the environment, see bot/.env.example.
+# <network> selects deployments/<network>.json (local, unichain-sepolia). `all` is the demo pair, mirror and keeper; the
+# sealed-oracle poker and prover starts only on its own, since it needs SEALED_ORACLE (or `sealedOracle` in the file).
+# Keys come from the environment or from bot/.env and the repo .env (DEPLOYER_PRIVATE_KEY, MIRROR_PRIVATE_KEY,
+# KEEPER_PRIVATE_KEY, SEALED_KEY); they are never printed. Every other bot setting (RPC_URL, MARKET_BUDGET_USDC,
+# SEALED_BATCH, ...) passes through from the environment, see bot/.env.example.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,12 +19,12 @@ NETWORK="${2:-}"
 WHICH="${3:-all}"
 
 usage() {
-  sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
 [[ -n "$CMD" && -n "$NETWORK" ]] || usage
-case "$WHICH" in mirror | keeper) BOTS=("$WHICH") ;; all) BOTS=(mirror keeper) ;; *) usage ;; esac
+case "$WHICH" in mirror | keeper | sealed) BOTS=("$WHICH") ;; all) BOTS=(mirror keeper) ;; *) usage ;; esac
 
 DEPLOYMENTS="$ROOT/deployments/$NETWORK.json"
 RUN="$ROOT/deployments/.run/$NETWORK"
@@ -77,11 +79,20 @@ case "$CMD" in
   start) for b in "${BOTS[@]}"; do start_one "$b"; done ;;
   stop) for b in "${BOTS[@]}"; do stop_one "$b"; done ;;
   status)
-    for b in mirror keeper; do
+    for b in mirror keeper sealed; do
+      # The sealed bot is optional: list it once it has run on this network
+      [[ "$b" != sealed || -f "$RUN/$b.log" || -f "$RUN/$b.pid" ]] || continue
       if pid="$(pid_of "$b")"; then echo "$b running (pid $pid)"; else echo "$b stopped"; fi
       if [[ -f "$RUN/$b.log" ]]; then tail -n 2 "$RUN/$b.log" | sed 's/^/    /'; fi
     done
     ;;
-  logs) tail -n 20 -f "$RUN/mirror.log" "$RUN/keeper.log" ;;
+  logs)
+    LOGS=()
+    for b in mirror keeper sealed; do
+      if [[ -f "$RUN/$b.log" ]]; then LOGS+=("$RUN/$b.log"); fi
+    done
+    ((${#LOGS[@]} > 0)) || { echo "no logs in $RUN" >&2; exit 1; }
+    tail -n 20 -f "${LOGS[@]}"
+    ;;
   *) usage ;;
 esac
