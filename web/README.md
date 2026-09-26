@@ -16,7 +16,7 @@ See [DESIGN.md](DESIGN.md) for the design system.
 
 ## Wallet connection (Privy)
 
-The shared wallet dialog hands off external-wallet connections to Privy. The app
+Every Connect wallet entry opens the Privy modal directly. The app
 uses `useWallets()` and `getEthereumProvider()` to feed the existing viem trading,
 balance, Portfolio and Vault flows. Embedded wallets and authentication signatures
 are not requested by this connection flow.
@@ -26,8 +26,11 @@ Phinary identifiers. Configure allowed web origins for the app/client in the Pri
 dashboard when deploying. Never put a Privy App secret in a `NEXT_PUBLIC_` variable
 or in the web app; this integration does not use one.
 
-The first dialog keeps Phinary branding. Privy's next step owns wallet selection,
-connection approval and mobile/extension handling. `ox@0.8.9` satisfies Privy's
+Privy's modal uses Phinary branding and owns wallet selection, connection approval
+and mobile/extension handling. The connect-only description is supplied through
+the SDK; scoped CSS replaces its generic landing icon/title without changing the
+approval or error screens. SDK 3.45.0 is pinned because these structural style
+overrides must be checked on upgrades. `ox@0.8.9` satisfies Privy's
 optional `permissionless` peer; viem keeps its own `ox@0.14.20`. Do not flatten these
 with `--force` or `--legacy-peer-deps`.
 

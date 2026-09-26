@@ -47,17 +47,19 @@ try {
    await page.setViewportSize({width,height:900});
    await page.goto(base + '/vault');
    await page.locator('.header-wallet').click();
-   const dialog=page.locator('.wallet-dialog');
-   await dialog.waitFor();
-   await page.waitForFunction(() => !document.querySelector('.wallet-option')?.disabled);
-   const bounds=await dialog.boundingBox();
+   const dialog=page.locator('#privy-dialog');
+   await dialog.locator('[id^="headlessui-dialog-panel"]').waitFor();
+   await page.locator('.phinary-privy-intro').waitFor();
+   assert.equal(await page.locator('[role=dialog]').count(),1);
+   assert.equal(await page.locator('.wallet-dialog').count(),0);
+   await page.getByRole('button',{name:'MetaMask',exact:true}).waitFor();
+   const bounds=await dialog.locator('[id^="headlessui-dialog-panel"]').boundingBox();
    assert.ok(bounds.x>=0 && bounds.x+bounds.width<=width);
    await page.screenshot({animations:'disabled',path:`${evidence}/${width}.png`});
    await page.keyboard.press('Escape');
    await dialog.waitFor({state:'hidden'});
  }
  await page.locator('.header-wallet').click();
- await page.getByRole('button',{name:'Connect MetaMask',exact:true}).click();
  await page.getByRole('button',{name:'MetaMask',exact:true}).click();
  await page.locator('.wallet-address').waitFor({timeout:20000}).catch(async error => { console.log((await page.locator('body').innerText()).slice(-1400)); throw error; });
  assert.match(await page.locator('.wallet-address').innerText(),/1111/);
@@ -72,7 +74,7 @@ try {
  const empty=await browser.newPage({viewport:{width:320,height:640}});
  await empty.goto(base + '/portfolio');
  await empty.locator('.header-wallet').click();
- await empty.getByRole('button',{name:'Connect MetaMask',exact:true}).waitFor();
+ await empty.getByRole('button',{name:'MetaMask',exact:true}).waitFor();
  assert.deepEqual(errors,[]);
  console.log('PASS responsive branding, real Privy connection with fixture account, session restoration, account changes, disconnect, no-extension entry');
 } finally {await browser.close();}
