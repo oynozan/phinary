@@ -19,7 +19,7 @@ test("all markets beyond 30 and every core read use the same block", async () =>
  assert.equal(core.userShares, 200n); assert.equal(core.usdc, 9n);
  const exposure = await readVaultExposure(client, config);
  assert.equal(exposure.markets.length, 83); assert.equal(seen.at(-1), 83n);
- assert.equal(exposure.totalValue, 349n); assert.equal(exposure.markets[0].category, "Crypto");
+ assert.equal(exposure.totalValue, 349n); assert.equal(exposure.markets[0].category, "ETH");
 });
 test("wrong chain fails before reading contract values", async () => {
  const client = { getChainId: async () => 1, getBlock: async () => ({ number: 1n, timestamp: 1n }) } as unknown as VaultClient;

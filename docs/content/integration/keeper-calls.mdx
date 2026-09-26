@@ -9,10 +9,13 @@ The keeper bot only calls public functions. Anyone can make the same calls with 
 
 ```sh
 export R=https://unichain-sepolia.drpc.org
-export HOOK=0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8
-export SCHED=0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd
+export HOOK=0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8
+export GATEKEEPER=0x755dBc10AB4b9BFDB8c46939702dC08B8F3e607A
+export SCHED=0x8f1b371e41FeCBb825d0baAB19f906E645C760e0   # the ETH 1-minute track
 export PK=0x...   # any funded wallet; it needs no role
 ```
+
+The other tracks are ETH 15 minutes `0x02f0B250120c817A45C6ba580FE68eB461E0A10e`, SOL 1 minute `0x067180DE54F4a800C88C3dC9EDa8b106f7126b83` and SOL 15 minutes `0x950eEDA8303253b76f0d47f4a3eD33aA7fF54E74`, which is also the order of `cast call $GATEKEEPER "schedulers()(address[])" --rpc-url $R`.
 
 ## Open a market
 
@@ -22,7 +25,13 @@ cast call $SCHED "nextOpenTime()(uint256)" --rpc-url $R
 cast send $SCHED "open()" --rpc-url $R --private-key $PK
 ```
 
-`open()` succeeds for the first caller in each 60-second slot and reverts `AlreadyOpened` for everyone after. `canOpen()` is false when the slot is taken, the vault is too low or the oracle cannot read a price.
+`open()` succeeds for the first caller in each slot (60 s on the 1-minute tracks, 900 s on the 15-minute ones) and reverts `AlreadyOpened` for everyone after. From the slot's deadline, which is when trading would stop, it reverts `TooLate(slot)` instead and that slot stays empty. `canOpen()` is false when the slot is taken or past its deadline, the vault is too low or the oracle cannot read a price.
+
+```sh
+cast call $SCHED "openDeadline(uint256)(uint256)" $(( $(date +%s) / 60 )) --rpc-url $R   # first second of TooLate for the current 1-minute slot
+cast call $SCHED "marketOfSlot(uint256)(uint256)" $(( $(date +%s) / 60 )) --rpc-url $R   # the market that slot opened, 0 if none
+cast call $GATEKEEPER "schedulerOf(uint256)(address)" 245 --rpc-url $R                  # which track opened market 245
+```
 
 ## Read a market
 
@@ -31,7 +40,7 @@ cast call $HOOK "marketCount()(uint256)" --rpc-url $R
 cast call $HOOK "quote(uint256)((bool,uint256,uint256,int256,uint256,uint256,uint256,uint256,uint256))" 245 --rpc-url $R
 ```
 
-A real reading of market 245 on 26 Sep 2026:
+A real reading from 26 Sep 2026, market 245 of the previous hook, a two-minute market:
 
 ```
 (true, 95, 1267523512561158009481075873, 1858520153327, 502154097098530377, 546064386654506839, 458243807542553915, 541756192457446085, 453935613345493161)

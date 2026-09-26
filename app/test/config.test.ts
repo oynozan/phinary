@@ -65,6 +65,14 @@ describe('resolveConfig', () => {
     assert.equal(cfg.contracts.v4Quoter.toLowerCase(), OTHER)
   })
 
+  it('uses the deployment tracks only for the deployment hook', () => {
+    const S1 = '0x8f1b371e41FeCBb825d0baAB19f906E645C760e0'
+    const deployment = { chainId: 1301, predictionHook: HOOK, marketSchedulers: [S1] }
+    assert.deepEqual(resolveConfig({ deployment }).marketSchedulers, [S1])
+    assert.deepEqual(resolveConfig({ deployment, search: `?hook=${HOOK.toLowerCase()}` }).marketSchedulers, [S1])
+    assert.deepEqual(resolveConfig({ deployment, search: `?hook=${OTHER}` }).marketSchedulers, [])
+  })
+
   it('clamps ?markets=', () => {
     assert.equal(resolveConfig({ search: '?markets=500' }).marketLimit, 200)
     assert.equal(resolveConfig({ search: '?markets=abc' }).marketLimit, 24)

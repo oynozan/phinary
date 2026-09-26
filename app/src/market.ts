@@ -1,7 +1,14 @@
-import type { HookQuote, Market, MarketInfo } from './sdk.ts'
+import type { HookQuote, Market, MarketInfo, Track } from './sdk.ts'
 import { MarketStatus, strikeUsdFromLn } from './sdk.ts'
 
 export type Phase = 'upcoming' | 'trading' | 'closing' | 'awaiting' | 'settled' | 'invalid'
+
+/** A market with the asset its oracle prices and the track that opened it */
+export interface AppMarket extends Market {
+  /** Upper-case asset such as "ETH" or "SOL" */
+  asset: string
+  track?: Track
+}
 export type Group = 'open' | 'closed' | 'settled'
 
 type Timing = Pick<MarketInfo, 'openTime' | 'expiry' | 'window' | 'cutoffBuffer' | 'status'>
@@ -73,15 +80,15 @@ export function winnerIsYes(m: Pick<Market, 'info'>): boolean | undefined {
   return m.info.status === MarketStatus.Settled ? m.info.yesWon : undefined
 }
 
-export interface MarketGroups {
-  open: Market[]
-  closed: Market[]
-  settled: Market[]
+export interface MarketGroups<M extends Market = Market> {
+  open: M[]
+  closed: M[]
+  settled: M[]
 }
 
 /** Newest first within each group. */
-export function groupMarkets(markets: readonly Market[], now: number): MarketGroups {
-  const groups: MarketGroups = { open: [], closed: [], settled: [] }
+export function groupMarkets<M extends Market>(markets: readonly M[], now: number): MarketGroups<M> {
+  const groups: MarketGroups<M> = { open: [], closed: [], settled: [] }
   const sorted = [...markets].sort((a, b) => (a.id === b.id ? 0 : a.id > b.id ? -1 : 1))
   for (const m of sorted) {
     groups[groupOf(marketPhase(m.info, now))].push(m)
@@ -97,12 +104,22 @@ export function defaultMarketId(markets: readonly Market[], now: number): bigint
 
 const STATUS_NAMES = ['None', 'Trading', 'Settled', 'Invalid'] as const
 
-export function withInfo(m: Market, info: MarketInfo): Market {
+export function withInfo<M extends Market>(m: M, info: MarketInfo): M {
   return { ...m, info, status: STATUS_NAMES[info.status] ?? 'None' }
 }
 
 /** "ETH above $2,701.35 at 14:31:00?" */
-export function questionText(strike: number, expiryClock: string): string {
+export function questionText(strike: number, expiryClock: string, asset = 'ETH'): string {
   const usd = strike.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
-  return `ETH above ${usd} at ${expiryClock}?`
+  return `${asset} above ${usd} at ${expiryClock}?`
+}
+
+/** "ETH 15m", or just the asset for a market no track claims */
+export function trackName(m: Pick<AppMarket, 'asset' | 'track'>): string {
+  return m.track ? `${m.asset} ${m.track.label}` : m.asset
+}
+
+/** Markets from the same track, or with the same asset when neither has one */
+export function sameTrack(a: Pick<AppMarket, 'asset' | 'track'>, b: Pick<AppMarket, 'asset' | 'track'>): boolean {
+  return a.track || b.track ? a.track?.scheduler === b.track?.scheduler : a.asset === b.asset
 }

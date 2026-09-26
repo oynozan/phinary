@@ -160,7 +160,8 @@ Flags: `BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY | BEFORE_REMOVE_LIQUIDITY | BEF
 
 ### 3.7 Access control
 
-- `owner` (the deployer) sets `keeper`. `createMarket` is callable by owner or keeper.
+- `owner` is immutable and set in the constructor; only the owner may set `keeper`. `createMarket` is callable by owner or keeper.
+- Live, the owner is `MarketGatekeeper`, an ownerless contract with no setter that deployed one `MarketScheduler` per track (ETH, ETH15M, SOL, SOL15M) in its constructor and forwards `createMarket` only from them. It cannot call `setKeeper`, so `keeper` stays `address(0)`. Anyone may call a scheduler's `open()` once per slot until the slot's deadline (`TooLate` after it), and the scheduler's immutable config sets every market parameter. The track set is fixed; changing it means a new gatekeeper, a new hook and a vault migration.
 - Global parameters are only the keeper and owner addresses.
 - Per-market parameters are immutable.
 - There is **no admin override of settlement**.
@@ -172,7 +173,8 @@ Flags: `BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY | BEFORE_REMOVE_LIQUIDITY | BEF
 | Quote | `V4Quoter.quoteExactInputSingle` / `quoteExactOutputSingle` with `PoolKey{currency0, currency1, fee 0, tickSpacing 60, hooks}` |
 | Swap | UniversalRouter 2.0 on chain 1301 (`0xf70536b3bcc1bd1a972dc186a2cf84cc6da6be5d`, **5-field** `ExactInputSingleParams`): commands `0x10` (V4_SWAP) or `0x0a10` (PERMIT2_PERMIT + V4_SWAP), actions `SWAP_EXACT_IN_SINGLE`, `SETTLE_ALL`, `TAKE_ALL` |
 | Market list | `hook.marketCount()`, `hook.marketInfo(id)` (tokens, pool keys, strike, expiry, window, status), `hook.quote(id)` (mid/ask/bid for YES and NO, τ, σ) |
-| Events | `MarketCreated`, `Trade`, `Settled` |
+| Market track | `gatekeeper.schedulerOf(id)` (the scheduler that opened it, 0 if none), each scheduler's `config()` (period, tenor, window, ticker, budgets) and `marketOfSlot(slot)` (a track's recent markets). Symbols match `ticker + "UP"` / `ticker + "DOWN"` exactly, never by prefix or expiry |
+| Events | `MarketCreated`, `Trade`, `MarketSettled` on the hook; `MarketOpened(marketId, slot, caller, budget, strikeCents)` on the track's scheduler, trusted only from addresses in `gatekeeper.schedulers()` |
 
 Chain 1301 addresses (verified in [research/interface-fork/unichain-sepolia.md](research/interface-fork/unichain-sepolia.md)):
 

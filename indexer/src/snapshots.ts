@@ -5,6 +5,7 @@ import { parseAbi } from 'viem'
 
 import { predictionHookAbi } from '../../packages/swap-sdk/src/abi/index.ts'
 import { loadIndexerDeployment } from './deployment.ts'
+import { oracleOf, oraclesOf } from './lib/tracks.ts'
 
 const deployment = loadIndexerDeployment(process.env)
 
@@ -23,31 +24,42 @@ ponder.on('PriceSnapshot:block', async ({ event, context }) => {
     return
   }
 
-  const ethLnWad = await context.client.readContract({
-    address: deployment.oracle,
-    abi: oracleAbi,
-    functionName: 'lnSpotSoBWad',
-  })
+  // Batched reads keep the backfill fast with several tracks open at once
+  const oracles = oraclesOf(openMarkets, deployment.oracle)
+  const [spots, quotes] = await Promise.all([
+    context.client.multicall({
+      multicallAddress: deployment.multicall3,
+      allowFailure: true,
+      contracts: oracles.map((address) => ({ address, abi: oracleAbi, functionName: 'lnSpotSoBWad' }) as const),
+    }),
+    context.client.multicall({
+      multicallAddress: deployment.multicall3,
+      allowFailure: true,
+      contracts: openMarkets.map(
+        (m) => ({ address: deployment.hook, abi: predictionHookAbi, functionName: 'quote', args: [m.id] }) as const,
+      ),
+    }),
+  ])
+  const lnSpot = new Map(oracles.map((oracle, i) => [oracle, spots[i]]))
 
-  for (const m of openMarkets) {
-    const quote = await context.client.readContract({
-      address: deployment.hook,
-      abi: predictionHookAbi,
-      functionName: 'quote',
-      args: [m.id],
-    })
+  for (const [i, m] of openMarkets.entries()) {
+    const spot = lnSpot.get(oracleOf(m, deployment.oracle))
+    const quote = quotes[i]
+    if (spot?.status !== 'success' || quote?.status !== 'success') {
+      continue
+    }
 
     await context.db.insert(priceSnapshot).values({
       id: `${m.id}-${event.block.number}`,
       marketId: m.id,
       blockNumber: event.block.number,
       timestamp: ts,
-      midUp: quote.midYes,
-      askUp: quote.askYes,
-      bidUp: quote.bidYes,
-      ethLnWad,
-      varE36: quote.varE36,
-      tau: quote.tau,
+      midUp: quote.result.midYes,
+      askUp: quote.result.askYes,
+      bidUp: quote.result.bidYes,
+      ethLnWad: spot.result,
+      varE36: quote.result.varE36,
+      tau: quote.result.tau,
     })
   }
 })

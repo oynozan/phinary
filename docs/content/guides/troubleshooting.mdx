@@ -19,7 +19,7 @@ Every trade must keep the price between 0.02 and 0.98. Here ETH was 1.18 USD abo
 | **Not enough liquidity**, "the market's reserve can't cover this trade" | After this trade the market's reserve could not back every winning token | Trade less |
 | **No routes found** on a normal amount | The trade hits the band, the per-block limit of 100 tokens, or the reserve | Trade 1 to 2 USDC |
 | Swap reverts with `V4TooLittleReceived` | The price moved past your slippage limit while you confirmed | Set slippage to **Auto**, trade earlier in the market, trade less |
-| A market vanished from the token picker | Trading closed and the result is not in yet | Wait about 15 seconds; it reappears under settled markets |
+| A market vanished from the token picker | Trading closed and the result is not in yet | Wait about 15 seconds (35 for a 15-minute market); it reappears under settled markets |
 | The signature is rejected, or the swap reverts with empty data | The account is a smart account or EIP-7702 delegated | Use a plain MetaMask account |
 | Unichain Sepolia is missing | Testnet mode is off; disconnecting turns it off | Turn **Testnet mode** back on in Settings |
 | The app does not load, or Uniswap's gateway refuses it | It is not on `localhost` | Open `http://localhost:3000`; the first load takes 30 to 40 s |

@@ -12,7 +12,8 @@ export interface CoreSnapshot extends VaultAmounts {
 export interface VaultMarket {
     id: number;
     name: string;
-    category: "Crypto" | "Other";
+    /** underlying asset such as "ETH" or "SOL", "Other" when the oracle is unknown */
+    category: string;
     bucket: bigint;
     liability: bigint;
     status: number;
@@ -63,9 +64,8 @@ export async function readVaultExposure(client = createChainClient(), config = g
         const infos = await client.multicall({ contracts: ids.map(id => ({ address: config.predictionHook, abi: predictionHookAbi, functionName: "marketInfo", args: [BigInt(id)] } as const)), blockNumber: block.number, multicallAddress: config.multicall3, allowFailure: false });
         infos.forEach((info, i) => {
             const asset = config.oracleAssets[info.oracle.toLowerCase()];
-            const crypto = asset !== undefined;
             const strike = Math.exp(Number(info.lnStrikeWad) / 1e18);
-            markets.push({ id: ids[i], name: crypto ? `${asset} > $${strike.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `Market #${ids[i]}`, category: crypto ? "Crypto" : "Other", bucket: info.bucket, liability: marketLiability(info), status: info.status, expiry: Number(info.expiry) });
+            markets.push({ id: ids[i], name: asset ? `${asset} > $${strike.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `Market #${ids[i]}`, category: asset ?? "Other", bucket: info.bucket, liability: marketLiability(info), status: info.status, expiry: Number(info.expiry) });
         });
     }
     const active = markets.reduce((sum, market) => sum + market.bucket, 0n);

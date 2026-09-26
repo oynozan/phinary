@@ -1,13 +1,13 @@
 ---
 title: Deploy your own
-description: Deploy the oracle, the hook and the scheduler to Unichain Sepolia and fund the vault.
+description: Deploy the oracles, the hook, the gatekeeper and its market tracks to Unichain Sepolia and fund the vault.
 ---
 
 import { Callout, Steps } from 'nextra/components'
 
 # Deploy your own
 
-One script deploys the whole stack: demo tokens, the oracle hook and its ETH/USDC pool, the price steerer, and the `MarketScheduler` and `PredictionHook` pair. The full runbook is [`docs/md/RUNBOOK.md`](https://github.com/oynozan/phinary/blob/main/docs/md/RUNBOOK.md).
+One script deploys the whole stack: demo tokens, an oracle hook with its pool for ETH and another for SOL, the price steerer, and the `MarketGatekeeper` with its four `MarketScheduler` tracks and the `PredictionHook` it owns. The full runbook, including how to add a price source to a live deployment or move the vault to a new set of tracks, is [`docs/md/RUNBOOK.md`](https://github.com/oynozan/phinary/blob/main/docs/md/RUNBOOK.md).
 
 ## Before you start
 
@@ -37,25 +37,32 @@ The script refuses to run without a terminal or against the wrong chain. It prin
 2. Deploys `UnderlyingOracleHook` at an address mined for its permission bits.
 3. Creates the ETH/USDC pool at the current ETH price.
 4. Deploys `PriceSteerer` and seeds the pool with full-range liquidity.
-5. Deploys the scheduler and the hook together, with the hook mined to permission mask `0x2AA8` and owned by the scheduler.
+5. Does the same for SOL: a demo SOL token, its own oracle hook and a SOL/USDC pool at `SOL_PRICE_USD`, seeded by the same steerer.
+6. Deploys the gatekeeper, which deploys the four track schedulers, then the hook, mined to permission mask `0x2AA8` and owned by the gatekeeper ([Scheduler and gatekeeper](/contracts/scheduler#deployment)).
 
-Last, it checks every permission mask, the pool binding, the owners and the oracle's first price.
+Last, it checks every permission mask, the pool bindings, the owners, each track's oracle and config, and the oracles' first prices. `TRACKS_ETH_ONLY=1` skips SOL and deploys the two ETH tracks only.
 
 ### Fund the vault
 
 ```sh
-make fund-sepolia FUND_USDC=40
+make fund-sepolia FUND_USDC=150
 ```
+
+Four tracks at a 10 USDC budget need about 90 USDC to open at full size when all of them roll over at a quarter hour, so keep 150 USDC or more in the vault ([Budget](/contracts/scheduler#budget)).
 
 ### Check it
 
 ```sh
 R=https://sepolia.unichain.org
-HOOK=$(node -p "require('./deployments/unichain-sepolia.json').predictionHook")
-SCHEDULER=$(node -p "require('./deployments/unichain-sepolia.json').marketScheduler")
-cast call $HOOK "owner()(address)" --rpc-url $R          # the scheduler
-cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R       # USDC in the vault
-cast call $SCHEDULER "canOpen()(bool)" --rpc-url $R       # true once the next slot is open
+D=./deployments/unichain-sepolia.json
+HOOK=$(node -p "require('$D').predictionHook")
+GATEKEEPER=$(node -p "require('$D').marketGatekeeper")
+cast call $HOOK "owner()(address)" --rpc-url $R                # the gatekeeper
+cast call $HOOK "vaultIdle()(uint256)" --rpc-url $R             # USDC in the vault
+cast call $GATEKEEPER "schedulers()(address[])" --rpc-url $R    # the four tracks, in order
+for S in $(node -p "require('$D').marketSchedulers.join(' ')"); do
+  cast call $S "canOpen()(bool)" --rpc-url $R                    # true while the track's slot can open
+done
 ```
 
 ### Start the bots
@@ -64,7 +71,7 @@ cast call $SCHEDULER "canOpen()(bool)" --rpc-url $R       # true once the next s
 make bots
 ```
 
-Use separate keys for the price mirror and the keeper, so they never collide on a nonce. The keeper's key needs no role.
+Use separate keys for the price mirror and the keeper, so they never collide on a nonce. The mirror's key must own the `PriceSteerer`; the keeper's key needs no role. One keeper drives every track.
 
 </Steps>
 
@@ -76,18 +83,26 @@ For the first 5 minutes the oracle quotes a fallback volatility of 60% a year. A
 
 Every setting is an environment variable read by the deploy script. The defaults are the demo values.
 
-| Variable | Default | Meaning |
+The market settings are per track and are frozen once deployed. Each takes the prefix `TRACK_<TICKER>_`, with the ticker `ETH`, `ETH15M`, `SOL` or `SOL15M`; for example `TRACK_ETH15M_MARKET_BUDGET_USDC=5`.
+
+| Track variable | Default | Meaning |
 |---|---|---|
-| `SCHEDULER_PERIOD_SEC` | 60 | One market per this many seconds |
-| `MARKET_TENOR_SEC` | 120 | How long each market lives |
-| `MARKET_WINDOW_SEC`, `MARKET_CUTOFF_BUFFER_SEC` | 10, 2 | Settlement window, and the gap before it when trading stops |
+| `SCHEDULER_PERIOD_SEC` | 60, or 900 on the 15-minute tracks | One market per this many seconds |
+| `MARKET_TENOR_SEC` | equal to the period | How long each market lives |
+| `MARKET_WINDOW_SEC`, `MARKET_N_SAMPLES` | 10 and 10, or 30 and 30 on the 15-minute tracks | Settlement window and its samples |
+| `MARKET_CUTOFF_BUFFER_SEC` | 2 | The gap before the window when trading stops |
 | `QUOTE_H0`, `QUOTE_GAMMA_S` | 0.02, 0.00002 | Base half-spread and volatility-scaled spread |
 | `QUOTE_LAMBDA`, `QUOTE_Q_EPOCH_MAX`, `QUOTE_P_MIN` | 0.001, 100, 0.02 | Price impact, per-block limit and price band |
 | `MARKET_BUDGET_USDC`, `SCHEDULER_MIN_BUDGET_USDC` | 10, 1 | Largest and smallest budget per market |
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TRACKS_ETH_ONLY` | 0 | 1 deploys only the two ETH tracks and no SOL stack |
+| `ETH_PRICE_USD`, `SOL_PRICE_USD` | the live Coinbase ETH price, 150 | Initial pool prices (`make local-env` fetches both live) |
 | `ORACLE_SIGMA_MIN`, `ORACLE_SIGMA_MAX`, `ORACLE_SIGMA_FALLBACK` | 0.2, 2.5, 0.6 | Volatility clamps and warm-up value |
 | `ORACLE_CARDINALITY` | 14400 | Price records kept, 4 hours of one-second writes |
-| `DEMO_LIQUIDITY` | 1e18 | Liquidity of the ETH/USDC pool the oracle reads |
+| `DEMO_LIQUIDITY` | 1e18 | Liquidity of each pool an oracle reads |
 
 <Callout type="important">
-Size `MARKET_BUDGET_USDC` to the depth of the ETH/USDC pool. A market's budget is the most a price push can win, and a deep pool makes pushes expensive ([Security](/contracts/security#manipulation)).
+Size each track's `MARKET_BUDGET_USDC` to the depth of its pool. A market's budget is the most a price push can win, and a deep pool makes pushes expensive ([Security](/contracts/security#manipulation)).
 </Callout>

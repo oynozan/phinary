@@ -9,6 +9,8 @@ export interface MarketMeta {
     ticker?: string;
     track?: string | null;
     oracleSpot?: number | null;
+    /** The market's pMinWad / 1e18 from marketParams */
+    pMin?: number;
 }
 
 /** Display-only conversion. Amounts used in future transactions must remain bigint. */
@@ -32,6 +34,7 @@ export function toMarket(id: number, info: ChainMarketInfo, nSamples: number, ra
         midUp: Number(raw.midYes) / 1e18, askUp: Number(raw.askYes) / 1e18,
         bidUp: Number(raw.bidYes) / 1e18, askDown: Number(raw.askNo) / 1e18, bidDown: Number(raw.bidNo) / 1e18,
         spot: strike * Math.exp(Number(raw.xWad) / 1e18), sigma: Math.sqrt(Number(raw.varE36) / 1e36 * 31557600),
+        pMin: meta.pMin ?? 0,
     } : null;
     return {
         id, ...timing, up: info.yes, down: info.no, oracle: info.oracle, strike, nSamples,

@@ -4,6 +4,9 @@ import {
   selectMarkets,
   underlyingOf,
   hasVolume,
+  matchesTrack,
+  trackFilterFrom,
+  trackFilterHref,
 } from "../src/lib/markets/explorer.ts";
 import { toMarket } from "../src/lib/onchain/market-adapter.ts";
 import { phaseOf } from "../src/lib/phase.ts";
@@ -146,7 +149,7 @@ test("preview price links preserve side selection; unavailable quotes cannot be 
     await import("../src/components/home/market-presentation.tsx");
   const quoted = {
     ...base,
-    quote: { tradable: true, askUp: 0.41, askDown: 0.63 },
+    quote: { tradable: true, askUp: 0.41, askDown: 0.63, pMin: 0.02 },
   } as Market;
   for (const side of ["up", "down"] as const) {
     const html = renderToStaticMarkup(
@@ -208,4 +211,17 @@ test("upcoming and resolved tables show correct columns without fabricated settl
     assert.doesNotMatch(html, /\?side=/);
     assert.doesNotMatch(html, /NaN|undefined/);
   }
+});
+test("asset and duration round-trip through the home URL", () => {
+  const sol15 = trackFilterFrom(new URLSearchParams("asset=sol&track=15m"));
+  assert.deepEqual(sol15, { underlying: "SOL", track: "15m" });
+  assert.equal(trackFilterHref(sol15), "/?asset=sol&track=15m");
+  assert.equal(trackFilterHref({ underlying: "ETH", track: "all" }), "/?asset=eth");
+  assert.deepEqual(trackFilterFrom(new URLSearchParams("")), { underlying: "all", track: "all" });
+  assert.deepEqual(trackFilterFrom(new URLSearchParams("asset=<x>&track=soon")), { underlying: "all", track: "all" });
+  assert.equal(trackFilterHref(trackFilterFrom(new URLSearchParams(""))), "/");
+  const eth1m = { ...base, asset: "ETH", track: "1m" } as Market;
+  assert.equal(matchesTrack(eth1m, { underlying: "ETH", track: "1m" }), true);
+  assert.equal(matchesTrack(eth1m, { underlying: "SOL", track: "all" }), false);
+  assert.equal(matchesTrack(eth1m, { underlying: "all", track: "15m" }), false);
 });

@@ -1,4 +1,4 @@
-const REPO = "https://github.com/oynozan/phinary/blob/843c2d2b5c3ca51569e3a4fda2c70f5300774003";
+const REPO = "https://github.com/oynozan/phinary/blob/422fb4ff933c6f01d8caeeed076cbf60e6b1a208";
 
 /** GitHub permalink to a repo file, shown as `File.sol:12-34` */
 export function Source({ path, lines }: { path: string; lines?: string }) {

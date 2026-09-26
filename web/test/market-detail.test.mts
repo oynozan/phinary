@@ -7,7 +7,7 @@ import { toMarket } from "../src/lib/onchain/market-adapter.ts";
 import type { Market, PricePoint } from "../src/lib/types.ts";
 const address = "0x1111111111111111111111111111111111111111";
 const base = toMarket(42, { yes: address, no: address, oracle: address, lnStrikeWad: 0n, openTime: 1000n, expiry: 1120n, window: 10, cutoffBuffer: 2, status: 1, yesWon: false, bucket: 0n, outYes: 0n, outNo: 0n, invYes: 0n, invNo: 0n }, 10, undefined, 1020);
-const quote = { tradable: true, tau: 100, variance: .001, x: 0, midUp: .39, askUp: .41, bidUp: .37, askDown: .63, bidDown: .59, spot: 2704.37, sigma: .582 };
+const quote = { tradable: true, tau: 100, variance: .001, x: 0, midUp: .39, askUp: .41, bidUp: .37, askDown: .63, bidDown: .59, spot: 2704.37, sigma: .582, pMin: .02 };
 const market: Market = { ...base, quote, upChance: .39, strike: 2705.02 };
 test("detail trading guard closes exactly at cutoff and rejects every inactive phase", () => {
     assert.equal(detailCanBuy(market, market.cutoff - 1), true);

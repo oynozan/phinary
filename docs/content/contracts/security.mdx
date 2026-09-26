@@ -22,7 +22,7 @@ The hook holds real collateral and prices off a pool that anyone can trade, so e
 | Markets cannot touch each other's money | One bucket per market | `test_multiMarketIsolation` |
 | LP shares cannot be bought cheap or sold dear | Deposits at NAV⁺, withdrawals at NAV⁻, neither reads a price | `invariant_navOrdering`, `test_vaultNav_underOpenExposure` |
 | A frozen USDC holder only blocks themselves | Payouts go to the caller only | `test_blacklistedHolder_onlyBlocksThemselves` |
-| Nobody can change a market or choose an outcome | Immutable owner (the scheduler, which has no admin), immutable market parameters, no settlement override | `test_accessControl` |
+| Nobody can change a market or choose an outcome | Immutable owner (the gatekeeper, which has no admin and forwards only its schedulers), immutable market parameters, no settlement override | `test_accessControl` |
 
 ## Direct calls
 

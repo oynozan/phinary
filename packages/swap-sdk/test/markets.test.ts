@@ -169,6 +169,15 @@ describe('listMarkets', () => {
     assert.equal(list[0]?.yes.symbol, 'YES-2')
   })
 
+  it('reads exactly the given ids in order and skips unknown ones', async () => {
+    const list = await listMarkets(client, { hook: HOOK, ids: [2n, 7n, 1n], metadata: false })
+    assert.deepEqual(
+      list.map((m) => m.id),
+      [2n, 1n],
+    )
+    assert.deepEqual(await listMarkets(client, { hook: HOOK, ids: [] }), [])
+  })
+
   it('finds the pool and direction for buys and sells', async () => {
     const list = await listMarkets(client, { hook: HOOK })
     const buy = findPredictionRoute(list, { tokenIn: USDC, tokenOut: tokens.y1 })

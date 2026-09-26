@@ -91,6 +91,10 @@ async function readMarketSnapshot(id?: number, client = createChainClient(), con
             warm,
         }] as const;
     }));
+    const pMinOf = (result: unknown) => {
+        const wad = (result as { quote?: { pMinWad?: bigint } }).quote?.pMinWad;
+        return wad === undefined ? undefined : Number(wad) / 1e18;
+    };
     const trackOf = (scheduler: Address | undefined) => tracks.find((t) => sameAddress(t.scheduler, scheduler));
     const timestamp = Number(block.timestamp);
     const markets = ids.map((marketId, index) => {
@@ -107,6 +111,7 @@ async function readMarketSnapshot(id?: number, client = createChainClient(), con
             quote?.status === "success" ? quote.result as HookQuote : undefined, timestamp, {
                 asset, ticker: track?.ticker ?? asset, track: track?.label ?? null,
                 oracleSpot: readings.get(chain.oracle.toLowerCase())?.price ?? null,
+                pMin: pMinOf(params.result),
             });
     });
     return {

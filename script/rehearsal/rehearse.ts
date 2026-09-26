@@ -1,8 +1,8 @@
 /**
  * Demo rehearsal on the local anvil fork started by script/local-env.sh (node >= 22.18, run with `make rehearse`).
  *
- * Two fresh EOAs, Alice and Bob, get ETH and Circle USDC through anvil cheats. On the newest keeper market with enough
- * time left, Alice buys YES and Bob buys NO for REHEARSAL_USDC each and Alice sells half her YES. Every trade is an
+ * Two fresh EOAs, Alice and Bob, get ETH and Circle USDC through anvil cheats. On the newest market of the 1-minute ETH
+ * track (found through its scheduler's marketOfSlot) with enough time left, Alice buys YES and Bob buys NO for REHEARSAL_USDC each and Alice sells half her YES. Every trade is an
  * exact-in swap quoted by the deployed V4Quoter and sent through UniversalRouter 2.0 with the Permit2 flow the web app
  * uses (ERC-20 approve of Permit2 once, then a signed PermitSingle), all built by packages/swap-sdk. The script then
  * waits for expiry, checks that the keeper bot settles the market, recomputes the outcome from the oracle's
@@ -56,7 +56,11 @@ import {
   predictionHookAbi,
   quoteExactIn,
   readAllowances,
+  readTracks,
+  recentTrackMarketIds,
   requireHook,
+  requireSchedulers,
+  type Track,
 } from '../../packages/swap-sdk/src/index.ts'
 import {
   avgPriceWad,
@@ -97,7 +101,7 @@ const deployment = parseDeployment(rawDeployment)
 const hook = requireHook(deployment)
 const usdc = deployment.usdc
 const poolManager = deployment.poolManager
-const oracle = getAddress(String(rawDeployment['underlyingOracle']))
+const schedulers = requireSchedulers(deployment)
 const rpc = process.env['RPC_URL'] ?? String(rawDeployment['rpcUrl'] ?? 'http://127.0.0.1:8545')
 
 const chain = defineChain({ ...unichainSepolia, rpcUrls: { default: { http: [rpc] } } })
@@ -115,6 +119,8 @@ interface Actor {
 }
 
 let market: Market
+/** The picked market's own oracle, from its marketInfo */
+let oracle: Address
 let budget = 0n
 /** USDC the traders paid into this market minus what they took out, while it trades. */
 let netIntoMarket = 0n
@@ -193,12 +199,23 @@ async function marketLine(): Promise<string> {
   )
 }
 
-async function pickMarket(): Promise<Market> {
+/** The shortest ETH track, the 1-minute one of the demo set, so the rehearsal never waits out a 15-minute market */
+async function rehearsalTrack(): Promise<Track> {
+  const tracks = await readTracks(pub, { marketSchedulers: schedulers, multicall3: deployment.multicall3 })
+  const [track] = tracks.filter((t) => t.asset === 'ETH').sort((a, b) => a.period - b.period)
+  if (!track) {
+    throw new Error(`no ETH track among marketSchedulers (${tracks.map((t) => t.ticker).join(', ')})`)
+  }
+  return track
+}
+
+async function pickMarket(track: Track): Promise<Market> {
   const deadline = Date.now() + MARKET_WAIT_SECONDS * 1000
   let waited = false
   for (;;) {
     const now = await chainTime()
-    const markets = await listMarkets(pub, { hook, limit: 4 })
+    const ids = await recentTrackMarketIds(pub, track, now, 2, { multicallAddress: deployment.multicall3 })
+    const markets = ids.length ? await listMarkets(pub, { hook, ids, multicallAddress: deployment.multicall3 }) : []
     const fresh = markets
       .filter((m) => m.status === 'Trading' && m.quote?.tradable)
       .filter((m) => m.info.outYes === 0n && m.info.outNo === 0n && m.info.invYes === 0n && m.info.invNo === 0n)
@@ -209,7 +226,7 @@ async function pickMarket(): Promise<Market> {
       throw new Error('no fresh market with enough trading time: is the keeper running? (script/bots.sh status local)')
     }
     if (!waited) {
-      say('script', `waiting for a keeper market with at least ${MIN_TRADING_SECONDS}s of trading left`)
+      say('script', `waiting for a ${track.ticker} market with at least ${MIN_TRADING_SECONDS}s of trading left`)
       waited = true
     }
     await sleep(1000)
@@ -391,7 +408,7 @@ async function main(): Promise<void> {
     throw new Error(`${rpc} is ${version}, not anvil: the rehearsal funds actors with anvil cheats and runs only on the local fork`)
   }
   assert.equal(await pub.getChainId(), 1301, 'the local fork must keep chain id 1301')
-  // The hook has no keeper role (an ownerless MarketScheduler owns it, and open()/settle() are permissionless), so
+  // The hook has no keeper role (the ownerless MarketGatekeeper owns it, and open()/settle() are permissionless), so
   // "the keeper bot" is identified by the account script/local-env.sh started it with, not by an on-chain role.
   const keeperRaw = rawDeployment['keeper']
   if (typeof keeperRaw !== 'string' || isPlaceholderAddress(keeperRaw)) {
@@ -401,7 +418,8 @@ async function main(): Promise<void> {
 
   section('Setup')
   say('script', `deployment ${DEPLOYMENT_FILE}`)
-  say('script', `PredictionHook ${hook}, oracle ${oracle}, keeper ${keeper}, RPC ${rpc}`)
+  const track = await rehearsalTrack()
+  say('script', `PredictionHook ${hook}, ${track.ticker} track ${track.scheduler} (${track.label}), keeper ${keeper}, RPC ${rpc}`)
   const alice: Actor = { name: 'Alice', account: privateKeyToAccount(generatePrivateKey()), usdcStart: 0n }
   const bob: Actor = { name: 'Bob', account: privateKeyToAccount(generatePrivateKey()), usdcStart: 0n }
   const actors = [alice, bob]
@@ -410,7 +428,8 @@ async function main(): Promise<void> {
     say(a.name, `fresh EOA ${a.account.address} with 1 ETH and ${fmtUsdc(a.usdcStart)} Circle USDC`)
   }
 
-  market = await pickMarket()
+  market = await pickMarket(track)
+  oracle = market.info.oracle
   await chainTime()
   const params = await pub.readContract({ address: hook, abi: predictionHookAbi, functionName: 'marketParams', args: [market.id] })
   budget = params.budget

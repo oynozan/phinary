@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AppConfig } from '../config.ts'
 import { addressUrl } from '../config.ts'
+import type { Spot } from '../data.ts'
 import { formatToken, formatUsd, shortAddress } from '../format.ts'
 import type { Connection, InjectedWallet } from '../wallet.ts'
 
 interface Props {
   cfg: AppConfig
-  ethPrice?: number
+  spots?: Spot[]
   conn?: Connection
   chainOk: boolean
   usdcBalance?: bigint
@@ -77,10 +78,12 @@ export function Header(p: Props) {
           <span className={`dot ${p.rpcOk ? '' : 'warn'}`} />
           {cfg.isLocalRpc ? 'Local fork' : 'Unichain Sepolia'}
         </span>
-        <div className="header-eth">
-          <span className="header-eth-label">ETH / USD</span>
-          <span className="header-eth-value num">{formatUsd(p.ethPrice)}</span>
-        </div>
+        {(p.spots ?? []).map((s) => (
+          <div key={s.asset} className="header-eth">
+            <span className="header-eth-label">{s.asset} / USD</span>
+            <span className="header-eth-value num">{formatUsd(s.price)}</span>
+          </div>
+        ))}
         <div className="menu-wrap" ref={ref}>
           {conn ? (
             p.chainOk ? (

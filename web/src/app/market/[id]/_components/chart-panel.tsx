@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,6 @@ export function ChartPanel({ market }: { market: Market }) {
     const history = usePriceHistory(market.id);
     const [mode, setMode] = useState<"probability" | "price">("probability");
     const [range, setRange] = useState<ChartRange>("Max");
-    const fillId = useId().replaceAll(":", "");
     const probability = mode === "probability";
     const available = (history.data?.length ?? 0) > 0;
     const points = historyInRange(history.data ?? [], range).filter((p) => Number.isFinite(probability ? p.mid : p.eth));
@@ -39,14 +38,13 @@ export function ChartPanel({ market }: { market: Market }) {
             <span className="sr-only">{probability ? "UP probability" : "Underlying price"} history in UTC. Latest: {probability ? formatPercent(last.mid) : formatPrice(last.eth)}.</span>
             <ChartContainer config={{ value: { label: probability ? "Chance UP" : `${underlying(market)} price`, color: "#d773ff" } }} className="detail-chart-canvas">
                 <AreaChart data={points} margin={{ top: 12, right: 16, left: 0, bottom: 4 }} accessibilityLayer>
-                    <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#be37ee" stopOpacity={0.28} /><stop offset="100%" stopColor="#be37ee" stopOpacity={0.01} /></linearGradient></defs>
                     <CartesianGrid stroke="#252a38" vertical={false} />
                     <XAxis dataKey="t" type="number" domain={domain} tickFormatter={formatTimeSeconds} tickLine={false} axisLine={false} minTickGap={60} tick={{ fill: "#b4bdd3" }} />
                     <YAxis domain={probability ? [0, 1] : ["auto", "auto"]} tickFormatter={probability ? (v) => formatPercent(v) : (v) => formatPrice(v)} width={probability ? 40 : 75} tickLine={false} axisLine={false} tick={{ fill: "#b4bdd3" }} />
                     {!probability && <ReferenceLine y={market.strike} stroke="#b4bdd3" strokeDasharray="4 4" ifOverflow="extendDomain" label={{ value: "Strike", fill: "#b4bdd3", position: "insideTopRight" }} />}
                     {!probability && windowStart < windowEnd && <ReferenceArea x1={windowStart} x2={windowEnd} fill="#b739ee" fillOpacity={0.12} label={{ value: "Settlement", fill: "#b4bdd3" }} />}
                     <ChartTooltip content={<HistoryTip probability={probability} />} />
-                    <Area type="linear" dataKey={probability ? "mid" : "eth"} stroke="#d773ff" strokeWidth={1.5} fill={`url(#${fillId})`} isAnimationActive={false} dot={false} />
+                    <Area type="linear" dataKey={probability ? "mid" : "eth"} stroke="#d773ff" strokeWidth={1.5} fill="none" isAnimationActive={false} dot={false} />
                     <ReferenceDot x={last.t} y={probability ? last.mid : last.eth} r={3} fill="#f5f5fa" stroke="#d773ff" />
                 </AreaChart>
             </ChartContainer>

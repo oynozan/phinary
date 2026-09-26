@@ -1,25 +1,32 @@
 ---
 title: Introduction
-description: Binary prediction markets on ETH, priced and settled inside a Uniswap v4 hook.
+description: Binary prediction markets on ETH and SOL, priced and settled inside a Uniswap v4 hook.
 ---
 
 import { Cards } from 'nextra/components'
 
 # Phinary
 
-Phinary runs binary prediction markets on the price of ETH inside a Uniswap v4 hook. Every market asks one question, such as "ETH above 2,689.62 USD at 15:28 UTC?", and trades through ordinary Uniswap swaps.
+Phinary runs binary prediction markets on the prices of ETH and SOL inside a Uniswap v4 hook. Every market asks one question, such as "ETH above 2,689.62 USD at 15:28 UTC?", and trades through ordinary Uniswap swaps.
 
 ![A live Phinary market in the Uniswap app: 5 USDC buys 6.08 ETHUP](/screenshots/uniswap/quote.png)
 
-- **Two tokens per market.** `ETHUP` (YES) pays 1 USDC if ETH ends above the strike. `ETHDOWN` (NO) pays 1 USDC if it does not.
+- **Two tokens per market.** `ETHUP` (YES) pays 1 USDC if ETH ends above the strike. `ETHDOWN` (NO) pays 1 USDC if it does not. The 15-minute and SOL markets use `ETH15MUP`, `SOLUP`, `SOL15MUP` and their `DOWN` pairs.
 - **The price is the probability.** A YES price of 0.78 means the market gives YES a 78% chance.
 - **Priced by the hook.** A Black-Scholes formula quotes every swap. The pools hold no liquidity, and an LP vault inside the hook takes the other side.
-- **Settled by Uniswap.** The strike and the result both come from a Uniswap v4 ETH/USDC pool. There are no external oracles and no external services.
-- **Nobody in charge.** Markets open on a fixed schedule that anyone can trigger, and nobody can change a market or choose its outcome.
+- **Settled by Uniswap.** The strike and the result both come from a Uniswap v4 pool of the asset against USDC. There is no external oracle and no external service.
+- **Nobody in charge.** Markets open on fixed schedules that anyone can trigger, and nobody can change a market or choose its outcome.
 
 ## Live demo
 
-On Unichain Sepolia a new market opens every minute and runs for two minutes, so there is always one to trade. Trading stops 12 seconds before expiry, and the result is known about 2 seconds after it.
+On Unichain Sepolia four **tracks** run side by side on one hook and one LP vault:
+
+| Track | A new market | Trading stops | Price averaged over |
+|---|---|---|---|
+| ETH and SOL, 1 minute | Every minute, as the last one expires | 12 s before expiry | The last 10 s |
+| ETH and SOL, 15 minutes | Every quarter hour, as the last one expires | 32 s before expiry | The last 30 s |
+
+Each track's markets run back to back, and the result is known a few seconds after expiry. Every market records which track opened it: `schedulerOf(marketId)` on the `MarketGatekeeper`, or the address of the scheduler that emitted its `MarketOpened` event ([Market tracks](/integration#market-tracks)).
 
 ## Start here
 

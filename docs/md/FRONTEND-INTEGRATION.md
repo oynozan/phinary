@@ -26,8 +26,9 @@ flowchart LR
   Wallet -->|send transaction| RPC
   RPC --> Hook[PredictionHook]
   Hook --> Oracle[IUnderlyingOracle]
-  Keeper[Keeper bot] --> Scheduler[MarketScheduler]
-  Scheduler -->|createMarket| Hook
+  Keeper[Keeper bot] -->|open| Scheduler[MarketScheduler x4]
+  Scheduler -->|createMarket| Gatekeeper[MarketGatekeeper]
+  Gatekeeper -->|createMarket| Hook
   Hook -->|events| Indexer[Ponder indexer]
   Indexer --> API[SQL / GraphQL]
   UI --> Web[Next.js server adapter]
@@ -45,18 +46,22 @@ Indexer の反映は取引確定より遅れるため、取引成功・保有残
 | 項目 | 設定値 / 役割 |
 |---|---|
 | Chain | Unichain Sepolia、1301 |
-| PredictionHook | `0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` |
-| MarketScheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` |
-| UnderlyingOracle | `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080` |
-| Indexing start | 63569270 |
+| PredictionHook | `0xb4544Af6c126773c2f8f4f02f7a1Bde7b975aaa8` |
+| MarketGatekeeper | `0x755dBc10AB4b9BFDB8c46939702dC08B8F3e607A`（Hook の owner） |
+| MarketSchedulers | ETH `0x8f1b371e41FeCBb825d0baAB19f906E645C760e0`、ETH15M `0x02f0B250120c817A45C6ba580FE68eB461E0A10e`、SOL `0x067180DE54F4a800C88C3dC9EDa8b106f7126b83`、SOL15M `0x950eEDA8303253b76f0d47f4a3eD33aA7fF54E74`（`marketSchedulers` の順） |
+| UnderlyingOracle | ETH `0x1F356D9E7d6dBE6d807aCBc5D163a7af265cd080`、SOL `0xc7dDbB6648BE0DFCF3eF2a68D40d66374184D080`（`underlyings`） |
+| Indexing start | 63591962（新 Hook の着地ブロック） |
 | Collateral | Circle test USDC。デモプールの demoUsdc とは別トークン |
-| Legacy Hook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8` |
+| Legacy Hook | `0x62bBCbA51cbFC8D0C932e482bD8F62590fEeeAa8`、`0xE6780bBeAee4183Ffd8EBe0d2862dEd221B96aA8` |
+| Legacy Scheduler | `0x511fFFb9fE5d393B10bF185A9c580A732Eff44Dd` |
 
 新しい `SealedPoolOracle` はソースに存在するが、この設定は従来の hooked demo pool を参照している。
 新オラクルへのデプロイ変更は今回の接続に含めない。
 両オラクルは `IUnderlyingOracle` を実装するため、フロントは内部の証明処理を再実装しない。
 
-Scheduler が Hook の owner となり、誰でも時間枠ごとに `open()` を呼べる。
+2026-09-26 から MarketGatekeeper が Hook の owner。Gatekeeper はコンストラクタで4つの MarketScheduler（トラック: ETH 1分、ETH 15分、SOL 1分、SOL 15分）をデプロイし、それらからの `createMarket` だけを Hook に転送する。トラックの構成は固定。
+誰でも各 Scheduler の `open()` を時間枠ごとに1回呼べる。枠の締切（取引終了時刻）以降は `TooLate` で失敗する。各トラックの市場は間を空けずに続く（tenor == period）。
+市場のトラックは `gatekeeper.schedulerOf(id)`、または `MarketOpened` を発行した Scheduler のアドレス（`gatekeeper.schedulers()` に含まれるものだけを信頼）で判定する。シンボルの前方一致や満期時刻では判定しない。
 Keeper は市場作成・settle・sweep を進める運用プロセスで、ユーザーの取引署名者ではない。
 一般ユーザーの画面に管理者用 `createMarket` 操作を追加する必要はない。
 
@@ -67,7 +72,7 @@ Keeper は市場作成・settle・sweep を進める運用プロセスで、ユ�
 
 | 機能 | 正となる取得先 / 操作 | 既存フロント |
 |---|---|---|
-| 市場一覧・詳細 | Hook.marketCount / marketInfo / marketParams / quote | RPC 接続あり。一覧は最新30件、個別 ID は別取得 |
+| 市場一覧・詳細 | Hook.marketCount / marketInfo / marketParams / quote、Scheduler.config / marketOfSlot | RPC 接続あり。一覧は最新30件と各トラックの直近スロットの市場、個別 ID は別取得 |
 | ETH 価格・分散 | Oracle.lnSpotSoBWad / varianceE36 | Phase 2 で正式な2値 ABI と整合。warm を snapshot と診断に保持 |
 | 購入・売却の見積もり | V4Quoter + swap-sdk | 実装あり。表示用 Hook.quote と取引数量の見積もりを区別 |
 | 購入・売却 | 入力トークン承認 → 必要時 Permit2 署名 → UniversalRouter | UP/DOWN 両方向あり |
@@ -101,6 +106,7 @@ Keeper は市場作成・settle・sweep を進める運用プロセスで、ユ�
 
 Phase 2 で `web/src/lib/onchain/check-connection.ts` の確認を9アドレスへ拡張。
 Scheduler に code があること、Hook.owner == Scheduler、Hook.keeper == zero、Scheduler.hook/oracle が設定と一致することを検証する。
+トラック構成への移行後は、Hook.owner == Gatekeeper、Gatekeeper.hook == Hook、Gatekeeper.schedulers が `marketSchedulers` と同順で一致、各 Scheduler の hook / gatekeeper / oracle が設定と一致することを検証し、トラックごとに canOpen と nextOpenTime を報告する。
 診断は画面と同じ readMarkets を使い、最新30市場を検証して最新3件を報告。code・所有関係・市場・オラクルは同じブロックに固定する。
 市場が存在することと、現在取引可能であることを分けて報告する。canOpen=false だけでは異常扱いしない。
 

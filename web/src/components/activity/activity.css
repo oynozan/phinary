@@ -1,7 +1,6 @@
 .activity-page { color:#f5f5fa; font-family:var(--font-sans); font-variant-numeric:tabular-nums; background:#080b12; position:relative; isolation:isolate; min-height:calc(100vh - var(--shell-top,76px)); padding-bottom:20px; }
 .activity-page,.activity-page * {box-sizing:border-box;}
 body:has(.activity-page) {background:#080b12;} body:has(.activity-page)::before{display:none;}
-.activity-page::before {content:"";position:absolute;z-index:-1;pointer-events:none;top:calc(-1 * var(--shell-top));right:0;width:100%;height:360px;background:url('/markets/orbit.webp') no-repeat 55% 36% / cover;opacity:.4;mask-image:linear-gradient(to bottom,black 25%,transparent 100%);}
 .activity-page ::selection {background:#7634a0;color:#f5f5fa;}
 .activity-container{max-width:var(--page-max);padding:0 var(--page-gutter);margin:auto;}
 
@@ -17,7 +16,7 @@ body:has(.activity-page) {background:#080b12;} body:has(.activity-page)::before{
 .activity-metric-copy{align-self:center;position:relative;z-index:1;}
 .activity-metric-copy>span,.activity-outcomes>div>span{display:block;margin-top:7px;}
 .activity-value-line{display:flex;align-items:center;gap:18px;}
-.activity-metric-icon{display:grid;place-items:center;flex:none;width:70px;height:70px;border:1px solid #272239;border-radius:50%;background:radial-gradient(ellipse at center,#28133b55,#11101e);}
+.activity-metric-icon{display:grid;place-items:center;flex:none;width:70px;height:70px;border:1px solid #272239;border-radius:50%;background:#11101e;}
 .activity-metric-icon svg{width:32px;height:32px;stroke:#b83bf0;stroke-width:2;}
 .activity-value-line .activity-change{font-size:12px;font-weight:700;color:#31efb8;background:#08271f;border-radius:20px;padding:6px 11px;white-space:nowrap;}
 .activity-value-line .is-negative{color:#ff665f;background:#29191e;}
@@ -50,8 +49,8 @@ body:has(.activity-page) {background:#080b12;} body:has(.activity-page)::before{
 .activity-page td:nth-last-child(1),.activity-page td:nth-last-child(2),.activity-page th:nth-last-child(1),.activity-page th:nth-last-child(2),.activity-traders-panel td:nth-child(3),.activity-traders-panel th:nth-child(3){text-align:right;}
 .activity-page tbody tr:hover{background:#151925;}
 .activity-address{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;}
-.activity-avatar{width:18px;height:18px;display:inline-block;border-radius:50%;flex:none;background:linear-gradient(145deg,#b03aff,#6514ec);}
-.activity-avatar-1{background:linear-gradient(145deg,#4cdbea,#553df5);}.activity-avatar-2{background:linear-gradient(145deg,#ff51b5,#e90092);}.activity-avatar-3{background:linear-gradient(145deg,#d850ff,#7536f6);}
+.activity-avatar{width:18px;height:18px;display:inline-block;border-radius:50%;flex:none;background:#9c30a5;}
+.activity-avatar-1{background:#4f7df0;}.activity-avatar-2{background:#e0409f;}.activity-avatar-3{background:#c828d6;}
 .activity-trade>span+span{margin-left:14px;border-radius:16px;padding:3px 10px;font-size:12px;font-weight:650;display:inline-block;}
 .activity-up{color:#34edb2;}.activity-down{color:#ff554f;}.activity-trade .activity-up{background:#09271f;}.activity-trade .activity-down{background:#29151c;}
 .activity-positive{color:#0bf1a4;}
@@ -59,7 +58,7 @@ body:has(.activity-page) {background:#080b12;} body:has(.activity-page)::before{
 .activity-traders-panel td{padding-top:5px;padding-bottom:5px;}
 .activity-rank{display:inline-grid;place-items:center;width:28px;height:28px;font-size:15px;}
 .activity-rank-1,.activity-rank-2,.activity-rank-3{color:#fff;border-radius:50%;border:1px solid #ffffff30;font-weight:650;}
-.activity-rank-1{background:linear-gradient(135deg,#ffcf39,#e99700);}.activity-rank-2{background:linear-gradient(135deg,#b8c6e0,#71829e);}.activity-rank-3{background:linear-gradient(135deg,#e58b58,#ac472d);}
+.activity-rank-1{background:#f0b31d;}.activity-rank-2{background:#95a5c2;}.activity-rank-3{background:#c8683f;}
 .activity-empty{font-size:13px;color:#b4bdd3;text-align:center;padding:50px 12px;margin:0;border-top:1px solid #252a38;min-height:160px;}
 .activity-note{color:#b4bdd3;font-size:12px;margin:12px 4px;}
 .activity-loading{display:grid;gap:12px;padding:16px 0;}.activity-loading>*{height:34px;background:#151925;border-radius:6px;}

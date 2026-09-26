@@ -1,6 +1,7 @@
 import type { HistoryPoint, LiveState, MarketParamsLite } from '../data.ts'
 import { formatCents, formatClock, formatCountdown, formatPercent, formatSignedUsd, formatUsd, localTimeZoneName } from '../format.ts'
 import {
+  type AppMarket,
   cutoffOf,
   hasPrices,
   marketPhase,
@@ -8,6 +9,7 @@ import {
   questionText,
   sigmaAnnual,
   strikeOf,
+  trackName,
   windowStartOf,
 } from '../market.ts'
 import type { Market } from '../sdk.ts'
@@ -15,7 +17,7 @@ import { WAD } from '../sdk.ts'
 import { Sparkline } from './Sparkline.tsx'
 
 interface Props {
-  market: Market
+  market: AppMarket
   live?: LiveState
   params?: MarketParamsLite
   history: HistoryPoint[]
@@ -116,7 +118,8 @@ export function MarketView({ market, live, params, history, now }: Props) {
   const expiryClock = formatClock(info.expiry)
   const quote = live?.quote
   const priced = hasPrices(quote) ? quote : undefined
-  const eth = live?.ethPrice
+  const eth = live?.spot
+  const asset = market.asset
   const diff = eth === undefined ? undefined : eth - strike
   const sigma = quote ? sigmaAnnual(quote.varE36) : undefined
   const midYes = priced ? Number(priced.midYes) / 1e18 : undefined
@@ -139,16 +142,17 @@ export function MarketView({ market, live, params, history, now }: Props) {
               {phase === 'trading' && <span className="dot live" />}
               {PHASE_LABEL[phase]}
             </span>
+            <span className="chip">{trackName(market)}</span>
             <span>Market #{market.id.toString()}</span>
             <span>·</span>
             <span>{tz ? `times in ${tz}` : 'local time'}</span>
           </div>
           <h1 className="mv-question" id="market-question">
-            {questionText(strike, expiryClock)}
+            {questionText(strike, expiryClock, asset)}
           </h1>
           <p className="mv-rule">
-            Settles <b className="yes-text">YES</b> if the average ETH price from {formatClock(windowStartOf(info))} to{' '}
-            {expiryClock} ({windowSec} s geometric TWAP of our Uniswap v4 ETH/USDC pool) is above {formatUsd(strike)}.
+            Settles <b className="yes-text">YES</b> if the average {asset} price from {formatClock(windowStartOf(info))} to{' '}
+            {expiryClock} ({windowSec} s geometric TWAP of our Uniswap v4 {asset}/USDC pool) is above {formatUsd(strike)}.
             Each winning token pays 1 USDC.
           </p>
         </div>
@@ -159,7 +163,7 @@ export function MarketView({ market, live, params, history, now }: Props) {
 
       <div className="stats">
         <div className="stat">
-          <div className="stat-label">ETH price (oracle)</div>
+          <div className="stat-label">{asset} price (oracle)</div>
           <div className="stat-value num">{eth === undefined ? <span className="skeleton" /> : formatUsd(eth)}</div>
           <div className={`stat-sub num ${diff === undefined ? '' : diff > 0 ? 'yes-text' : 'no-text'}`}>
             {diff === undefined ? 'start-of-block price' : `${formatSignedUsd(diff)} vs strike`}
@@ -231,7 +235,7 @@ export function MarketView({ market, live, params, history, now }: Props) {
         </div>
         <div className="chart-card">
           <div className="chart-head">
-            <span className="chart-title">ETH price vs strike</span>
+            <span className="chart-title">{asset} price vs strike</span>
             <span className="chart-now num">{formatUsd(eth)}</span>
           </div>
           <Sparkline
@@ -243,7 +247,7 @@ export function MarketView({ market, live, params, history, now }: Props) {
             color="var(--chart-eth)"
             format={(v) => formatUsd(v)}
             formatTime={formatClock}
-            label="ETH price over time"
+            label={`${asset} price over time`}
           />
         </div>
       </div>

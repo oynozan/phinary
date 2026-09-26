@@ -8,10 +8,11 @@ Small Node 24 processes that keep the live demo moving:
   token order and decimals, and calls `PriceSteerer.steer(key, target)` for each pool more than
   `MIRROR_THRESHOLD_BPS` away.
 - **`keeper`** drives every track of the `MarketGatekeeper` that owns the hook from one process: it calls each track's
-  ownerless `MarketScheduler.open()` once per slot (ETH1M and SOL1M every minute, ETH15M and SOL15M every quarter
-  hour). The scheduler builds the market on chain, struck at its oracle's start-of-block price rounded to the cent
-  (tickers such as `ETH1MUP` / `ETH1MDOWN`, name for example `ETH1M > $2701.35 26 Sep 14:32`). The keeper then settles
-  every market on the hook once it expires and sweeps its surplus back to the LP vault.
+  ownerless `MarketScheduler.open()` once per slot (the tracks `ETH` and `SOL` every minute, `ETH15M` and `SOL15M`
+  every quarter hour). The scheduler builds the market on chain, struck at its oracle's start-of-block price rounded to
+  the cent (symbols such as `ETHUP` / `ETHDOWN` or `SOL15MUP` / `SOL15MDOWN`, name for example
+  `ETH > $2701.35 26 Sep 14:32`). The keeper then settles every market on the hook once it expires and sweeps its
+  surplus back to the LP vault.
 - **`sealed`** keeps a `SealedPoolOracle`'s history complete, for a hookless pool we do not own (see
   [Sealed-oracle bot](#sealed-oracle-bot)). The demo pair above does not need it.
 
@@ -75,9 +76,9 @@ Log format (values illustrative):
 ```
 2026-09-26T14:30:01.204Z INFO  [mirror] steered symbol=ETH source=coinbase feed=2701.35 pool=2700.64 devBps=2.63 target=15… tx=0x… block=… gas=…
 2026-09-26T14:30:02.377Z INFO  [mirror] steered symbol=SOL source=coinbase feed=148.27 pool=148.19 devBps=5.39 target=… tx=0x… block=… gas=…
-2026-09-26T14:31:00.611Z INFO  [keeper] market opened track=ETH1M market=17 now=… slot=29840551 budget=10.00 strikeCents=270135 tx=0x…
-2026-09-26T14:32:02.090Z INFO  [keeper] settled market=17 track=ETH1M yesWon=true status=2 tx=0x…
-2026-09-26T14:32:03.311Z INFO  [keeper] swept market=17 track=ETH1M usdc=8.41 tx=0x…
+2026-09-26T14:31:00.611Z INFO  [keeper] market opened track=ETH market=17 now=… slot=29840551 budget=10.00 strikeCents=270135 tx=0x…
+2026-09-26T14:32:02.090Z INFO  [keeper] settled market=17 track=ETH yesWon=true status=2 tx=0x…
+2026-09-26T14:32:03.311Z INFO  [keeper] swept market=17 track=ETH usdc=8.41 tx=0x…
 ```
 
 ### Mirror behaviour
@@ -117,7 +118,7 @@ Log format (values illustrative):
   the slot's deadline `slot × period + tenor - window - cutoffBuffer`, where trading also stops; after it `open()`
   reverts `TooLate(slot)`. With `KEEPER_ALIGN=1` (default) each track wakes on wall-clock multiples of its period, and
   at start-up a track whose `canOpen()` is true opens its current slot at once.
-- Each tick opens the due tracks first, shortest period first (at a quarter hour ETH1M and SOL1M, then ETH15M and
+- Each tick opens the due tracks first, shortest period first (at a quarter hour ETH and SOL, then ETH15M and
   SOL15M), then settles and sweeps every market on the hook.
 - A slot with less than `KEEPER_MIN_TRADE_SEC` (default 5) of trading left is skipped without a call, and a `TooLate`
   skips the slot too; both log one `slot skipped` line and wait for the track's next slot.

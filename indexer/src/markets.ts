@@ -3,6 +3,10 @@ import { market } from 'ponder:schema'
 import type { Address } from 'viem'
 
 import { predictionHookAbi } from '../../packages/swap-sdk/src/abi/index.ts'
+import { loadIndexerDeployment } from './deployment.ts'
+import { assetOfOracle } from './lib/tracks.ts'
+
+const deployment = loadIndexerDeployment(process.env)
 
 ponder.on('PredictionHook:MarketCreated', async ({ event, context }) => {
   const { marketId, yes, no, yesPoolId, noPoolId, lnStrikeWad, expiry } = event.args
@@ -32,6 +36,8 @@ ponder.on('PredictionHook:MarketCreated', async ({ event, context }) => {
     volumeUsdc: 0n,
     tradeCount: 0,
     createdAt: Number(event.block.timestamp),
+    oracle: info.oracle.toLowerCase() as Address,
+    asset: assetOfOracle(deployment.underlyings, info.oracle),
   })
 })
 

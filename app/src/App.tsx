@@ -14,7 +14,7 @@ import {
   useTicker,
 } from './data.ts'
 import { formatClock, formatUsd, shortAddress } from './format.ts'
-import { defaultMarketId, groupMarkets, hasPrices, marketPhase, strikeOf, withInfo } from './market.ts'
+import { defaultMarketId, groupMarkets, hasPrices, marketPhase, sameTrack, strikeOf, trackName, withInfo } from './market.ts'
 import { describeError, type ExecContext } from './trade.ts'
 import {
   burnerConnection,
@@ -251,8 +251,8 @@ export function App() {
     if (hasPrices(liveData.quote)) {
       point.mid = Number(liveData.quote.midYes) / 1e18
     }
-    if (liveData.ethPrice !== undefined) {
-      point.eth = liveData.ethPrice
+    if (liveData.spot !== undefined) {
+      point.eth = liveData.spot
     }
     history.current.set(key, mergeHistory(history.current.get(key) ?? [], [point]))
   }, [liveData])
@@ -322,9 +322,13 @@ export function App() {
   }
 
   const rpcOk = !marketsPoll.error || marketsPoll.data !== undefined
-  const newestTrading = groupMarkets(markets, now).open.find((m) => marketPhase(m.info, now) === 'trading')
+  const newestTrading = current
+    ? groupMarkets(markets, now).open.find((m) => marketPhase(m.info, now) === 'trading' && sameTrack(m, current))
+    : undefined
   const showJump = current && phase !== 'trading' && phase !== 'upcoming' && newestTrading && newestTrading.id !== current.id
-  const ethPrice = liveData?.ethPrice ?? marketsPoll.data?.ethPrice
+  const spots = (marketsPoll.data?.spots ?? []).map((s) =>
+    s.asset === current?.asset && liveData?.spot !== undefined ? { ...s, price: liveData.spot } : s,
+  )
   const showTrade = phase === 'trading' || phase === 'upcoming' || (current !== undefined && tradeBusyId === current.id)
   const panelProps = {
     cfg,
@@ -341,7 +345,7 @@ export function App() {
     <>
       <Header
         cfg={cfg}
-        ethPrice={ethPrice}
+        spots={spots}
         conn={conn}
         chainOk={chainOk}
         usdcBalance={liveData?.balances?.usdc}
@@ -360,6 +364,7 @@ export function App() {
         <div className="col markets-col">
           <MarketList
             markets={markets}
+            tracks={marketsPoll.data?.tracks ?? []}
             selectedId={selectedId}
             onSelect={setSelectedId}
             now={now}
@@ -383,7 +388,8 @@ export function App() {
             <div className="notice">
               <span className="dot live" style={{ marginTop: 6 }} />
               <span style={{ flex: 1 }}>
-                A new market is open: ETH above {formatUsd(strikeOf(newestTrading.info))} at {formatClock(newestTrading.info.expiry)}.
+                A new {trackName(newestTrading)} market is open: {newestTrading.asset} above {formatUsd(strikeOf(newestTrading.info))} at{' '}
+                {formatClock(newestTrading.info.expiry)}.
               </span>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setSelectedId(newestTrading.id)}>
                 Go to live market
@@ -405,7 +411,7 @@ export function App() {
               </h1>
               <p className="secondary">
                 {marketsPoll.data
-                  ? 'The keeper creates a 1-minute market every minute. This page refreshes on its own.'
+                  ? 'The keeper opens a new market on every track each period. This page refreshes on its own.'
                   : `Reading the PredictionHook at ${shortAddress(hook)}.`}
               </p>
             </section>

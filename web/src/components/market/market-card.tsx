@@ -7,6 +7,7 @@ import { Panel } from "@/components/layout/panel";
 import { Button } from "@/components/ui/button";
 import { usePriceHistory } from "@/lib/data";
 import { formatCents, formatPrice, formatUsd, sideLabel } from "@/lib/format";
+import { buyPrice } from "@/lib/trade";
 import { DEADLINE_LABEL, isResolved, isTradable, nextDeadline } from "@/lib/phase";
 import type { Market, Side } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -78,7 +79,7 @@ export function MarketCard({ market, onBuy, className }: { market: Market; onBuy
 
     const buy = (side: Side) => {
         const q = market.quote;
-        const price = q ? (side === "up" ? q.askUp : q.askDown) : null;
+        const price = q ? buyPrice(q, side) : null;
         const label = (
             <>
                 Buy {sideLabel(side)}

@@ -35,7 +35,7 @@ The contracts already work without any platform: an UP or DOWN position is a Uni
 | Stack | Next.js (App Router) + wagmi + RainbowKit + Tailwind; Ponder indexer | Your choice over "grow `app/`". The design below makes sure trading never depends on the indexer. |
 | Hosting | Vercel for `web/`; Railway (or similar) for Ponder + Postgres; one-command local fallback | Your choice |
 | Faucet | Server drip of Circle test USDC plus a little ETH, rate-limited | The deployed hook uses **Circle's test USDC** (`0x31d0…768F`) as collateral, which we cannot mint. |
-| Labels and token names | UP / DOWN in the UI. Tickers are `ETHUP` / `ETHDOWN`. Token names use the compact `ETH > PRICE DATE` form: `ETH > $2684.00 26 Sep 14:31` for UP, `ETH < $2684.00 26 Sep 14:31` for DOWN, meaning the strike, then the deadline's date and time in UTC. The ticker, the `>`/`<` comparison, and a generated logo ("▲ 2,684 · 14:31") tell UP and DOWN apart. | Your choice (2026-09-26): `ETHUP` / `ETHDOWN` tickers, with names in the compact style of the current keeper names (`YES ETH>2684.93 22:17:00`). MetaMask's "Add to wallet" rejects symbols longer than 11 characters ([MetaMask/core `TokensController.ts:1044`](https://github.com/MetaMask/core/blob/main/packages/assets-controllers/src/TokensController.ts)), so target and deadline cannot both fit in the symbol. The name and the icon carry them instead, and the token address stays the real identity. |
+| Labels and token names | UP / DOWN in the UI. Each track has its own ticker, and the symbols are the ticker plus `UP` or `DOWN`: `ETHUP` / `ETHDOWN` (ETH, 1 minute), `ETH15MUP` / `ETH15MDOWN` (ETH, 15 minutes), `SOLUP` / `SOLDOWN` and `SOL15MUP` / `SOL15MDOWN`. Token names use the compact `TICKER > PRICE DATE` form: `ETH > $2684.00 26 Sep 14:31` for UP, `ETH < $2684.00 26 Sep 14:31` for DOWN, meaning the strike, then the deadline's date and time in UTC. The ticker, the `>`/`<` comparison, and a generated logo ("▲ 2,684 · 14:31") tell UP and DOWN apart. The track itself comes from `gatekeeper.schedulerOf(id)` or the scheduler's `config()`, never from a symbol prefix. | Your choice (2026-09-26): `ETHUP` / `ETHDOWN` tickers, with names in the compact style of the current keeper names (`YES ETH>2684.93 22:17:00`). MetaMask's "Add to wallet" rejects symbols longer than 11 characters ([MetaMask/core `TokensController.ts:1044`](https://github.com/MetaMask/core/blob/main/packages/assets-controllers/src/TokensController.ts)), so target and deadline cannot both fit in the symbol. The name and the icon carry them instead, and the token address stays the real identity. |
 | Shared code | Reuse `packages/swap-sdk` (quotes, UniversalRouter encoding, revert decoding). Port the tested logic from `app/src` (market phases, formatting, trade steps). | This code is already tested against a local stack. |
 | Visual direction | Set with the Impeccable design skill before building the phase 1 UI | Keeps the look deliberate rather than generic |
 
@@ -122,10 +122,11 @@ The phases come from `app/src/market.ts`. The "closing" phase is split in two so
 | Settled | **Resolved UP** / **Resolved DOWN** | Winners claim $1.00 per token |
 | Invalid | Invalid, 50/50 | Both sides claim $0.50 |
 
-Demo markets last 2 minutes and a new one opens every minute. Each has about 105 s live, a 2 s closed gap, then a 10 s window. Markets overlap, so one is always live, and one resolves every minute.
+Demo markets run on four tracks, and on each track a market expires in the second the next one opens. A 1-minute market (ETH or SOL) has 48 s live, a 2 s closed gap, then a 10 s window. A 15-minute market has 868 s live, a 2 s gap, then a 30 s window. At every quarter hour all four tracks resolve and open together.
 
 ### `/` Markets home
 - **Hero:** the market that is live now, with a big UP percentage, a countdown bar, and **Buy UP** / **Buy DOWN** buttons (prices are the asks, e.g. "UP 63¢", "DOWN 39¢").
+- **Filters:** the list shows every track by default. Asset (ETH, SOL) and duration (1m, 15m) are optional filters; clicking the active pill clears it again.
 - **Tabs:**
   - *Live*: trading, closed and averaging markets;
   - *Upcoming*;

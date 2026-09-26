@@ -2,6 +2,12 @@
 
 **Date:** 2026-09-26. **Status:** phase 1 (scheduler) and phase 2 (SealedPoolOracle with proofs) approved in chat.
 
+> **Superseded in part (2026-09-27).** The single `MarketScheduler` that owns the hook, its 120 s tenor with overlapping
+> markets and its deploy flow are replaced by a `MarketGatekeeper` that owns the hook and runs four tracks (ETH, ETH15M,
+> SOL, SOL15M), each with `tenor == period` and a `TooLate` deadline. See
+> [2026-09-27-market-tracks-design.md](2026-09-27-market-tracks-design.md). Everything else here, including phase 2,
+> still applies. The superseded passages are marked below.
+
 ## Goal
 
 After this change, no key can create markets, change pricing or touch the oracle. Anyone can open, settle, sweep and redeem.
@@ -12,7 +18,8 @@ Settlement, redeem, sweep, deposit and withdraw are already permissionless. Two 
 
 ## Decisions
 
-- **A new `MarketScheduler` contract owns a freshly deployed `PredictionHook`.**
+- **A new `MarketScheduler` contract owns a freshly deployed `PredictionHook`.** *(Superseded: a `MarketGatekeeper` owns
+  the hook and forwards `createMarket` from its per-track schedulers only. The no-keeper property is unchanged.)*
   - The hook's code does not change. It has 144 bytes of room under the size limit and its tests stay valid.
   - The scheduler has no owner, no setters and no call to `setKeeper`, so `keeper` stays `address(0)` forever.
 - **Base half-spread `h0 = 0.02` (2¢)**, the research minimum. It is fixed for this deployment.
@@ -40,6 +47,8 @@ Settlement, redeem, sweep, deposit and withdraw are already permissionless. Two 
   - The constructor requires `tenor >= period + window + cutoffBuffer`.
   - That keeps the hook's `openTime + window + cutoffBuffer < expiry` check true even when `open()` is called in the slot's last
     second.
+  - *(Superseded: the constructor now requires only `tenor > window + cutoffBuffer`, so `tenor == period` runs markets back to
+    back, and `open()` reverts `TooLate(slot)` once `block.timestamp + window + cutoffBuffer >= expiry`.)*
 - **Strike:**
   - `cents = round(expWad(oracle.lnSpotSoBWad()) / 1e16)` and `lnStrikeWad = lnWad(cents * 1e16)`. This is the same rounding as
     `script/CreateMarket.s.sol`.
@@ -53,10 +62,13 @@ Settlement, redeem, sweep, deposit and withdraw are already permissionless. Two 
   - UTC and built on-chain: `ETH > $2690.13 26 Sep 14:07` for UP and `ETH < $2690.13 26 Sep 14:07` for DOWN.
   - Symbols are `ETHUP` and `ETHDOWN`, the same format `script/CreateMarket.s.sol` produces today.
   - The formatting moves into a library, `src/lib/MarketNames.sol`, which both the scheduler and the script use.
-- The function emits `MarketOpened(marketId, slot, caller)`.
+- The function emits `MarketOpened(marketId, slot, caller, budget, strikeCents)`.
 - Views: `lastSlot`, `nextOpenTime()`, and `canOpen()` (whether `open()` would succeed now).
 
 ## Deployment
+
+*(Superseded: the gatekeeper takes the scheduler's place in this flow and deploys the schedulers itself, see
+`script/base/TrackSet.sol` and `script/DeployTracks.s.sol`. `script/DeployScheduler.s.sol` is gone.)*
 
 The two addresses depend on each other: the hook's constructor needs the scheduler address as `owner`, and the scheduler needs the
 hook address.
@@ -279,6 +291,7 @@ every second.
 ## Risks
 
 - **Two-minute markets remain outside the research's backtests.** The 2¢ spread lowers LP risk but does not remove it.
+  *(Superseded: the tracks run 1-minute and 15-minute markets; the same caveat applies to both.)*
 - **Names are in UTC**, as the keeper's default was. Screens that show local time format it from `expiry`.
 - **The deployer nonce could shift between simulation and broadcast.** The post-deploy assertions catch it; the only cost is
   wasted gas.

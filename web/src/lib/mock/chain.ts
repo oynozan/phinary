@@ -262,6 +262,7 @@ export class MockChain {
             bidDown: ask >= 1 ? 0 : 1 - ask,
             spot,
             sigma: varianceToSigma(variance),
+            pMin: 0.02,
         };
     }
 

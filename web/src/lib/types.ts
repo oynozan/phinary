@@ -69,6 +69,8 @@ export interface Quote {
     spot: number;
     /** annualised volatility implied by variance */
     sigma: number;
+    /** Every executed price must stay in [pMin, 1 - pMin]; a buy outside it reverts */
+    pMin: number;
 }
 
 export interface Market extends MarketInfo {

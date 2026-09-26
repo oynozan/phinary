@@ -3,8 +3,18 @@ import { type Address, erc20Abi, type PublicClient } from 'viem'
 import { multicall3Abi, oracleAbi } from './abi.ts'
 import type { ChainClock } from './chain.ts'
 import type { AppConfig } from './config.ts'
-import { averagePriceFromCumulatives, lnWadToPrice, windowStartOf } from './market.ts'
-import { type HookQuote, listMarkets, type Market, type MarketInfo, predictionHookAbi } from './sdk.ts'
+import { type AppMarket, averagePriceFromCumulatives, lnWadToPrice, windowStartOf } from './market.ts'
+import {
+  type HookQuote,
+  listMarkets,
+  type Market,
+  type MarketInfo,
+  predictionHookAbi,
+  readTracks,
+  recentTrackMarketIds,
+  sameAddress,
+  type Track,
+} from './sdk.ts'
 
 export interface Polled<T> {
   data?: T
@@ -65,14 +75,79 @@ export function useTicker(ms: number): number {
   return tick
 }
 
+/** Spot price of one asset from its oracle */
+export interface Spot {
+  asset: string
+  price?: number
+}
+
 export interface MarketsSnapshot {
-  markets: Market[]
+  markets: AppMarket[]
   usdc: Address
-  ethPrice?: number
+  tracks: Track[]
+  spots: Spot[]
   blockTs: number
 }
 
 const usdcCache = new Map<string, Address>()
+const trackCache = new Map<string, Promise<Track[]>>()
+
+/** Track configs are frozen at deploy, so they are read once per scheduler list */
+function loadTracks(pub: PublicClient, cfg: AppConfig): Promise<Track[]> {
+  const key = cfg.marketSchedulers.join(',')
+  if (!key) {
+    return Promise.resolve([])
+  }
+  let hit = trackCache.get(key)
+  if (!hit) {
+    hit = readTracks(pub, { marketSchedulers: cfg.marketSchedulers, multicall3: cfg.contracts.multicall3 })
+    trackCache.set(key, hit)
+    hit.catch(() => trackCache.delete(key))
+  }
+  return hit
+}
+
+function assetOfOracle(cfg: AppConfig, oracle: Address): string {
+  return cfg.underlyings.find((u) => sameAddress(u.oracle, oracle))?.symbol ?? 'ETH'
+}
+
+/** The newest markets of every track, or of the hook when the deployment lists no tracks for it */
+async function readMarkets(pub: PublicClient, cfg: AppConfig, hook: Address, tracks: Track[], clock: ChainClock): Promise<AppMarket[]> {
+  const common = { hook, quotes: true, metadata: false, multicallAddress: cfg.contracts.multicall3 }
+  if (!tracks.length) {
+    const list = await listMarkets(pub, { ...common, limit: cfg.marketLimit })
+    return list.map((m) => ({ ...m, asset: assetOfOracle(cfg, m.info.oracle) }))
+  }
+  if (!clock.synced) {
+    clock.sync(Number((await pub.getBlock({ blockTag: 'latest' })).timestamp))
+  }
+  const perTrack = Math.max(2, Math.ceil(cfg.marketLimit / tracks.length))
+  const idLists = await Promise.all(
+    tracks.map((t) => recentTrackMarketIds(pub, t, clock.estimate(), perTrack, { multicallAddress: cfg.contracts.multicall3 })),
+  )
+  const trackOf = new Map<bigint, Track>()
+  idLists.forEach((ids, i) => ids.forEach((id) => trackOf.set(id, tracks[i] as Track)))
+  if (!trackOf.size) {
+    return []
+  }
+  const list = await listMarkets(pub, { ...common, ids: [...trackOf.keys()] })
+  return list.map((m) => {
+    const track = trackOf.get(m.id)
+    return { ...m, track, asset: track?.asset ?? assetOfOracle(cfg, m.info.oracle) }
+  })
+}
+
+/** One oracle per asset: the tracks' own, else the deployment's price sources, else the configured or newest market's */
+function spotSources(cfg: AppConfig, tracks: Track[], markets: AppMarket[]): { asset: string; oracle: Address }[] {
+  const all = tracks.length
+    ? tracks.map((t) => ({ asset: t.asset, oracle: t.oracle }))
+    : cfg.underlyings.length
+      ? cfg.underlyings.map((u) => ({ asset: u.symbol, oracle: u.oracle }))
+      : [cfg.underlyingOracle ?? markets[markets.length - 1]?.info.oracle]
+          .filter((o): o is Address => !!o)
+          .map((oracle) => ({ asset: assetOfOracle(cfg, oracle), oracle }))
+  return all.filter((s, i) => all.findIndex((x) => x.asset === s.asset) === i)
+}
 
 export async function fetchMarkets(pub: PublicClient, cfg: AppConfig, hook: Address, clock: ChainClock): Promise<MarketsSnapshot> {
   let usdc = usdcCache.get(hook)
@@ -80,18 +155,13 @@ export async function fetchMarkets(pub: PublicClient, cfg: AppConfig, hook: Addr
     usdc = await pub.readContract({ address: hook, abi: predictionHookAbi, functionName: 'usdc' })
     usdcCache.set(hook, usdc)
   }
-  const markets = await listMarkets(pub, {
-    hook,
-    limit: cfg.marketLimit,
-    quotes: true,
-    metadata: false,
-    multicallAddress: cfg.contracts.multicall3,
-  })
-  const oracle = cfg.underlyingOracle ?? markets[markets.length - 1]?.info.oracle
-  const [ts, ln] = (await pub.multicall({
+  const tracks = await loadTracks(pub, cfg)
+  const markets = await readMarkets(pub, cfg, hook, tracks, clock)
+  const sources = spotSources(cfg, tracks, markets)
+  const [ts, ...lns] = (await pub.multicall({
     contracts: [
       { address: cfg.contracts.multicall3, abi: multicall3Abi, functionName: 'getCurrentBlockTimestamp' },
-      ...(oracle ? [{ address: oracle, abi: oracleAbi, functionName: 'lnSpotSoBWad' }] : []),
+      ...sources.map((s) => ({ address: s.oracle, abi: oracleAbi, functionName: 'lnSpotSoBWad' })),
     ] as never,
     allowFailure: true,
     multicallAddress: cfg.contracts.multicall3,
@@ -101,7 +171,11 @@ export async function fetchMarkets(pub: PublicClient, cfg: AppConfig, hook: Addr
   return {
     markets,
     usdc,
-    ethPrice: ln?.status === 'success' ? lnWadToPrice(ln.result as bigint) : undefined,
+    tracks,
+    spots: sources.map((s, i) => {
+      const ln = lns[i]
+      return { asset: s.asset, price: ln?.status === 'success' ? lnWadToPrice(ln.result as bigint) : undefined }
+    }),
     blockTs,
   }
 }
@@ -132,7 +206,8 @@ export interface LiveState {
   blockTs: number
   quote?: HookQuote
   info: MarketInfo
-  ethPrice?: number
+  /** Spot price from the market's own oracle */
+  spot?: number
   balances?: { usdc: bigint; yes: bigint; no: bigint; eth: bigint }
   /** Running geometric average over the settlement window, once it has started. */
   windowAvg?: { price: number; seconds: number }
@@ -233,7 +308,7 @@ export async function fetchLive(
     blockTs,
     quote: ok<HookQuote>(1),
     info,
-    ethPrice: ln === undefined ? undefined : lnWadToPrice(ln),
+    spot: ln === undefined ? undefined : lnWadToPrice(ln),
     balances,
     windowAvg,
   }

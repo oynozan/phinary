@@ -17,7 +17,7 @@ How it uses v4:
 - **ERC-6909 claims.** The hook keeps all of its USDC and returned tokens as claims inside the PoolManager. A trade only adjusts claims, plus a mint of new outcome tokens straight into the PoolManager when inventory runs short.
 - **Self-initialised pools.** Only the hook can create its pools. v4 skips `beforeInitialize` on self-calls, and the hook reverts it for everyone else.
 - **Unchanged routing.** Traders use UniversalRouter and V4Quoter exactly as for any other v4 pool ([Integration](/integration)).
-- **One external read.** Prices and settlement come from an `IUnderlyingOracle`, itself a v4 hook on an ETH/USDC pool ([Oracle](/contracts/oracle)). There are no external oracles and no external services.
+- **One external read.** Prices and settlement come from each market's `IUnderlyingOracle`, itself a v4 hook on a pool of the asset against USDC ([Oracle](/contracts/oracle)). There is no external oracle and no external service.
 
 ## Lifecycle
 
@@ -38,7 +38,7 @@ flowchart TD
 ```
 
 1. LPs deposit USDC into the vault ([`deposit`](#deposit-withdraw-unlockcallback)).
-2. The owner calls [`createMarket`](#createmarket), which moves a budget from the vault into the new market and creates its two pools.
+2. The owner calls [`createMarket`](#createmarket), which moves a budget from the vault into the new market and creates its two pools. Live, the owner is `MarketGatekeeper`, passing on a scheduler's `open()` ([Scheduler and gatekeeper](/contracts/scheduler)).
 3. Traders swap USDC for YES or NO. Each swap runs [`_beforeSwap`](#_beforeswap), which quotes, fills and books it.
 4. Trading stops before the settlement window starts. After expiry, [`settle`](#settle) compares the window's average price with the strike.
 5. Winners redeem with [`redeem`](#redeem) or sell back through a normal swap. [`sweep`](#sweep) returns the surplus to the vault.
@@ -93,7 +93,7 @@ function setKeeper(address keeper_) external {
 }
 ```
 
-`owner` is immutable, and only the owner or the keeper can create markets. In the live deployment the owner is `MarketScheduler`, a contract with no admin that never calls `setKeeper`, so `keeper` stays `address(0)` ([Scheduler](/contracts/scheduler)). Nobody can then create a market outside the schedule, change a market's parameters or choose an outcome.
+`owner` is immutable, and only the owner or the keeper can create markets. In the live deployment the owner is `MarketGatekeeper`, a contract with no admin that forwards `createMarket` only from its four track schedulers and has no way to call `setKeeper`, so `keeper` stays `address(0)` ([Scheduler and gatekeeper](/contracts/scheduler)). Nobody can then create a market outside a track's schedule, change a market's parameters or choose an outcome.
 
 ## Market state
 

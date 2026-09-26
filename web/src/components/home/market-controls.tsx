@@ -1,6 +1,10 @@
 import { Search, ChevronDown } from "lucide-react";
 import type { MarketTab } from "@/lib/phase";
-import type { ExplorerFilters, MarketSort } from "@/lib/markets/explorer";
+import type {
+  ExplorerFilters,
+  MarketSort,
+  TrackFilter as TrackFilterValue,
+} from "@/lib/markets/explorer";
 export const MARKET_TABS: { value: MarketTab; label: string }[] = [
   { value: "live", label: "Live" },
   { value: "upcoming", label: "Upcoming" },
@@ -8,17 +12,18 @@ export const MARKET_TABS: { value: MarketTab; label: string }[] = [
 ];
 /** Optional asset and duration filters: "All" by default, clicking the active pill clears it */
 export function TrackFilter({
-  filters,
+  value,
   onChange,
   assets,
   durations,
 }: {
-  filters: ExplorerFilters;
-  onChange: (next: ExplorerFilters) => void;
+  value: TrackFilterValue;
+  onChange: (next: TrackFilterValue) => void;
   assets: string[];
   durations: string[];
 }) {
-  const track = filters.track ?? "all";
+  if (!assets.length && !durations.length)
+    return <div className="track-filter" aria-hidden="true" />;
   return (
     <div className="track-filter">
       <div role="group" aria-label="Asset">
@@ -26,11 +31,11 @@ export function TrackFilter({
           <button
             type="button"
             key={a}
-            aria-pressed={filters.underlying === a}
+            aria-pressed={value.underlying === a}
             onClick={() =>
               onChange({
-                ...filters,
-                underlying: filters.underlying === a ? "all" : a,
+                ...value,
+                underlying: value.underlying === a ? "all" : a,
               })
             }
           >
@@ -43,9 +48,9 @@ export function TrackFilter({
           <button
             type="button"
             key={d}
-            aria-pressed={track === d}
+            aria-pressed={value.track === d}
             onClick={() =>
-              onChange({ ...filters, track: track === d ? "all" : d })
+              onChange({ ...value, track: value.track === d ? "all" : d })
             }
           >
             {d === "all" ? "All" : d}

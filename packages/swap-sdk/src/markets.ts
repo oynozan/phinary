@@ -68,6 +68,8 @@ export interface ListMarketsOptions {
   /** First id to read; defaults to the newest `limit` markets. */
   fromId?: bigint
   limit?: number
+  /** Exact ids to read in this order, such as a track's `recentTrackMarketIds`; `fromId` and `limit` are then ignored */
+  ids?: readonly bigint[]
   /** Also read `hook.quote(id)` (default true). */
   quotes?: boolean
   /** Also read YES/NO `symbol()` and `name()` (default true). */
@@ -95,11 +97,13 @@ export async function listMarkets(client: Client, opts: ListMarketsOptions): Pro
   const { hook } = opts
   const limit = BigInt(opts.limit ?? 50)
   const multicallAddress = opts.multicallAddress ?? UNICHAIN_SEPOLIA.multicall3
-  const count = await getMarketCount(client, hook)
-  const from = opts.fromId ?? (count >= limit ? count - limit + 1n : 0n)
-  const ids: bigint[] = []
-  for (let id = from; id <= count && ids.length < Number(limit) + 1; id++) {
-    ids.push(id)
+  const ids: bigint[] = opts.ids ? [...opts.ids] : []
+  if (!opts.ids) {
+    const count = await getMarketCount(client, hook)
+    const from = opts.fromId ?? (count >= limit ? count - limit + 1n : 0n)
+    for (let id = from; id <= count && ids.length < Number(limit) + 1; id++) {
+      ids.push(id)
+    }
   }
   if (!ids.length) {
     return []
