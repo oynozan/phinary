@@ -92,6 +92,25 @@ describe('parseDeployment', () => {
     })
     assert.deepEqual(d.legacyPredictionHooks, [getAddress(LEGACY)])
   })
+
+  it('skips malformed legacyPredictionHooks entries instead of throwing', () => {
+    const malformed = [
+      123,
+      null,
+      {},
+      [LEGACY],
+      'nope',
+      '0x1234',
+      `${LEGACY}00`,
+      `0x${'zz'.repeat(20)}`,
+      ` ${LEGACY}`,
+      LEGACY.slice(2),
+    ]
+    const d = parseDeployment({ chainId: 1301, legacyPredictionHooks: [...malformed, LEGACY.toLowerCase()] })
+    assert.deepEqual(d.legacyPredictionHooks, [getAddress(LEGACY)])
+    assert.deepEqual(parseDeployment({ chainId: 1301, legacyPredictionHooks: malformed }).legacyPredictionHooks, [])
+    assert.deepEqual(parseDeployment({ chainId: 1301, legacyPredictionHooks: LEGACY }).legacyPredictionHooks, [], 'not an array')
+  })
 })
 
 describe('loadDeployment', () => {
