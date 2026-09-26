@@ -24,7 +24,7 @@ export const render = display => renderToStaticMarkup(<ActivityScreen display={d
         const snapshot = { events: [], realized: [], tradesComplete: true, accountingComplete: false, asOf: 1000 };
         for (const status of ['ready', 'paused', 'error', 'loading']) {
             const html = render({ status, snapshot: status === 'ready' || status === 'paused' ? snapshot : null });
-            assert.match(html, /Profit rankings and win rates are not available yet/);
+            assert.match(html, /<header class="page-head"><h1>Activity<\/h1><\/header>/);
             assert.match(html, /Live Feed/);
             assert.doesNotMatch(html, /id="activity-traders-title"|Wins 1h|Losses 1h|activity-win-ring/);
         }

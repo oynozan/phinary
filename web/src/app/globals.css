@@ -255,11 +255,28 @@
 
 /* Compact shared header, matching the approved reference. */
 :root { --header-h: 52px; --shell-top: 76px; }
+
+/* One page grid for every route: the header, page heads and page bodies share these edges */
+:root { --page-max: 1536px; --page-gutter: 48px; --page-top: 28px; }
+@media (max-width: 1279px) { :root { --page-gutter: 28px; } }
+@media (max-width: 639px) { :root { --page-gutter: 16px; --page-top: 20px; } }
+body { background: #080b12; }
+body::before { display: none; }
+.page-container { width: 100%; max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }
+.page-head { padding: var(--page-top) 0 24px; }
+.page-head h1 { margin: 0; font-family: var(--font-heading); font-size: 40px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; color: #f5f5fa; }
+@media (max-width: 639px) { .page-head h1 { font-size: 32px; } }
+.page-action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 22px; border: 1px solid #b431e9; border-radius: 8px; background: #a50cdf; color: #fff; font-family: var(--font-secondary); font-size: 14px; font-weight: 600; }
+.page-action:hover { background: #8b21d4; }
+.page-action:focus-visible { outline: 2px solid #db9bff; outline-offset: 3px; }
+
+/* Type roles: Akt headings, Lexend Deca body, Manrope for labels, table heads and controls */
+:where(.app-header, .app-dock, .markets-page, .market-detail-page, .portfolio-page, .portfolio-dialog, .activity-page, .vault-page, .vault-explanation) :where(th, dt, label, legend, small, button, select, input, summary) { font-family: var(--font-secondary); }
 .app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--header-h); background: rgb(8 11 18 / var(--header-background-alpha, 0)); backdrop-filter: blur(var(--header-background-blur, 0px)); -webkit-backdrop-filter: blur(var(--header-background-blur, 0px)); border-bottom: 1px solid #282239; color: #f5f5fa; font-family: var(--font-manrope), sans-serif; isolation: isolate; }
-.app-header-inner { width: 100%; height: 100%; max-width: 1536px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 56px; justify-content: space-between; }
+.app-header-inner { width: 100%; height: 100%; max-width: var(--page-max); margin: auto; padding: 0 var(--page-gutter); display: flex; align-items: center; gap: 56px; justify-content: space-between; }
 .header-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
 .header-brand-mark { flex-shrink: 0; }
-.header-brand > span { font-family: var(--font-manrope), sans-serif; font-size: 23px; font-weight: 750; letter-spacing: -.035em; }
+.header-brand > span { font-family: var(--font-heading); font-size: 23px; font-weight: 600; letter-spacing: -.02em; }
 .app-header-nav { align-self: stretch; flex: 1; gap: 34px; align-items: stretch; }
 .app-header-link { position: relative; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #aab6d1; }
 .app-header-link.is-active { color: #fff; font-weight: 700; }
@@ -273,8 +290,8 @@
 .app-header .header-wallet:hover { background: #20192d; border-color: #8e55b3; }
 .app-header .header-menu { border-radius: 8px; background: #121722; color: #c5cce0; }
 .app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 3px; }
-@media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 38px; } .app-header-nav { gap: 26px; } }
-@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { padding: 0 16px; gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 28px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
+@media (max-width: 1279px) { .app-header-inner { gap: 38px; } .app-header-nav { gap: 26px; } }
+@media (max-width: 639px) { :root { --shell-top: 68px; } .app-header-inner { gap: 8px; } .header-brand { gap: 8px; } .header-brand-mark { width: 28px; height: 28px; } .header-brand > span { font-size: 20px; } .app-header .header-wallet { min-width: 0; padding: 0 9px; font-size: 11px; } }
 
 @media (max-width: 380px) { .app-header .header-wallet { font-size: 10px; padding: 0 8px; gap: 6px; } .app-header .wallet-chevron { display: none; } .app-header .wallet-address { max-width: 70px; overflow: hidden; text-overflow: ellipsis; } }
 

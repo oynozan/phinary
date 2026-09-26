@@ -12,9 +12,9 @@ function Profit({ row }: { row: PortfolioRow }) {
     return <span className={row.profit === null ? "" : row.profit > 0 ? "portfolio-positive" : row.profit < 0 ? "portfolio-negative" : ""}>{displayMoney(row.profit, true)}{row.profit !== null && row.profitPercent !== null && <small>({row.profitPercent > 0 ? "+" : ""}{row.profitPercent.toFixed(1)}%)</small>}</span>;
 }
 export const SECTION_COPY = {
-    open: { title: "Open Positions", subtitle: "Your active positions across all markets.", empty: "No open positions", columns: ["Market", "Side", "Amount", "Avg cost", "Current price", "Value", "P&L", "Time left", "Action"] },
-    claimable: { title: "Claimable Positions", subtitle: "Your settled positions ready to claim.", empty: "Nothing to claim right now.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Action"] },
-    history: { title: "History", subtitle: "Your resolved position history.", empty: "No position history yet.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Status"] },
+    open: { title: "Open Positions", empty: "No open positions", columns: ["Market", "Side", "Amount", "Avg cost", "Current price", "Value", "P&L", "Time left", "Action"] },
+    claimable: { title: "Claimable Positions", empty: "Nothing to claim right now.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Action"] },
+    history: { title: "History", empty: "No position history yet.", columns: ["Market", "Result", "Amount", "Avg cost", "Payout", "Value", "Profit", "Settled", "Status"] },
 };
 function StateContent({ availability, section, marketBase }: { availability: PortfolioAvailability; section: PortfolioSection; marketBase: string }) {
     if (availability === "loading") return <div aria-label={`Loading ${SECTION_COPY[section].title}`} aria-busy className="portfolio-loading"><Skeleton /><Skeleton /><Skeleton /></div>;
@@ -39,7 +39,7 @@ export function PositionsTable({ rows, section, availability, now, actionsEnable
         ];
     }
     return <section className="portfolio-section" aria-labelledby={`portfolio-${section}-heading`}>
-        <div className="portfolio-section-heading"><div><h2 id={`portfolio-${section}-heading`}>{copy.title}</h2><p>{copy.subtitle}</p></div>{availability === "ready" && (section !== "history" || historyComplete) && <span>{rows.length} {rows.length === 1 ? "position" : "positions"}</span>}</div>
+        <div className="portfolio-section-heading"><div><h2 id={`portfolio-${section}-heading`}>{copy.title}</h2></div>{availability === "ready" && (section !== "history" || historyComplete) && <span>{rows.length} {rows.length === 1 ? "position" : "positions"}</span>}</div>
         {availability !== "ready" || rows.length === 0 ? <div className="portfolio-table-shell">{section === "history" && !historyComplete && availability === "ready" ? <div className="portfolio-empty">Complete transaction history is not available yet.</div> : <StateContent availability={availability} section={section} marketBase={marketBase} />}</div> : <>
             <div className="portfolio-table-shell portfolio-desktop"><Table><TableHeader><TableRow>{copy.columns.map((col) => <TableHead key={col}>{col}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}>{cells(row).map((value, i) => <TableCell key={copy.columns[i]}>{value}</TableCell>)}</TableRow>)}</TableBody></Table></div>
             <div className="portfolio-mobile">{rows.map((row) => { const values = cells(row); return <article className="portfolio-position-card" key={row.id}><div className="portfolio-card-title">{values[0]}{values[1]}</div><dl>{[5, 6, 2, 3, 4, 7].map((i) => <div key={copy.columns[i]}><dt>{copy.columns[i]}</dt><dd>{values[i]}</dd></div>)}</dl><div className="portfolio-card-action">{section === "history" && <span>Status</span>}{values[8]}</div></article>; })}</div>

@@ -1,15 +1,14 @@
 import Link from "next/link";
 
-import { PageHeading, PageNarrow } from "@/components/layout/page";
-import { Button } from "@/components/ui/button";
-
 export default function NotFound() {
     return (
-        <PageNarrow className="flex flex-col items-center">
-            <PageHeading>Nothing here</PageHeading>
-            <Button asChild size="lg">
-                <Link href="/">Markets</Link>
-            </Button>
-        </PageNarrow>
+        <div className="page-container">
+            <header className="page-head">
+                <h1>Nothing here</h1>
+            </header>
+            <Link href="/" className="page-action">
+                Back to markets
+            </Link>
+        </div>
     );
 }

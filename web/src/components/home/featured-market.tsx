@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { Flame } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePriceHistory } from "@/lib/data";
 import { formatPercent, formatPrice } from "@/lib/format";
@@ -69,15 +68,6 @@ function FeaturedCard({
         href={`/market/${m.id}`}
         aria-label={`View featured market ${m.id}`}
       />
-      <div className="featured-label">
-        <span>
-          <Flame size={16} /> Featured market
-        </span>
-        <span className={`market-status ${m.phase === "live" ? "live" : ""}`}>
-          <i />
-          {PHASE_LABEL[m.phase]}
-        </span>
-      </div>
       <h2>
         <MarketIdentity market={m} registry={registry} />
       </h2>

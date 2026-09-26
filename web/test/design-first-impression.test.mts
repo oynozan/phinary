@@ -25,8 +25,8 @@ export function render(availability) {
         });
         const { render } = createRequire(import.meta.url)(outfile);
         const disconnected = render('disconnected');
-        assert.match(disconnected, /View your positions and claims/);
-        assert.match(disconnected, /href="\/">Explore markets/);
+        assert.match(disconnected, /class="portfolio-connect" aria-label="Connect wallet"/);
+        assert.match(disconnected, /Connect your wallet to view your portfolio\./);
         assert.equal((disconnected.match(/>Connect wallet<\/button>/g) ?? []).length, 1);
         assert.doesNotMatch(disconnected, /Portfolio summary|>N\/A<|>Claim all</);
         for (const availability of ['ready', 'loading', 'error', 'wrong-network']) {
@@ -34,7 +34,7 @@ export function render(availability) {
             assert.match(html, /Portfolio summary/, availability);
             assert.match(html, /Open Positions/, availability);
             assert.match(html, /Claimable Positions/, availability);
-            assert.doesNotMatch(html, /View your positions and claims/, availability);
+            assert.doesNotMatch(html, /class="portfolio-connect"/, availability);
         }
     } finally { await rm(dir, { recursive: true, force: true }); }
 });

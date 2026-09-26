@@ -70,13 +70,13 @@ colors:
   vault-panel-end: "#0e1016ed"
 typography:
   display:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "clamp(38px, 3.65vw, 58px)"
     fontWeight: 800
     lineHeight: 1.08
     letterSpacing: "-0.035em"
   title:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "25px"
     fontWeight: 800
     letterSpacing: "-0.035em"
@@ -87,31 +87,31 @@ typography:
     fontFamily: "Manrope, sans-serif"
     fontSize: "11px"
   detail-heading:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "clamp(25px, 2.5vw, 36px)"
     fontWeight: 800
     lineHeight: 1.2
     letterSpacing: "-0.025em"
   detail-heading-mobile:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "27px"
     fontWeight: 800
     lineHeight: 1.2
     letterSpacing: "-0.025em"
   detail-section:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "17px"
     fontWeight: 800
     lineHeight: 1.3
     letterSpacing: "-0.025em"
   detail-trade-title:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "24px"
     fontWeight: 800
     lineHeight: 1.3
     letterSpacing: "-0.025em"
   detail-body:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.5
@@ -126,54 +126,54 @@ typography:
     fontWeight: 400
     lineHeight: 1.5
   detail-empty:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
   detail-pricing:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "15px"
     fontWeight: 700
     lineHeight: 1.35
   detail-quote:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "16px"
     fontWeight: 700
     lineHeight: 1.5
   detail-metric:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "17px"
     fontWeight: 700
     lineHeight: 1.35
   detail-action:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "18px"
     fontWeight: 700
     lineHeight: 1.5
   detail-model-output:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "22px"
     fontWeight: 700
     lineHeight: 1.35
   detail-amount:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "24px"
     fontWeight: 400
     lineHeight: 1.5
   vault-heading:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "50px"
     fontWeight: 650
     lineHeight: 1.08
     letterSpacing: "-1.5px"
   vault-metric:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Lexend Deca, sans-serif"
     fontSize: "25px"
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: "-0.7px"
   vault-section:
-    fontFamily: "Manrope, sans-serif"
+    fontFamily: "Akt, sans-serif"
     fontSize: "16px"
     fontWeight: 600
     lineHeight: 1.4
@@ -201,8 +201,11 @@ spacing:
   compact: "12px"
   card-mobile: "16px"
   card: "20px"
+  gutter-mobile: "16px"
   gutter-tablet: "28px"
   gutter-desktop: "48px"
+  page-max: "1536px"
+  page-top: "28px"
   detail-grid-row: "12px"
   detail-grid-column: "24px"
   detail-panel-inline: "18px"
@@ -256,6 +259,17 @@ components:
 This refresh applies to Markets, Market Detail (`/market/[id]`), Portfolio (`/portfolio`), Activity (`/activity`) and the shared header. Market Detail extends the approved Markets system; it does not introduce new branding. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface briefs are `.impeccable/markets.md` and `.impeccable/market-detail.md`; Portfolio scope is defined below and in `preview/portfolio/README.md`. Product and data constraints remain in `PRODUCT.md`.
 
 Vault (`/vault`) is a scoped extension following the approved `.impeccable/vault.md` reference: near-black panels, vivid magenta actions, static violet orbital artwork and an Ethereum hero motif. Its body and explanation dialog use scoped Vault styles; the shared header and other route bodies are unchanged.
+
+
+## Shared page grid and type roles
+
+These rules apply to every route and the shared header, and they supersede any route-specific container, gutter, heading-font or body-font value described further down.
+
+- **One grid.** The header and every page body use `--page-max` (1536px) and `--page-gutter` (48px, 28px below 1280px, 16px below 640px) from `src/app/globals.css`. The logo, page titles and content blocks share one left edge, and content ends under the header's right edge. No route caps its content narrower on tablets.
+- **One page head.** Portfolio, Activity, Vault and 404 open with `.page-head`: a single Akt h1 (40px, 32px below 640px, weight 600), `--page-top` (28px, 20px below 640px) below the header offset, and no subtitle. Market Detail keeps its back link above the question; Markets keeps its hero.
+- **Type roles.** Akt for headings and the wordmark, Lexend Deca for body text and values, Manrope for labels, table heads and controls.
+- **One ground.** Every route uses the `#080b12` ground; Portfolio, Activity and Vault share the same full-width orbit backdrop at 0.4 opacity.
+- **No stray labels.** No eyebrows, slogans, network labels, status pills on headings, section subtitles or page footers. Status is the countdown or result text. Connect and empty states are one line and one action on a full-width panel.
 
 ## Colors
 

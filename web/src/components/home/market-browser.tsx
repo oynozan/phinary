@@ -56,17 +56,19 @@ export function MarketBrowser({
   };
   return (
     <section aria-label="Market explorer">
-      <TrackFilter
-        filters={filters}
-        assets={assets}
-        durations={durations}
-        onChange={change}
-      />
-      <MarketControls
-        filters={filters}
-        volumeAvailable={volumeAvailable}
-        onChange={change}
-      />
+      <div className="market-toolbar">
+        <TrackFilter
+          filters={filters}
+          assets={assets}
+          durations={durations}
+          onChange={change}
+        />
+        <MarketControls
+          filters={filters}
+          volumeAvailable={volumeAvailable}
+          onChange={change}
+        />
+      </div>
       {error ? (
         <div className="market-empty" role="status">
           Markets unavailable. Retry using the button above.

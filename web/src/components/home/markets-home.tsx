@@ -16,7 +16,6 @@ export function MarketsHome() {
       <div className="markets-container">
         <div className="markets-hero">
           <div className="markets-intro">
-            <p className="hero-eyebrow">Binary options. Fully onchain.</p>
             <h1>
               Trade what’s next
               <br />
@@ -53,14 +52,8 @@ export function MarketsHome() {
           )}
         </div>
         <div className="markets-section-heading">
-          <div>
-            <h2>Markets</h2>
-            <p>Explore onchain markets.</p>
-          </div>
-          <div><span className="network-note">
-            <i />
-            Unichain Sepolia
-          </span><MarketRefreshNotice stale={!!error && !!markets} /></div>
+          <h2>Markets</h2>
+          <MarketRefreshNotice stale={!!error && !!markets} />
         </div>
         <MarketBrowser
           markets={markets}

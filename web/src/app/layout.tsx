@@ -11,8 +11,8 @@ import { BRAND_NAME } from "@/config/brand";
 
 import "./globals.css";
 
-const akt = Akt({ variable: "--font-akt", weight: ["400", "500"], subsets: ["latin"], display: "swap", fallback: ["system-ui", "sans-serif"] });
-const lexendDeca = Lexend_Deca({ variable: "--font-lexend-deca", weight: ["300", "400", "500", "600"], subsets: ["latin"] });
+const akt = Akt({ variable: "--font-akt", subsets: ["latin"], display: "swap", fallback: ["system-ui", "sans-serif"] });
+const lexendDeca = Lexend_Deca({ variable: "--font-lexend-deca", subsets: ["latin"] });
 const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 const ubuntuMono = Ubuntu_Mono({ variable: "--font-ubuntu-mono", weight: ["400", "700"], subsets: ["latin"] });
 
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-    themeColor: "#191919",
+    themeColor: "#080b12",
     colorScheme: "dark",
 };
 

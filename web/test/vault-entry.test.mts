@@ -23,7 +23,7 @@ export const render = (props = {}) => renderToStaticMarkup(<VaultScreen view={em
         });
         const { render } = createRequire(import.meta.url)(outfile);
         const guest = render();
-        assert.match(guest, /View and manage your vault shares/);
+        assert.match(guest, /class="vault-connect" aria-label="Connect wallet"/);
         assert.equal((guest.match(/>Connect wallet<\/button>/g) ?? []).length, 1);
         assert.doesNotMatch(guest, /Vault metrics|Vault deposit and withdrawal|Exposure by Market|>N\/A</);
         assert.match(render({ connecting: true }), /disabled=""[^>]*>Connecting…/);
@@ -32,7 +32,7 @@ export const render = (props = {}) => renderToStaticMarkup(<VaultScreen view={em
             assert.match(html, /Vault metrics/);
             assert.match(html, /Vault deposit and withdrawal/);
             assert.match(html, /Exposure by Market/);
-            assert.doesNotMatch(html, /View and manage your vault shares/);
+            assert.doesNotMatch(html, /class="vault-connect"/);
             if (wrongNetwork) assert.match(html, />Switch network<\/button>/);
         }
         const recovery = render({ pending: true, message: 'Checking receipt', onCheckPending() {} });

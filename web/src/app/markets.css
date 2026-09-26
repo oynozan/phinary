@@ -13,7 +13,7 @@
   min-height: calc(100vh - var(--shell-top));
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-manrope), sans-serif;
+  font-family: var(--font-sans);
   padding-bottom: 48px;
   isolation: isolate;
 }
@@ -24,13 +24,13 @@ body:has(.markets-page)::before {
   display: none;
 }
 .markets-container {
-  max-width: 1536px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 0 48px;
+  padding: 0 var(--page-gutter);
 }
 .markets-page h1,
 .markets-page h2 {
-  font-family: inherit;
+  font-family: var(--font-heading);
 }
 .markets-page :is(a, button, input, select):focus-visible {
   outline: 2px solid #db9bff;
@@ -58,14 +58,14 @@ body:has(.markets-page)::before {
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   gap: 32px;
   align-items: center;
-  padding: 26px 0 30px;
+  padding: var(--page-top) 0 32px;
 }
 .markets-hero::before {
   content: "";
   position: absolute;
   z-index: -1;
   top: calc(-1 * var(--shell-top));
-  left: -48px;
+  left: calc(-1 * var(--page-gutter));
   width: 72%;
   height: calc(100% + var(--shell-top) + 4px);
   background: url("/markets/orbit.webp") center right / cover no-repeat;
@@ -73,21 +73,13 @@ body:has(.markets-page)::before {
   mask-image: linear-gradient(to bottom, black 75%, transparent);
 }
 .markets-intro {
-  padding: 14px 6px 22px;
-}
-.hero-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.23em;
-  text-transform: uppercase;
-  color: #bdc8e8;
-  margin-bottom: 12px;
+  padding: 0;
 }
 .markets-intro h1 {
   font-size: clamp(38px, 3.65vw, 58px);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.08;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   text-wrap: initial;
 }
 .markets-intro h1 span {
@@ -145,26 +137,6 @@ body:has(.markets-page)::before {
   position: relative;
   z-index: 2;
 }
-.featured-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.045em;
-  color: #c6cbea;
-  margin-bottom: 19px;
-}
-.featured-label > span:first-child {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.featured-label svg {
-  color: #ff7569;
-  fill: #ff7569;
-}
 .market-status {
   display: inline-flex;
   align-items: center;
@@ -179,8 +151,7 @@ body:has(.markets-page)::before {
   background: #07251e;
   color: #20dfa0;
 }
-.market-status i,
-.network-note i {
+.market-status i {
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -346,35 +317,26 @@ body:has(.markets-page)::before {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 .markets-section-heading h2 {
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
-.markets-section-heading p {
-  font-size: 13px;
-  color: #aebbd7;
-  margin-top: 1px;
-}
-.network-note {
+/* Asset and duration on the left, status, search and sort on the right, one row */
+.market-toolbar {
   display: flex;
   align-items: center;
-  gap: 7px;
-  color: #a5afc6;
-  font-size: 11px;
-  padding-bottom: 3px;
-}
-.network-note i {
-  color: #a679de;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-bottom: 16px;
 }
 .track-filter {
   display: flex;
-  justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 16px;
 }
 .track-filter > div,
 .market-state-controls {
@@ -386,7 +348,7 @@ body:has(.markets-page)::before {
 }
 .track-filter button {
   min-width: 46px;
-  min-height: 30px;
+  min-height: 32px;
   padding: 0 14px;
   border-radius: 7px;
   font-size: 12px;
@@ -398,15 +360,15 @@ body:has(.markets-page)::before {
   background: #222032;
 }
 .track-filter button[aria-pressed="true"] {
-  background: #9021c5;
-  color: white;
+  background: #542078;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #a442dd;
 }
 .market-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 18px;
-  margin-bottom: 19px;
 }
 .market-controls button {
   min-height: 32px;
@@ -621,9 +583,6 @@ a.market-price:hover {
   display: none;
 }
 @media (max-width: 1279px) {
-  .markets-container {
-    padding: 0 28px;
-  }
   .markets-hero {
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
     gap: 24px;
@@ -650,15 +609,11 @@ a.market-price:hover {
 @media (max-width: 1023px) {
   .markets-hero {
     grid-template-columns: 1fr;
-    padding-top: 12px;
     gap: 20px;
   }
   .markets-hero::before {
-    width: calc(100% + 48px);
+    width: calc(100% + 2 * var(--page-gutter));
     height: 350px;
-  }
-  .markets-intro {
-    padding-top: 22px;
   }
   .markets-intro h1 {
     font-size: 46px;
@@ -668,6 +623,10 @@ a.market-price:hover {
   }
   .featured-market .market-question {
     font-size: 21px;
+  }
+  .market-toolbar {
+    align-items: stretch;
+    flex-direction: column;
   }
   .market-controls {
     align-items: stretch;
@@ -679,9 +638,6 @@ a.market-price:hover {
   }
   .market-search {
     flex: 1;
-  }
-  .network-note {
-    font-size: 10px;
   }
   .market-table-desktop {
     display: none;
@@ -729,20 +685,8 @@ a.market-price:hover {
   }
 }
 @media (max-width: 639px) {
-  .markets-container {
-    padding: 0 20px;
-  }
   .markets-hero {
-    padding-top: 8px;
     padding-bottom: 28px;
-  }
-  .markets-intro {
-    padding: 16px 0 8px;
-  }
-  .hero-eyebrow {
-    font-size: 9px;
-    letter-spacing: 0.17em;
-    margin-bottom: 14px;
   }
   .markets-intro h1 {
     font-size: clamp(32px, 9vw, 44px);
@@ -777,10 +721,7 @@ a.market-price:hover {
     width: 38px;
     height: 38px;
   }
-  .featured-label {
-    margin-bottom: 17px;
-  }
-  .featured-stats strong {
+    .featured-stats strong {
     font-size: 14px;
   }
   .featured-stats > div {

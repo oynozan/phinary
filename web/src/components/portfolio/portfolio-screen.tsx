@@ -21,12 +21,9 @@ export function PortfolioScreen({ display, now, actions, notice, marketBase = ""
     const sellTarget = sellId ? display.rows.find((r) => r.id === sellId) ?? null : null;
     const shared = { availability: display.availability, now, actionsEnabled: actionEnabled, onSell: (row: PortfolioRow) => { captureFocus(); setMessage(""); setSellId(row.id); }, onClaim: (row: PortfolioRow) => { captureFocus(); setMessage(""); setClaimRows(claimable.filter((r) => r.marketId === row.marketId)); }, marketBase };
     return <div className="portfolio-page"><div className="portfolio-container">
-        <header className="portfolio-heading"><h1 ref={heading} tabIndex={-1}>Portfolio</h1><p>Your positions, claims and history.</p></header>
-        {display.availability === "disconnected" ? <section className="portfolio-connect" aria-labelledby="portfolio-connect-title">
-            <h2 id="portfolio-connect-title">View your positions and claims</h2>
-            <p>Track the tokens you hold and collect payouts from settled markets.</p>
+        <header className="page-head"><h1 ref={heading} tabIndex={-1}>Portfolio</h1></header>
+        {display.availability === "disconnected" ? <section className="portfolio-connect" aria-label="Connect wallet">
             {notice && <div className="portfolio-notice">{notice}</div>}
-            <a href={marketBase || "/"}>Explore markets</a>
         </section> : <>
         {notice && <div className={`portfolio-notice ${display.availability === "ready" ? "portfolio-notice-ready" : ""}`}>{notice}</div>}
         <PortfolioSummary display={display} claimEnabled={actionEnabled && claimPlan(claimable).marketIds.length > 0 && claimPlan(claimable).amount !== null} onClaimAll={() => { captureFocus(); setMessage(""); setClaimRows(claimable); }} />

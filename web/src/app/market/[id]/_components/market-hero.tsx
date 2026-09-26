@@ -12,8 +12,8 @@ export function MarketHero({ market, stale = false }: { market: Market; stale?: 
     return <header className="detail-hero">
         <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4"><Link href="/" className="detail-back">Back to Markets</Link><MarketRefreshNotice id={market.id} stale={stale} /></div>
         <div className="detail-title-row"><div><h1>{detailQuestion(market)}</h1><p>{utcDate(market.expiry)}</p></div>
-            <p className={`detail-status ${market.phase === "live" ? "is-live" : ""}`}>
-                {DETAIL_PHASE[market.phase]}{deadline !== null && <> · <span aria-label={DEADLINE_LABEL[market.phase]}><Countdown to={deadline} /></span></>}
+            <p className="detail-status">
+                {deadline !== null && DEADLINE_LABEL[market.phase] ? <>{DEADLINE_LABEL[market.phase]} <strong><Countdown to={deadline} /></strong></> : DETAIL_PHASE[market.phase]}
             </p>
         </div>
     </header>;
