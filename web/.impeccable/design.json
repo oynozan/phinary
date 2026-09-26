@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T06:40:50.993433+00:00",
+  "title": "Design System: Phinary",
+  "extensions": {
+    "scope": [
+      "Markets route /",
+      "shared header"
+    ],
+    "sources": [
+      "src/app/markets.css",
+      "src/app/globals.css",
+      "src/components/layout/header.tsx"
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ],
+    "layout": {
+      "shellTop": "88px",
+      "shellTopBelow640": "76px",
+      "headerHeight": "64px",
+      "containerMax": "1536px"
+    },
+    "shadows": [
+      {
+        "name": "active-state-filter",
+        "value": "inset 0 0 0 1px #a442dd",
+        "purpose": "Active state filter boundary."
+      }
+    ],
+    "motion": [
+      {
+        "name": "markets-reduced-motion",
+        "value": "animation: none; transition: none",
+        "purpose": "Applied throughout Markets under prefers-reduced-motion: reduce."
+      }
+    ],
+    "effects": {
+      "headerBackdrop": "blur(12px)",
+      "heroArtworkOpacity": 0.65
+    },
+    "previewData": "Price values in component snippets are illustrative design-panel examples, never application data."
+  },
+  "components": [
+    {
+      "name": "UP price action",
+      "kind": "button",
+      "description": "Featured available UP price link.",
+      "html": "<a class=\"ds-up\" href=\"#\">Buy UP 63\u00a2</a>",
+      "css": ".ds-up{display:flex;align-items:center;justify-content:center;gap:5px;min-height:43px;border-radius:8px;font:800 15px Manrope,sans-serif;color:white;background:linear-gradient(110deg,#9918d0,#7733cf);text-decoration:none}.ds-up:hover{filter:brightness(1.14)}.ds-up:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
+    },
+    {
+      "name": "DOWN price action",
+      "kind": "button",
+      "description": "Featured DOWN navigation retains existing preview behavior.",
+      "html": "<a class=\"ds-down\" href=\"#\">Buy DOWN 37\u00a2</a>",
+      "css": ".ds-down{display:flex;align-items:center;justify-content:center;min-height:43px;border-radius:8px;font:800 15px Manrope,sans-serif;color:white;background:#bb3739;text-decoration:none}.ds-down:hover{filter:brightness(1.14)}.ds-down:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
+    },
+    {
+      "name": "Search",
+      "kind": "input",
+      "refersTo": "search",
+      "description": "Compact market search with border focus treatment.",
+      "html": "<label class=\"ds-search\"><input aria-label=\"Search markets\" placeholder=\"Search markets\" /></label>",
+      "css": ".ds-search{height:40px;width:215px;display:flex;align-items:center;border:1px solid #2c3242;border-radius:8px;padding:0 12px;color:#b4bdd3}.ds-search input{width:100%;min-width:0;font:12px Manrope,sans-serif;background:transparent;color:#f5f5fa;border:0;caret-color:#db9bff}.ds-search input::placeholder{color:#a4afc8}.ds-search:focus-within{border-color:#bc79ed}.ds-search input:focus-visible{outline:none}"
+    },
+    {
+      "name": "Shared navigation",
+      "kind": "nav",
+      "refersTo": "header",
+      "description": "Translucent shared bar; full application header also retains wordmark and wallet.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Markets</a><a href=\"#\">Portfolio</a></nav>",
+      "css": ".ds-nav{height:64px;display:flex;gap:36px;padding:0 48px;background:rgb(9 12 20 / 94%);border-bottom:1px solid #252a38;backdrop-filter:blur(12px);font:14px Manrope,sans-serif}.ds-nav a{position:relative;display:flex;align-items:center;color:#bfc8df;text-decoration:none}.ds-nav a[aria-current]{color:#fff}.ds-nav a[aria-current]::after{content:\"\";position:absolute;left:0;right:0;bottom:0;height:2px;background:#bc55ff}.ds-nav a:hover{color:#ddaeff}.ds-nav a:focus-visible{outline:2px solid #d190ff;outline-offset:4px}"
+    },
+    {
+      "name": "Live status",
+      "kind": "chip",
+      "description": "Featured live status label.",
+      "html": "<span class=\"ds-live\"><i></i>LIVE</span>",
+      "css": ".ds-live{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 8px;background:#07251e;color:#20dfa0;font:700 10px Manrope,sans-serif;letter-spacing:.045em}.ds-live i{width:6px;height:6px;border-radius:50%;background:currentColor}"
+    },
+    {
+      "name": "Featured card",
+      "kind": "card",
+      "refersTo": "featured-card",
+      "description": "Translucent preview surface with whole-card focus and hover.",
+      "html": "<a class=\"ds-card\" href=\"#\">Featured market</a>",
+      "css": ".ds-card{display:block;min-width:0;padding:20px;border:1px solid #252a38;border-radius:12px;background:rgb(12 16 25 / 88%);color:#f5f5fa;font:13px Manrope,sans-serif;text-decoration:none}.ds-card:hover,.ds-card:focus-visible{border-color:#654085}.ds-card:focus-visible{outline:2px solid #db9bff;outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "overview": "This refresh applies to the Markets route and shared header only. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface brief is `.impeccable/markets.md`; product and data constraints remain in `PRODUCT.md`.",
+    "dos": [
+      "Do preserve the scoped Markets palette, compact density and visible keyboard focus.",
+      "Do keep the shared header offset consistent across every route."
+    ],
+    "donts": [
+      "Don't apply this refresh to other route bodies without a separate decision.",
+      "Don't animate the orbital artwork continuously or replace unavailable data with decorative charts."
+    ]
+  }
+}

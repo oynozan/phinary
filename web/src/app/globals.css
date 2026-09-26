@@ -252,3 +252,18 @@
         animation: none;
     }
 }
+
+/* Shared header refresh. Other page body tokens remain unchanged. */
+:root { --header-h: 64px; --shell-top: 88px; }
+.app-header { position: fixed; inset: 0 0 auto; z-index: 50; height: 64px; background: rgb(9 12 20 / 94%); border-bottom: 1px solid #252a38; backdrop-filter: blur(12px); color: #f5f5fa; font-family: var(--font-manrope), sans-serif; }
+.app-header-inner { width: 100%; height: 100%; max-width: 1536px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 48px; justify-content: space-between; }
+.app-header-nav { align-self: stretch; flex: 1; gap: 36px; align-items: stretch; }
+.app-header-link { position: relative; display: flex; align-items: center; font-size: 14px; color: #bfc8df; }
+.app-header-link.is-active { color: #fff; }
+.app-header-link.is-active::after { content: ''; position: absolute; height: 2px; left: 0; right: 0; bottom: 0; background: #bc55ff; }
+.app-header-link:hover { color: #ddaeff; }
+.app-header .header-wallet, .app-header .header-balance { height: 38px; border-radius: 9px; border: 1px solid #303646; background: #10141e; color: #e7eafb; font-size: 12px; padding: 0 13px; }
+.app-header .header-wallet:hover { background: #20192d; border-color: #8e55b3; }
+.app-header a:focus-visible, .app-header button:focus-visible { outline: 2px solid #d190ff; outline-offset: 4px; }
+@media (max-width: 1279px) { .app-header-inner { padding: 0 28px; gap: 32px; } .app-header-nav { gap: 26px; } }
+@media (max-width: 639px) { :root { --shell-top: 76px; } .app-header-inner { padding: 0 20px; gap: 12px; } .app-header .header-wallet { padding: 0 12px; max-width: 155px; } }

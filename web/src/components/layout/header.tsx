@@ -13,23 +13,24 @@ import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { isActivePath, NAV_ITEMS } from "./nav-items";
 
-/** Floating pill header (atomic.cash): logo left, text nav centered, wallet right. */
+/** Shared navigation; wallet behavior stays in its existing components. */
 export function Header() {
     const pathname = usePathname();
 
     return (
-        <header className="fixed z-50 flex w-full items-center justify-center px-2 pt-4 sm:px-4">
-            <div className="flex h-(--header-h) w-full max-w-[1200px] min-w-0 items-center justify-between gap-2 rounded-full border bg-surface px-4 sm:gap-4 sm:px-6 lg:px-10">
+        <header className="app-header">
+            <div className="app-header-inner">
                 <Logo />
 
-                <nav className="hidden min-w-0 flex-1 justify-center gap-6 lg:flex">
+                <nav className="app-header-nav hidden lg:flex">
                     {NAV_ITEMS.map((item) => (
                         <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
                             className={cn(
-                                "text-lg transition-colors",
-                                isActivePath(pathname, item.href) ? "text-white" : "text-muted-foreground hover:text-primary",
+                                "app-header-link",
+                                isActivePath(pathname, item.href) ? "is-active" : "",
                             )}
                         >
                             {item.label}
@@ -38,8 +39,8 @@ export function Header() {
                 </nav>
 
                 <div className="flex min-w-0 items-center justify-end gap-2">
-                    <BalancePill className="hidden md:flex" />
-                    <ConnectButton />
+                    <BalancePill className="header-balance hidden md:flex" />
+                    <ConnectButton className="header-wallet" />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button

@@ -1,22 +1,125 @@
-# Design system
+---
+name: Phinary Markets and shared header
+description: Compact near-black financial interface with violet atmosphere.
+colors:
+  background: "#080b12"
+  surface: "#0d111a"
+  surface-2: "#151925"
+  foreground: "#f5f5fa"
+  muted: "#b4bdd3"
+  border: "#252a38"
+  primary: "#b739ee"
+  hero-accent: "#bf55f5"
+  nav-accent: "#bc55ff"
+  up: "#d773ff"
+  down: "#ff736a"
+  live: "#20dfa0"
+  header: "rgb(9 12 20 / 94%)"
+  featured: "rgb(12 16 25 / 88%)"
+typography:
+  display:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "clamp(38px, 3.65vw, 58px)"
+    fontWeight: 800
+    lineHeight: 1.08
+    letterSpacing: "-0.035em"
+  title:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "25px"
+    fontWeight: 800
+    letterSpacing: "-0.035em"
+  table:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "13px"
+  label:
+    fontFamily: "Manrope, sans-serif"
+    fontSize: "11px"
+rounded:
+  card: "12px"
+  control: "8px"
+  filter: "7px"
+  control-group: "9px"
+spacing:
+  compact: "12px"
+  card-mobile: "16px"
+  card: "20px"
+  gutter-tablet: "28px"
+  gutter-desktop: "48px"
+components:
+  featured-card:
+    backgroundColor: "{colors.featured}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.card}"
+    padding: "20px"
+  header:
+    backgroundColor: "{colors.header}"
+    textColor: "{colors.foreground}"
+    height: "64px"
+  search:
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.control}"
+    height: "40px"
+    width: "215px"
+---
 
-The look follows atomic.cash (floating pill header, magnifying dock, big centered hero, rounded-3xl panels, pill controls, noise overlay), re-tinted orchid on carbon. Dark theme only.
+# Design System: Phinary
 
-## Hard rules
+## Overview
+
+This refresh applies to the Markets route and shared header only. It pairs compact financial content with a near-black ground and static violet atmosphere. Other route bodies retain the legacy reference below. The approved surface brief is `.impeccable/markets.md`; product and data constraints remain in `PRODUCT.md`.
+
+## Colors
+
+Violet has distinct implemented roles: primary token, hero accent, navigation underline and lighter UP text. Coral identifies DOWN; green identifies live/success. Dark panels use fine neutral borders and subdued secondary text. Frontmatter values are extracted from `src/app/markets.css` and the shared-header rules in `src/app/globals.css`.
+
+## Typography
+
+Markets and header use Manrope, with inherited tabular numerals. The text-only Phinary wordmark retains its existing Akt treatment. Hero type is bold and tightly tracked; table values use compact regular and semibold text. At tablet widths the hero is 46px; below 640px it uses `clamp(32px, 9vw, 44px)`.
+
+## Layout
+
+Shared header height is 64px on every route. The shell supplies 88px top padding, reduced to 76px below 640px; page bodies must not add a second header offset. Existing bottom dock clearance remains unchanged.
+
+Markets and header containers cap at 1536px, with 48px gutters, 28px below 1280px and 20px below 640px. Markets uses a 1.6:1 hero grid (1.3:1 below 1280px), stacking below 1024px. At the same breakpoint the semantic desktop table becomes compact list rows. Desktop navigation gives way to the existing mobile menu and dock below 1024px.
+
+## Elevation & Depth
+
+Thin borders and tonal surfaces establish depth. The header uses 12px backdrop blur; the featured card is slightly translucent. Static orbital artwork fades behind the hero at 0.65 opacity. Scoped gradient masks and the UP action gradient are approved. Active state filters use an inset border shadow. No permanent artwork animation; Markets honors reduced motion.
+
+## Shapes
+
+Cards and table containers use the card radius. Search, select and featured actions use the control radius. Filter buttons use the smaller filter radius; filter groups, row actions and header wallet controls use the control-group radius. Status labels and ETH symbols are rounded independently.
+
+## Components
+
+The header keeps a text-only wordmark, active underline and existing wallet behavior. Markets includes a featured preview, UP/DOWN price actions, underlying and state filters, search, sort, and row links with separate price/action targets. Hover and keyboard focus preserve row geometry; search focus highlights its border. Disabled or unavailable prices use muted opaque surfaces. Loading, empty and error states retain card boundaries.
+
+## Do's and Don'ts
+
+- Do preserve the scoped Markets palette, compact density and visible keyboard focus.
+- Do keep the shared header offset consistent across every route.
+- Don't apply this refresh to other route bodies without a separate decision.
+- Don't animate the orbital artwork continuously or replace unavailable data with decorative charts.
+
+## Legacy body reference
+
+The following rules apply only to other route bodies and their existing components. Their atomic.cash-derived panels, dock, typography, noise and pill controls remain unchanged. Shared header and shell spacing follow Layout above.
+
+### Hard rules
 
 - **No gradients anywhere.** No `linear-` / `radial-` / `conic-gradient` in CSS or inline styles, no Tailwind `bg-linear-*` / `bg-gradient-*` / `from-` / `via-` / `to-`, no SVG `<linearGradient>` / `<radialGradient>`, no gradient chart fills, masks or text. Flat solid colours only. Charts are a line, no area fill.
 - **Buttons are solid.** Every button, pill button, segmented / tab item, dock icon, menu trigger and the LiquidMetal Trade button has an opaque fill. No `bg-x/NN` alpha fills, no transparent ghost fills, no `backdrop-blur`, no `opacity-*` on a button surface. Tinted buttons use the opaque tint tokens (`bg-up-soft`, `bg-primary-soft`, ...). Outline buttons sit on `bg-surface-2`. Disabled is an opaque muted fill (`bg-primary-disabled` for primary, `bg-surface-2` + `text-subtle` for the rest), never reduced opacity.
 - **No labels on or above headings.** No status pill, eyebrow, kicker, overline or tag above, on or attached to a heading or market question. Status is the countdown itself (a live market shows its countdown), disabled / closed actions, or the value in a result line ("Resolved ▲ UP", "Settled $2,696.45").
 - **No mock logos.** The header shows the plain "Phinary" wordmark in Akt, no mark. The favicon is a solid orchid "P" on carbon. No generated token discs: where a side needs an indicator use plain inline "▲ UP" / "▼ DOWN" text in the side colour (`SideMark`).
 
-## Copy rules
+### Copy rules
 
 - No em dashes anywhere (UI, code, comments, docs). Avoid en dashes in UI copy. Use a hyphen, colon or comma.
 - No eyebrow / kicker / overline text or status pill above, on or beside headings. Headings stand alone.
 - Minimal: numbers and actions. No helper paragraphs, no explanatory labels, no marketing copy. Empty states are one line plus at most one button.
 - Sides are always **UP** / **DOWN** (never YES / NO). Prices as cents (`63¢`) or chance (`62%`). Tickers `ETHUP` / `ETHDOWN`.
 
-## Tokens (`src/app/globals.css`)
+### Tokens (`src/app/globals.css`)
 
 | Token (Tailwind) | Value | Use |
 |---|---|---|
@@ -45,7 +148,7 @@ Always pair UP / DOWN colours with ▲ / ▼ or the words UP / DOWN. Profit is n
 
 Utilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash` (flat `wash` colour for highlight and empty panels), `animate-live` (pulsing dot), `no-scrollbar`.
 
-## Fonts
+### Fonts
 
 | Class | Font | When |
 |---|---|---|
@@ -54,21 +157,21 @@ Utilities: `num` (tabular numbers, also on by default on body), `bg-accent-wash`
 | `font-secondary` | Manrope | small UI text: pills, badges, table numbers, axis ticks, captions |
 | `font-mono` | Ubuntu Mono | addresses and tx hashes only, rarely |
 
-## Layout
+### Layout
 
-- Shell: fixed pill header (top, opaque `bg-surface`) and floating dock (bottom, opaque `bg-surface`, icons on `bg-surface-2`) live in `app/layout.tsx`. `<main>` already pads for both (`--shell-top`, `--shell-bottom`) and uses `overflow-x-clip`, so `sticky` works on every page; pages start directly with content.
+- Shell: the shared translucent header and existing floating dock live in `app/layout.tsx`. `<main>` provides the shared top offset described above and existing bottom padding (`--shell-bottom`), with `overflow-x-clip` so sticky content works; pages start directly with content.
 - The dock is mobile and tablet navigation only (hidden from 1024 px, where the header nav takes over). Keep primary actions clear of it below 1024 px.
 - Containers (`@/components/layout/page`): `PageWide` (1200px, header gutters) for grids and tables; `PageNarrow` (`size="sm"` 575px for trade box and forms, `size="md"` 720px for lists and detail). Everything is centered.
 - Headings: `PageHeading` (centered h1, 3xl to 5xl) for section pages; `HeroHeading` + `Accent` (one accent word) for the home hero. Every page hero is centered on the page, above any two-column grid (the market page puts its question, its countdown and the timeline in a full-width row, then the grid). Titles of panels in a column sit inside the panel (`h2 text-xl` in the panel's padding); `SectionHeading` is for centered section titles in a single column.
 - Spacing: generous. Panels `p-5 sm:p-6`, grids `gap-5`, sections `space-y-10` or more. Large type.
 
-## Radii and shapes
+### Radii and shapes
 
 - `rounded-3xl` (24px): panels, cards, stacked trade card, dialogs. `rounded-4xl` (32px) for a big hero panel.
 - `rounded-full`: every button, pill, segmented control, input, badge, the round arrow between stacked sections.
 - `rounded-2xl`: menu popovers, list rows inside dialogs, chart tooltip.
 
-## Components
+### Components
 
 Layout and wallet:
 
@@ -108,7 +211,7 @@ Market (`@/components/market`):
 
 Also exported: `PHASE_DOT` (status dot classes per phase) from `phase-badge`. Trade (`@/components/trade`): `TradeCard` (swaps to an outcome card with Claim once resolved), `useClaims` (`claimOne`, `claimAll`, switches network first; the only claim hook).
 
-## atomic.cash patterns to reuse
+### atomic.cash patterns to reuse
 
 - **Stacked trade card**: always `SwapStack` + `SwapOutput` + `AssetChip`, never a hand-rolled copy. One card, not a card inside a card: selectors (pills, outcome buttons) above it, the summary line and CTA below it.
 - **Settings row under a card**: `mt-3 flex justify-between px-1 text-xs text-muted-foreground` with `SegmentedPills size="xs"`.
@@ -120,7 +223,7 @@ Also exported: `PHASE_DOT` (status dot classes per phase) from `phase-badge`. Tr
 - **Disabled CTAs**: the label stays readable; the surface switches to an opaque muted fill (`LiquidMetalButton` uses its muted rim and surface, the default `Button` goes `bg-primary-disabled`), never reduced opacity.
 - **Error panels**: `rounded-3xl border border-down bg-down-soft text-down text-sm` centered one-liner.
 
-## Data
+### Data
 
 Pages read data only through `@/lib/data`: `useMarkets(tab?)` (rolling 90-minute window), `useMarket(id)`, `useLiveMarketId(exclude?)`, `useQuote(id)`, `usePriceHistory(id)`, `useMarketTrades(id)`, `useEthPrice()`, `usePortfolio()`, `useActivity(limit?)`, `useLeaderboard(limit?)`, `useVault()`, `useWallet()` (state + `connect`, `disconnect`, `switchNetwork`, `requestTestFunds`, `buy`, `sell`, `claim`, `vaultDeposit`, `vaultWithdraw`). Each returns `{ data, isLoading }` (`useWallet` returns state + actions + `isLoading`). `data` is `undefined` on the server and during hydration: render `Skeleton`s, never clock-dependent values. `useNow()` gives the ticking clock.
 
