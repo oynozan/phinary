@@ -343,5 +343,12 @@ test("anvil: mirror steers the real pool and keeper drives a market lifecycle", 
     assert.equal(isAlreadyOpened(threw), false, "InsufficientIdle is not AlreadyOpened");
     assert.equal(submitted, false, "onSubmitted is not called for a real failure");
     assert.equal(await read<boolean>(c, scheduler, a.scheduler.abi, "canOpen"), false, "canOpen agrees");
+
+    const before = lines.length;
+    await keeperTick(keeper, { create: true, settle: false });
+    await keeperTick(keeper, { create: true, settle: false });
+    const refusals = lines.slice(before).filter((l) => l.includes("open() refused"));
+    assert.equal(refusals.length, 1, "keeperTick warns once for the slot instead of failing every poll");
+    assert.match(refusals[0]!, /WARN .*InsufficientIdle\(500000, 5000000\)/);
   });
 });

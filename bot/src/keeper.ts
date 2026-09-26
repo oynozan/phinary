@@ -8,7 +8,7 @@ import {
   type PublicClient,
   type TransactionReceipt,
 } from "viem";
-import { marketSchedulerAbi, MarketStatus, predictionHookAbi, predictionHookAdminAbi } from "./abi.ts";
+import { marketSchedulerAbi, MarketStatus, predictionHookAbi, predictionHookAdminAbi, sealedPoolOracleAbi } from "./abi.ts";
 import { assertChainId, makeClients, shutdownSignal, sleep, waitForSuccess, type Clients } from "./chain.ts";
 import { loadEnvFiles, loadKeeperConfig, requireAddress, USDC_DECIMALS, type KeeperConfig } from "./config.ts";
 import { createLogger, errMsg, type Logger } from "./log.ts";
@@ -32,6 +32,9 @@ export interface KeeperOptions {
 }
 
 type HookWrite = { functionName: "settle" | "settleInvalid" | "sweep"; args: readonly [bigint] };
+
+/** With the sealed oracle's errors, so a StaleSpot or NotStarted inside `open()` decodes by name */
+const openAbi = [...marketSchedulerAbi, ...sealedPoolOracleAbi.filter((x) => x.type === "error")] as const;
 
 /** First wall-clock second at which the next market should be created. */
 export function nextCreateTime(nowSec: number, periodSec: number, align: boolean, first: boolean): number {
@@ -72,6 +75,13 @@ export function isAlreadyOpened(e: unknown): boolean {
   return alreadyOpenedSlot(e) !== undefined;
 }
 
+/** A revert's decoded error and args, its selector when undecoded, else the error's short message */
+export function revertText(e: unknown): string {
+  const r = e instanceof BaseError ? (e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null) : null;
+  if (r?.data) return `${r.data.errorName}(${(r.data.args ?? []).map(String).join(", ")})`;
+  return r?.signature ?? r?.reason ?? errMsg(e);
+}
+
 /** The slot a create due at `wallSec` targets, the later of the wall clock's and the latest block's */
 export function targetSlot(chainNow: bigint, wallSec: number, periodSec: number): bigint {
   const now = BigInt(wallSec) > chainNow ? BigInt(wallSec) : chainNow;
@@ -110,6 +120,8 @@ export class Keeper {
   readonly pending = new Set<bigint>();
   lastCount: bigint | undefined;
   nextCreateAt: number | undefined;
+  /** Slot of the last refused `open()` logged, so a refusal warns once per slot */
+  private refusedSlot: bigint | undefined;
 
   constructor(opts: KeeperOptions) {
     this.opts = opts;
@@ -262,7 +274,7 @@ export class Keeper {
     const { log, scheduler } = this.opts;
     let outcome: { result: unknown; hash?: Hash; receipt?: TransactionReceipt };
     try {
-      outcome = await this.send(scheduler, marketSchedulerAbi, { functionName: "open", args: [] }, onSubmitted);
+      outcome = await this.send(scheduler, openAbi, { functionName: "open", args: [] }, onSubmitted);
     } catch (e) {
       const opened = alreadyOpenedSlot(e);
       if (opened === undefined) throw e;
@@ -305,6 +317,18 @@ export class Keeper {
     return id;
   }
 
+  /** Opens the due slot's market, a refused `open()` warns once per slot and stays due, other failures throw */
+  async openDue(now: bigint, wallSec: number): Promise<void> {
+    try {
+      await this.createMarket(now, () => this.scheduleNextCreate(wallSec), wallSec);
+    } catch (e) {
+      if (!isRevert(e)) throw e;
+      const slot = targetSlot(now, wallSec, this.opts.periodSec);
+      if (slot !== this.refusedSlot) this.opts.log.warn("open() refused, retrying every poll", { slot, error: revertText(e) });
+      this.refusedSlot = slot;
+    }
+  }
+
   isCreateDue(nowSec: number): boolean {
     if (this.nextCreateAt === undefined) {
       this.nextCreateAt = nextCreateTime(nowSec, this.opts.periodSec, this.opts.alignToPeriod, true);
@@ -328,7 +352,7 @@ export async function keeperTick(
   if (cfg.settle) await keeper.settleAndSweep((await publicClient.getBlock({ blockTag: "latest" })).timestamp);
   if (cfg.create && keeper.isCreateDue(wallSec)) {
     const block = await publicClient.getBlock({ blockTag: "latest" });
-    await keeper.createMarket(block.timestamp, () => keeper.scheduleNextCreate(wallSec), wallSec);
+    await keeper.openDue(block.timestamp, wallSec);
   }
 }
 

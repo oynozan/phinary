@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ContractFunctionRevertedError, encodeErrorResult, type Address } from "viem";
-import { marketSchedulerAbi, MarketStatus, predictionHookAbi } from "../src/abi.ts";
+import { ContractFunctionRevertedError, encodeErrorResult, type Abi, type Address } from "viem";
+import { marketSchedulerAbi, MarketStatus, predictionHookAbi, sealedPoolOracleAbi } from "../src/abi.ts";
 import type { Clients } from "../src/chain.ts";
 import {
   idsToScan,
@@ -115,6 +115,22 @@ const alreadyOpened = (slot = 1n) =>
     data: encodeErrorResult({ abi: marketSchedulerAbi, errorName: "AlreadyOpened", args: [slot] }),
   });
 
+/** A decoded InsufficientIdle revert, the scheduler refusing a vault too small for its minimum budget */
+const insufficientIdle = () =>
+  new ContractFunctionRevertedError({
+    abi: marketSchedulerAbi,
+    functionName: "open",
+    data: encodeErrorResult({ abi: marketSchedulerAbi, errorName: "InsufficientIdle", args: [400_000n, 1_000000n] }),
+  });
+
+/** The sealed oracle's StaleSpot bubbling up through `open()`, decoded with the ABI the keeper simulates with */
+const staleSpot = (abi: Abi) =>
+  new ContractFunctionRevertedError({
+    abi,
+    functionName: "open",
+    data: encodeErrorResult({ abi: sealedPoolOracleAbi, errorName: "StaleSpot", args: [10n, 15n] }),
+  });
+
 function info(status: number, expiry = 10n ** 12n): MarketInfo {
   return {
     yes: HOOK,
@@ -140,8 +156,8 @@ interface Fake {
   infoFails: Map<bigint, number>;
   /** Generic (non-revert) failures `open()`'s simulate should throw before it succeeds, e.g. an RPC error. */
   openFails: number;
-  /** When set, every `open()` simulate throws this instead of succeeding */
-  openError?: () => Error;
+  /** When set, every `open()` simulate throws this, given the simulated ABI, instead of succeeding */
+  openError?: (abi: Abi) => Error;
   blockTimes: bigint[];
   /** Args recorded on each `open()` simulate that was accepted (i.e. did not throw). */
   opens: unknown[][];
@@ -176,9 +192,9 @@ function fakeKeeper(f: Fake, opts: { dryRun?: boolean; log?: (line: string) => v
       throw new Error(`unexpected read ${functionName}`);
     },
     getBlock: async () => ({ timestamp: f.blockTimes.shift() ?? 0n }),
-    simulateContract: async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+    simulateContract: async ({ abi, functionName, args }: { abi: Abi; functionName: string; args?: readonly unknown[] }) => {
       if (functionName === "open") {
-        if (f.openError) throw f.openError();
+        if (f.openError) throw f.openError(abi);
         if (f.openFails-- > 0) throw new Error("fetch failed");
         f.opens.push([...(args ?? [])]);
         return { request: { functionName }, result: f.count + 1n };
@@ -354,3 +370,37 @@ test("open, settle and sweep are sent with the padded estimate, not viem's bare 
   for (const s of f.sent!) assert.equal(s.gas, keeperGasLimit(1_670_860n), `${s.functionName} gas`);
 });
 
+test("a refused open() warns once per slot and stays due, a transport error still throws", async () => {
+  const lines: string[] = [];
+  const f = fake({ openError: insufficientIdle });
+  const k = fakeKeeper(f, { log: (l) => lines.push(l) });
+  const cfg = { create: true, settle: false };
+  const warns = () => lines.filter((l) => l.includes(" WARN ") && l.includes("open() refused"));
+  f.blockTimes.push(6000n);
+  await keeperTick(k, cfg, 6000);
+  assert.equal(warns().length, 1);
+  assert.match(warns()[0]!, /InsufficientIdle/);
+  assert.match(warns()[0]!, /slot=100/);
+  assert.equal(k.nextCreateAt, 6000, "still due");
+  for (const t of [6002, 6004, 6030]) {
+    f.blockTimes.push(BigInt(t));
+    await keeperTick(k, cfg, t);
+  }
+  assert.equal(warns().length, 1, "no repeat inside slot 100");
+
+  f.openError = staleSpot;
+  f.blockTimes.push(6061n);
+  await keeperTick(k, cfg, 6061);
+  assert.equal(warns().length, 2, "slot 101 warns again");
+  assert.match(warns()[1]!, /StaleSpot/, "an oracle revert through open() is named");
+
+  f.openError = () => new Error("fetch failed");
+  f.blockTimes.push(6063n);
+  await assert.rejects(keeperTick(k, cfg, 6063), /fetch failed/);
+  assert.equal(warns().length, 2);
+
+  f.openError = undefined;
+  f.blockTimes.push(6065n);
+  await keeperTick(k, cfg, 6065);
+  assert.equal(f.opens.length, 1, "opens once the scheduler accepts");
+});

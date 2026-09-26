@@ -243,7 +243,7 @@ MARKET_BUDGET_USDC=10 make bots    # any bot setting passes through, see bot/.en
 - A market's budget is the most its LPs can lose. It also caps trade size: a buy of `x` USDC at price `p` needs `budget + x ≥ x / p`, so near 0.5 a single buy is capped at about the budget.
 - Each opened market's budget is `min(MARKET_BUDGET_USDC, vaultIdle / 2)`, decided by the scheduler itself; `open()` reverts `InsufficientIdle` below `SCHEDULER_MIN_BUDGET_USDC`, and about two markets hold budget at once.
 
-With a 40 USDC vault, use `MARKET_BUDGET_USDC=10` and demo trades of 2-5 USDC. While the vault is too short to afford `SCHEDULER_MIN_BUDGET_USDC`, `open()` reverts `InsufficientIdle`; the keeper logs the failure and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded.
+With a 40 USDC vault, use `MARKET_BUDGET_USDC=10` and demo trades of 2-5 USDC. While the vault is too short to afford `SCHEDULER_MIN_BUDGET_USDC`, `open()` reverts `InsufficientIdle`. The keeper logs `open() refused … error=InsufficientIdle(…)` once per slot as a warning and retries every poll (`KEEPER_POLL_MS`, default 2 s) until the vault is funded. An oracle revert inside `open()`, such as the sealed oracle's `StaleSpot`, is logged the same way.
 
 ## 5. Front ends
 
