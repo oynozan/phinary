@@ -15,7 +15,7 @@ How it uses v4:
 - **ERC-6909 claims.** The hook keeps all of its USDC and returned tokens as claims inside the PoolManager. A trade only adjusts claims, plus a mint of new outcome tokens straight into the PoolManager when inventory runs short.
 - **Self-initialised pools.** Only the hook can create its pools. v4 skips `beforeInitialize` on self-calls, and the hook reverts it for everyone else.
 - **Unchanged routing.** Traders use UniversalRouter and V4Quoter exactly as for any other v4 pool ([Integration](/integration)).
-- **One external read.** Prices and settlement come from an `IUnderlyingOracle`, itself a v4 hook on an ETH/USDC pool ([Oracle](/oracle)). There are no external oracles and no external services.
+- **One price source: Uniswap.** Prices and settlement come from an `IUnderlyingOracle`, itself a v4 hook on an ETH/USDC pool ([Oracle](/oracle)). That is an oracle, but not an external one: no third party reports prices. The off-chain bots only send permissionless transactions and cannot choose a price.
 
 ## Lifecycle
 
