@@ -1,6 +1,6 @@
 # Permissionless markets: design
 
-**Date:** 2026-09-26. **Status:** approved in chat; awaiting review of this written spec.
+**Date:** 2026-09-26. **Status:** phase 1 (scheduler) and phase 2 (SealedPoolOracle with proofs) approved in chat.
 
 ## Goal
 
@@ -120,11 +120,142 @@ hook address.
 - **Rehearsal:** open, buy UP through UniversalRouter, settle, redeem.
 - **Bot:** unit tests for the new create step.
 
+## Phase 2: SealedPoolOracle (mainnet price source on Unichain)
+
+### Why
+
+Mainnet has to stay on Unichain with no external oracle. Research on 2026-09-26 covered live Unichain data, prior art, and
+state proofs from L1 and from L2:
+- The only deep ETH/USDC pool on Unichain is the **hookless** v4 5 bp pool `0x3258…39d9`.
+  - Its TVL is $20M. Its in-range virtual depth is $8.09M: L = 1.56e17, read on-chain.
+  - A hook cannot be added to an existing pool.
+- **Our own oracle-hooked pool:** safe only when small. It would need seed liquidity and a routing allowlist.
+- **Reading the deep pool's `slot0` directly:** a same-transaction push, read and unwind costs about $38 per 1%. Unusable.
+- **Unichain's v3 30 bp pool:** can be moved up to 0.3% for almost nothing, because of its fee band.
+- **Proving L1 state:** always about 60 s stale.
+
+`SealedPoolOracle` gives the deep hookless pool the same guarantee as `UnderlyingOracleHook`: no value can be moved by swaps
+earlier in the same block. It also keeps a complete history with no gaps.
+
+### Two facts it rests on
+
+1. **Seal.**
+   - In a pool with `L > 0` and `lpFee > 0`, every price-moving swap step charges at least 1 wei of LP fee and raises
+     `feeGrowthGlobal0/1`. See `lib/v4-core/src/libraries/SwapMath.sol` (fee rounded up) and `Pool.sol:401-406`.
+   - Suppose the tuple `(sqrtPriceX96, feeGrowthGlobal0X128, feeGrowthGlobal1X128)` read in block `b` equals a snapshot taken in
+     an earlier block `a`, and the snapshot had `L > 0`. Then no swap happened in between, so the pool's end state for every block
+     from `a` to `b − 1` is that snapshot.
+   - `sqrtPriceX96` alone is not enough: an attacker can restore it exactly with a price limit.
+2. **Proof.**
+   - A block header whose `keccak256` equals Unichain's own hash for block `k` gives that block's `stateRoot`.
+   - The hash comes from `BLOCKHASH` for the last 256 blocks, then the EIP-2935 contract
+     `0x0000F90827F1C53a10cb7A02335B175320002935` for 8,191 blocks. Both were verified live on Unichain mainnet and Sepolia on
+     2026-09-26.
+   - Older blocks use a header chain walked back from a known hash.
+   - A Merkle-Patricia account proof of the PoolManager, plus a storage proof of `pools[poolId].slot0` (StateLibrary: slot
+     `keccak256(poolId, 6)`), gives the pool's exact state at the end of block `k`.
+
+### Contract
+
+`src/oracle/SealedPoolOracle.sol` implements `IUnderlyingOracle`. The `PredictionHook` does not change. The contract has no owner
+and no setters; everything is immutable.
+
+**Configuration:**
+- PoolManager, pool key or id, orientation sign and `decimalsShift`.
+- Estimator parameters, with the same meaning as `UnderlyingOracleHook`: `gridSeconds`, `nWindows`, `minWindows`, `winsorTicks`
+  and the variance bounds.
+- `blockTime` (1 s on both chains).
+- `maxStaleBlocks`.
+- Observation cardinality.
+- The constructor rejects a pool with a hook, a dynamic fee or `lpFee == 0`.
+
+**Notation:**
+- `E_k` is the pool state at the end of block `k`.
+- The start-of-block (SoB) price of block `k` is `E_{k−1}`.
+- The oracle keeps a **frontier** `K`: every `E_j` with `j ≤ K` has been applied, contiguously.
+- Applying `E_j` credits its normalised tick to block `j + 1`'s time in the tick cumulative. This is the same "tick prevailing
+  since the last write" semantics as `UnderlyingOracleHook`.
+- `cumulativeAt(T) − cumulativeAt(T − window)` therefore averages SoB ticks over the window, exactly like today.
+
+**`poke()`**, callable by anyone and at most once per block:
+- It reads `slot0`, both fee-growth words and `liquidity` with one `extsload`.
+- If the stored snapshot comes from an earlier block `a`, its tuple is unchanged, and its `L > 0`, then the run `E_a … E_{b−1}` is
+  proven.
+- A proven run is applied if it starts at or before `K + 1`. Otherwise it is appended to a FIFO queue.
+- The snapshot is then replaced with the live state at block `b`.
+
+**`prove(...)` / `proveMany(...)`**, callable by anyone:
+- Verifies the header, account and storage proofs for block `K + 1` and applies `E_{K+1}`.
+- Then drains queued runs that are now contiguous.
+- Proofs must be submitted in block order.
+- `checkpointHeaders(headers[])` stores verified hashes of older blocks by walking parent hashes back from a known hash. A missed
+  window can therefore always be recovered, so the oracle cannot die permanently.
+
+**Views:**
+
+| View | Behaviour |
+|---|---|
+| `lnSpotSoBWad()` / `sobTick()` | The SoB of the current block comes from one of: `E_{number−1}` when `K == number − 1`; the snapshot, when the live tuple still equals it and it was taken in an earlier block (a sealed view that needs no write); or `E_K` when `K ≥ number − 1 − maxStaleBlocks`. Otherwise the call reverts, and trading halts because `quote()` returns zeros. |
+| `cumulativeAt(t)` | Answers only for `t ≤ time(K + 1)`, or beyond that when the sealed view proves the live state has held since the frontier. It **never extrapolates across a gap**, so settlement waits for proofs. |
+| `varianceE36()` | The same TWAP-return realised-variance estimator and policy as today, over contiguous history. |
+| `frontier()`, `snapshot()`, `queueLength()` | Exposed for the bot. |
+
+**Shared code:**
+- The observation ring, the grid checkpoints and the estimator move into `src/oracle/TickAccumulator.sol`, an abstract contract.
+- `UnderlyingOracleHook.sol` stays byte-for-byte unchanged, because it is live and its build matches the deployed bytecode.
+- A differential test checks that both produce the same cumulatives and variance for the same price path.
+
+**Proof libraries:**
+- Optimism contracts-bedrock `RLPReader`, `MerkleTrie`, `SecureMerkleTrie` and `Bytes` (MIT), vendored unmodified under
+  `src/vendor/optimism/` with the pinned commit.
+- `src/oracle/PoolStateProof.sol` holds the header decode (fields 3 `stateRoot`, 8 `number` and 11 `timestamp` of the 21-field
+  Isthmus header) and the account and slot0 proofs.
+- Measured cost is about 0.47M gas per proven block: header ~37k, account ~250k, slot ~180k. That is about $0.002 at Unichain gas
+  prices.
+
+### Prover and poker bot
+
+`bot/src/sealed.ts`, run as `script/bots.sh start … sealed`:
+- It pokes every block.
+- It watches `frontier()` against the head and proves every block the seal could not cover, in order and batched.
+- It rebuilds headers from `eth_getBlockByNumber`. The public RPC has no `debug_getRawHeader`. The rebuilt header's `keccak`
+  must equal the block hash before anything is sent.
+- It uses `eth_getProof`, which drpc, publicnode and mainnet.unichain.org all serve.
+- It needs no role and can only advance the truth.
+
+### Phase 2 testing
+
+- **Seal unit tests** on a local PoolManager with a hookless 5 bp pool:
+  - an idle run proves;
+  - any swap, donate or same-transaction push-and-restore to the exact `sqrtPriceX96` breaks the seal;
+  - a zero-liquidity snapshot never seals;
+  - one poke per block.
+- **Fuzz** over random swap, poke and proof sequences: the frontier only moves forward, and the cumulative equals a brute-force
+  reference built from end-of-block states.
+- **Differential test** against `UnderlyingOracleHook` on the same price path: identical `cumulativeAt`, `varianceE36` and SoB
+  values.
+- **Proof tests** with real Unichain mainnet fixtures (headers plus `eth_getProof`) for the deep pool:
+  - valid proofs are accepted;
+  - a tampered header, account node or storage node is rejected;
+  - a wrong block number or a hash outside the window is rejected;
+  - header-chain checkpoints work;
+  - gas is recorded.
+- **Header encoder test** in the bot: the rebuilt hash equals the RPC hash for recent Unichain mainnet and Sepolia blocks.
+- **End-to-end on Anvil** (local chain, real `eth_getProof`):
+  - PoolManager, hookless pool, `SealedPoolOracle`, `PredictionHook` and scheduler;
+  - the bot pokes and proves while swaps create gaps;
+  - a market opens, trades and settles with a complete history.
+- **Fork test on Unichain mainnet:** poke the real `0x3258…39d9` pool across rolled blocks. Sealed spot must equal `slot0` and
+  track the pool.
+
+Phase 2 does not change the testnet demo. It keeps `UnderlyingOracleHook`, because the mirror bot trades the demo pool almost
+every second.
+
 ## Out of scope
 
 - An "open market" button in the dashboard.
 - Indexing the legacy hook.
-- A mainnet deployment.
+- A mainnet deployment of either phase. Phase 2 is proven by tests against real Unichain mainnet state.
 - On-chain parameter bounds inside the hook. The scheduler is the only creator, and its immutable settings are the bounds.
 
 ## Risks
@@ -133,3 +264,12 @@ hook address.
 - **Names are in UTC**, as the keeper's default was. Screens that show local time format it from `expiry`.
 - **The deployer nonce could shift between simulation and broadcast.** The post-deploy assertions catch it; the only cost is
   wasted gas.
+- **The seal is new.** No prior art was found. Its soundness rests on the two facts above and on the tests.
+  - If a protocol fee is ever turned on, a dust swap (below about 2,000 wei of input) can carry zero LP fee. Moving the price 1%
+    that way takes about 4e7 swaps.
+  - A 1-wei `donate` can break a seal. That only forces a proof, costing about $0.002 per block.
+- **Proof liveness.** If no one proves within the 1 h `GRACE` after expiry, anyone can call `settleInvalid`, which pays 50/50. The
+  bot keeps the frontier within a few blocks of the head. `checkpointHeaders` recovers from outages, so proofs are always
+  possible.
+- **Real money needs windows of at least 30 minutes.** A 10 s window is demo-only at any depth. Research cost to bias
+  settlement by 0.3%: about $6.6k over 5 min and about $40k over 30 min on the $8.09M pool.
