@@ -27,6 +27,8 @@ export interface PortfolioDisplay {
     availability: PortfolioAvailability;
     rows: PortfolioRow[];
     realized: number | null;
+    historyComplete?: boolean;
+    accountingComplete?: boolean;
 }
 export type PortfolioSection = "open" | "claimable" | "history";
 export function sectionOf(row: PortfolioRow): PortfolioSection {
@@ -48,7 +50,7 @@ export function portfolioTotals(display: PortfolioDisplay) {
     if (display.availability !== "ready") return { total: null, unrealized: null, realized: null, openCount: null, claimable: null };
     const { open, claimable } = partitionPortfolio(display.rows);
     const claimableValue = claimPlan(claimable).amount;
-    return { total: sumKnown([...open.map((r) => r.value), claimableValue]), unrealized: sumKnown(open.map((r) => r.profit)), realized: display.realized, openCount: open.length, claimable: claimableValue };
+    return { total: sumKnown([...open.map((r) => r.value), claimableValue]), unrealized: display.accountingComplete === false ? null : sumKnown(open.map((r) => r.profit)), realized: display.realized, openCount: open.length, claimable: claimableValue };
 }
 export function claimPlan(rows: PortfolioRow[]) {
     const candidates = partitionPortfolio(rows).claimable;

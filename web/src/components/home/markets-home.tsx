@@ -1,6 +1,6 @@
 "use client";
 import { LockKeyhole, Droplets, Zap } from "lucide-react";
-import { QueryError } from "@/components/market/query-error";
+import { MarketRefreshNotice, QueryError } from "@/components/market/query-error";
 import { useMarkets, useTracks } from "@/lib/data";
 import type { UnderlyingRegistry } from "@/lib/markets/explorer";
 import { FeaturedMarket, pickFeatured } from "./featured-market";
@@ -41,7 +41,7 @@ export function MarketsHome() {
               </div>
             </div>
           </div>
-          {error ? (
+          {error && !markets ? (
             <div className="featured-market">
               <QueryError />
             </div>
@@ -57,16 +57,16 @@ export function MarketsHome() {
             <h2>Markets</h2>
             <p>Explore onchain markets.</p>
           </div>
-          <span className="network-note">
+          <div><span className="network-note">
             <i />
             Unichain Sepolia
-          </span>
+          </span><MarketRefreshNotice stale={!!error && !!markets} /></div>
         </div>
         <MarketBrowser
           markets={markets}
           tracks={tracks}
           registry={registry}
-          error={!!error}
+          error={!!error && !markets}
         />
       </div>
     </div>

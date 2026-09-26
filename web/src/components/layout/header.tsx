@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
@@ -16,16 +18,33 @@ import { isActivePath, NAV_ITEMS } from "./nav-items";
 /** Shared navigation; wallet behavior stays in its existing components. */
 export function Header() {
     const pathname = usePathname();
+    const header = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        let frame = 0;
+        const update = () => {
+            frame = 0;
+            // Only the backdrop fades; navigation and wallet controls stay opaque.
+            const progress = Math.min(1, Math.max(0, window.scrollY) / 96);
+            header.current?.style.setProperty("--header-background-alpha", String(progress * 0.96));
+            header.current?.style.setProperty("--header-background-blur", `${progress * 12}px`);
+        };
+        const onScroll = () => {
+            if (!frame) frame = requestAnimationFrame(update);
+        };
+        update();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            window.removeEventListener("scroll", onScroll);
+            cancelAnimationFrame(frame);
+        };
+    }, []);
 
     return (
-        <header className="app-header">
+        <header ref={header} className="app-header">
             <div className="app-header-inner">
                 <Link href="/" aria-label={`${BRAND_NAME} home`} className="header-brand">
-                    <svg className="header-brand-mark" width="30" height="32" viewBox="0 0 30 32" fill="none" aria-hidden="true">
-                        <defs><linearGradient id="phinary-header-mark" x1="4" y1="3" x2="25" y2="29" gradientUnits="userSpaceOnUse"><stop stopColor="#72ddfa"/><stop offset=".48" stopColor="#9c83fa"/><stop offset="1" stopColor="#bd35f0"/></linearGradient></defs>
-                        <path d="M15 7C8.1 7 3 10.5 3 16s5.1 9 12 9 12-3.5 12-9-5.1-9-12-9Z" stroke="url(#phinary-header-mark)" strokeWidth="5"/>
-                        <path d="M15 1v30" stroke="url(#phinary-header-mark)" strokeWidth="5"/>
-                    </svg>
+                    <Image className="header-brand-mark" src="/wallets/phinary.svg" width={32} height={32} alt="" />
                     <span>{BRAND_NAME}</span>
                 </Link>
 

@@ -41,7 +41,8 @@ export function parseTrade(row: Record<string, unknown>): Trade {
 export function parsePrice(row: Record<string, unknown>): PricePoint {
     const mid = amount(row.midUp, 18), ask = amount(row.askUp, 18), bid = amount(row.bidUp, 18);
     const eth = Math.exp(Number(units(row.ethLnWad)) / 1e18);
-    if ([mid, ask, bid].some(value => value > 1) || !Number.isFinite(eth) || eth <= 0) throw Error('Invalid price');
+    // Probability is bounded by 1; executable ask includes spread and can exceed 1.
+    if (mid > 1 || bid > 1 || !Number.isFinite(eth) || eth <= 0) throw Error('Invalid price');
     return { t: integer(row.timestamp), mid, ask, bid, eth };
 }
 type Indexer = ReturnType<typeof createIndexerClient>;

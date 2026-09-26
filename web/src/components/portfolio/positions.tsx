@@ -21,8 +21,8 @@ function StateContent({ availability, section, marketBase }: { availability: Por
     if (availability !== "ready") return <div className="portfolio-empty">{availability === "disconnected" ? "Connect your wallet to view this section." : availability === "wrong-network" ? "Switch to Unichain Sepolia to view this section." : availability === "error" ? "Portfolio data could not be loaded." : "Portfolio data is not connected yet."}</div>;
     return <div className="portfolio-empty"><p>{SECTION_COPY[section].empty}</p>{section === "open" && <><span>Explore markets to open a position.</span><a href={`${marketBase}/`}>Browse Markets</a></>}</div>;
 }
-export function PositionsTable({ rows, section, availability, now, actionsEnabled, onSell, onClaim, marketBase = "" }: {
-    rows: PortfolioRow[]; section: PortfolioSection; availability: PortfolioAvailability; now: number; actionsEnabled: boolean; onSell: (row: PortfolioRow) => void; onClaim: (row: PortfolioRow) => void; marketBase?: string;
+export function PositionsTable({ rows, section, availability, now, actionsEnabled, onSell, onClaim, marketBase = "", historyComplete = true }: {
+    rows: PortfolioRow[]; section: PortfolioSection; availability: PortfolioAvailability; now: number; actionsEnabled: boolean; onSell: (row: PortfolioRow) => void; onClaim: (row: PortfolioRow) => void; marketBase?: string; historyComplete?: boolean;
 }) {
     const copy = SECTION_COPY[section];
     function cells(row: PortfolioRow) {
@@ -39,8 +39,8 @@ export function PositionsTable({ rows, section, availability, now, actionsEnable
         ];
     }
     return <section className="portfolio-section" aria-labelledby={`portfolio-${section}-heading`}>
-        <div className="portfolio-section-heading"><div><h2 id={`portfolio-${section}-heading`}>{copy.title}</h2><p>{copy.subtitle}</p></div>{availability === "ready" && <span>{rows.length} {rows.length === 1 ? "position" : "positions"}</span>}</div>
-        {availability !== "ready" || rows.length === 0 ? <div className="portfolio-table-shell"><StateContent availability={availability} section={section} marketBase={marketBase} /></div> : <>
+        <div className="portfolio-section-heading"><div><h2 id={`portfolio-${section}-heading`}>{copy.title}</h2><p>{copy.subtitle}</p></div>{availability === "ready" && (section !== "history" || historyComplete) && <span>{rows.length} {rows.length === 1 ? "position" : "positions"}</span>}</div>
+        {availability !== "ready" || rows.length === 0 ? <div className="portfolio-table-shell">{section === "history" && !historyComplete && availability === "ready" ? <div className="portfolio-empty">Complete transaction history is not available yet.</div> : <StateContent availability={availability} section={section} marketBase={marketBase} />}</div> : <>
             <div className="portfolio-table-shell portfolio-desktop"><Table><TableHeader><TableRow>{copy.columns.map((col) => <TableHead key={col}>{col}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}>{cells(row).map((value, i) => <TableCell key={copy.columns[i]}>{value}</TableCell>)}</TableRow>)}</TableBody></Table></div>
             <div className="portfolio-mobile">{rows.map((row) => { const values = cells(row); return <article className="portfolio-position-card" key={row.id}><div className="portfolio-card-title">{values[0]}{values[1]}</div><dl>{[5, 6, 2, 3, 4, 7].map((i) => <div key={copy.columns[i]}><dt>{copy.columns[i]}</dt><dd>{values[i]}</dd></div>)}</dl><div className="portfolio-card-action">{section === "history" && <span>Status</span>}{values[8]}</div></article>; })}</div>
         </>}

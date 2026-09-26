@@ -25,7 +25,7 @@ function resource(id?: number) {
             const result = await readMarkets(id);
             syncChainClock(result.timestamp);
             return result;
-        });
+        }, 5000, true);
         resources.set(key, existing);
     }
     return existing;
@@ -37,24 +37,24 @@ function useSnapshot(id?: number) {
 export function retryMarkets(id?: number) { void resource(id).refresh(); }
 
 /** Re-evaluate cutoffs between polls. Never display a cutoff sentinel as a probability. */
-function current(m: Market, now: number): Market {
+function current(m: Market, now: number, stale = false): Market {
     const phase = phaseOf(m, now);
-    const quote = now < m.cutoff ? m.quote : null;
+    const quote = !stale && now < m.cutoff ? m.quote : null;
     return { ...m, phase, quote, upChance: m.status === "trading" ? quote?.midUp ?? null : m.upChance };
 }
 export function useMarkets(tab?: MarketTab): Query<Market[]> {
     const query = useSnapshot();
     const now = useNow();
     if (!query.data || now === null) return { ...query, data: undefined };
-    const markets = query.data.markets.map((m) => current(m, now));
-    return ready(tab ? markets.filter((m) => tabOf(m.phase) === tab) : markets);
+    const markets = query.data.markets.map((m) => current(m, now, !!query.error));
+    return { ...query, data: tab ? markets.filter((m) => tabOf(m.phase) === tab) : markets };
 }
 export function useMarket(id: number): Query<Market | null> {
     const query = useSnapshot(id);
     const history = useHistory(id);
     const now = useNow();
     if (!query.data || now === null) return { ...query, data: undefined };
-    return ready(query.data.markets[0] ? withHistory(current(query.data.markets[0], now), history.data) : null);
+    return { ...query, data: query.data.markets[0] ? withHistory(current(query.data.markets[0], now, !!query.error), history.data) : null };
 }
 export function useLiveMarketId(exclude?: number): Query<number | null> {
     const query = useMarkets();

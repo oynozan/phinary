@@ -9,6 +9,7 @@ import { assertWalletNetwork, isRejected, walletIdentity, type BrowserProvider }
 
 export interface WalletOption { id: string; name: string; provider: BrowserProvider }
 interface Session {
+    connectionReady: boolean;
     status: "disconnected" | "connecting" | "connected";
     address: Address | null;
     chainId: number | null;
@@ -17,22 +18,17 @@ interface Session {
     balanceError?: string;
     options: WalletOption[];
 }
-const initial: Session = { status: "disconnected", address: null, chainId: null, usdc: null, eth: null, options: [] };
+const initial: Session = { connectionReady: false, status: "disconnected", address: null, chainId: null, usdc: null, eth: null, options: [] };
 let state = initial;
 let selected: WalletOption | undefined;
+let releaseWallet: (() => Promise<void>) | undefined;
+let openConnection: ((id?: string) => void) | undefined;
 let version = 0;
 let balanceRequest = 0;
 let started = false;
 let cleanup: (() => void) | undefined;
 let timer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
-const savedKey = "phinary.wallet.provider";
-function saved(value?: string) {
-    try {
-        if (value === undefined) return localStorage.getItem(savedKey);
-        if (value) localStorage.setItem(savedKey, value); else localStorage.removeItem(savedKey);
-    } catch { /* storage may be disabled */ }
-}
 function set(patch: Partial<Session>) { state = { ...state, ...patch }; for (const fn of listeners) fn(); }
 
 export async function refreshWalletBalances() {
@@ -81,24 +77,30 @@ function attach(option: WalletOption) {
         option.provider.removeListener?.("disconnect", disconnected);
     };
 }
+/** Privy owns connection prompts and persistence; trading continues through its EIP-1193 provider. */
+export function registerWalletConnection(open: (id?: string) => void) {
+    openConnection = open;
+    set({ connectionReady: true });
+    return () => { if (openConnection === open) { openConnection = undefined; set({ connectionReady: false }); } };
+}
 export async function connectWallet(id?: string) {
-    if (state.status === "connecting") return;
-    const option = state.options.find((item) => item.id === id) ?? state.options[0];
-    if (!option) throw new Error("No browser wallet found. Install or enable a wallet extension.");
-    const epoch = ++version;
-    set({ status: "connecting" });
-    try {
-        await option.provider.request({ method: "eth_requestAccounts" });
-        if (epoch !== version) return;
-        attach(option); saved(option.id); await syncIdentity();
-    } catch (error) {
-        if (epoch === version) set({ status: "disconnected" });
-        throw new Error(isRejected(error) ? "Connection cancelled" : "Could not connect wallet");
-    }
+    if (!openConnection) throw new Error("Wallet connection is still loading. Please try again.");
+    openConnection(id);
+}
+export async function adoptPrivyWallet(option: WalletOption, disconnect: () => Promise<void>) {
+    releaseWallet = disconnect;
+    if (selected?.provider === option.provider && state.status === "connected") return;
+    attach(option);
+    await syncIdentity();
+}
+export function clearWalletSession() {
+    ++version; clearTimeout(timer); cleanup?.(); cleanup = undefined; selected = undefined; releaseWallet = undefined;
+    set({ ...initial, options: state.options, connectionReady: state.connectionReady });
 }
 export function disconnectWallet() {
-    ++version; clearTimeout(timer); cleanup?.(); cleanup = undefined; selected = undefined; saved("");
-    set({ ...initial, options: state.options });
+    const release = releaseWallet;
+    clearWalletSession();
+    void release?.().catch(() => { /* local session remains disconnected */ });
 }
 export async function switchWalletNetwork() {
     if (!selected) throw new Error("Connect a wallet first");
@@ -120,7 +122,6 @@ export async function switchWalletNetwork() {
 function addOption(option: WalletOption) {
     if (state.options.some((item) => item.provider === option.provider)) return;
     set({ options: [...state.options, option] });
-    if (!selected && state.status !== "connecting" && saved() === option.id) { attach(option); void syncIdentity(); }
 }
 function start() {
     if (started) return; started = true;

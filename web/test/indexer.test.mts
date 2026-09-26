@@ -93,3 +93,16 @@ test('history resource failure does not invalidate independent execution reads a
     assert.ok(history.getSnapshot().error); assert.equal(rpc.getSnapshot().data?.mid, .5);
     fails = false; await history.refresh(); assert.deepEqual(history.getSnapshot().data, []);
 });
+
+// Captured from market 306: BinaryPricer adds h0 after the probability band.
+test('spread-inclusive asks above one survive server and browser history validation', async () => {
+    const spreadPrice = { ...price, midUp: '1000000000000000000', askUp: '1020000000000000000', bidUp: '980000000000000000' };
+    const client = mock(q => q.includes('priceSnapshots') ? page([spreadPrice]) : q.includes('trades') ? page([]) : { market });
+    const history = await readIndexedMarket(client, 1, head);
+    assert.equal(history.prices[0].ask, 1.02);
+    assert.equal(parseHistory(history, 1, 10001).prices[0].ask, 1.02);
+    for (const field of ['mid', 'bid']) {
+        assert.throws(() => parseHistory({ ...history, prices: [{ ...history.prices[0], [field]: 1.02 }] }, 1, 10001));
+    }
+    assert.throws(() => parseHistory({ ...history, prices: [{ ...history.prices[0], ask: -1 }] }, 1, 10001));
+});

@@ -132,3 +132,14 @@ body:has(.portfolio-page)::before { display: none; }
 @media (prefers-reduced-motion:reduce) {
   .portfolio-page *, .portfolio-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.portfolio-connect { max-width: 640px; margin: 40px auto; padding: 40px 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: center; }
+.portfolio-connect h2 { margin: 0 0 12px; font-size: clamp(24px, 4vw, 30px); line-height: 1.25; }
+.portfolio-connect > p { max-width: 420px; margin: 0 auto 24px; color: var(--muted-foreground); font-size: 16px; }
+.portfolio-connect .portfolio-notice { flex-direction: column; align-items: center; margin: 0; padding: 0; border: 0; background: transparent; font-size: 14px; }
+.portfolio-connect .portfolio-notice button { min-height: 44px; padding: 10px 24px; background: #a50cdf; border-color: #b431e9; font-weight: 700; }
+.portfolio-connect .portfolio-notice button:hover:not(:disabled) { background: #8b21d4; }
+.portfolio-connect > a { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; text-decoration: underline; color: var(--muted-foreground); }
+@media (max-width: 639px) { .portfolio-connect { margin: 20px auto; padding: 28px 20px; } }
+
+.portfolio-notice-ready { background: transparent; border: 0; padding: 0; font-size: 12px; }

@@ -15,7 +15,7 @@ export function parseHistory(value: unknown, id: number, now = Date.now() / 1000
     for (const value of data.prices) {
         const row = object(value);
         if (!positive(row.t) || Number(row.t) > asOf || !positive(row.eth) ||
-            !['mid', 'ask', 'bid'].every(key => positive(row[key]) && Number(row[key]) <= 1)) throw Error('Invalid price history');
+            !['mid', 'ask', 'bid'].every(key => positive(row[key])) || Number(row.mid) > 1 || Number(row.bid) > 1) throw Error('Invalid price history');
     }
     for (const value of data.trades) {
         const row = object(value);

@@ -5,6 +5,7 @@ import { Dock } from "@/components/layout/dock";
 import { Header } from "@/components/layout/header";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { WalletProvider } from "@/components/wallet/privy-provider";
 import { WrongNetworkBanner } from "@/components/wallet/wrong-network-banner";
 import { BRAND_NAME } from "@/config/brand";
 
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             className={`dark ${akt.variable} ${lexendDeca.variable} ${manrope.variable} ${ubuntuMono.variable} antialiased`}
         >
             <body>
-                <TooltipProvider>
+                <WalletProvider><TooltipProvider>
                     <Header />
                     <main className="relative min-w-0 overflow-x-clip pt-(--shell-top) pb-(--shell-bottom)">
                         <WrongNetworkBanner />
@@ -40,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     </main>
                     <Dock />
                     <Toaster position="top-center" offset={{ top: 120 }} mobileOffset={{ top: 88 }} />
-                </TooltipProvider>
+                </TooltipProvider></WalletProvider>
             </body>
         </html>
     );
