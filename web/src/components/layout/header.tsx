@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
@@ -16,9 +17,30 @@ import { isActivePath, NAV_ITEMS } from "./nav-items";
 /** Shared navigation; wallet behavior stays in its existing components. */
 export function Header() {
     const pathname = usePathname();
+    const header = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        let frame = 0;
+        const update = () => {
+            frame = 0;
+            // Only the backdrop fades; navigation and wallet controls stay opaque.
+            const progress = Math.min(1, Math.max(0, window.scrollY) / 96);
+            header.current?.style.setProperty("--header-background-alpha", String(progress * 0.96));
+            header.current?.style.setProperty("--header-background-blur", `${progress * 12}px`);
+        };
+        const onScroll = () => {
+            if (!frame) frame = requestAnimationFrame(update);
+        };
+        update();
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            window.removeEventListener("scroll", onScroll);
+            cancelAnimationFrame(frame);
+        };
+    }, []);
 
     return (
-        <header className="app-header">
+        <header ref={header} className="app-header">
             <div className="app-header-inner">
                 <Link href="/" aria-label={`${BRAND_NAME} home`} className="header-brand">
                     <svg className="header-brand-mark" width="30" height="32" viewBox="0 0 30 32" fill="none" aria-hidden="true">
