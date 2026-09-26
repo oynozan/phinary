@@ -369,14 +369,14 @@ body:has(.markets-page)::before {
 .network-note i {
   color: #a679de;
 }
-.market-controls {
+.track-filter {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 19px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.underlying-controls,
+.track-filter > div,
 .market-state-controls {
   display: flex;
   border: 1px solid #292d3c;
@@ -384,9 +384,29 @@ body:has(.markets-page)::before {
   padding: 3px;
   gap: 3px;
 }
-.underlying-controls {
-  overflow-x: auto;
-  flex-shrink: 0;
+.track-filter button {
+  min-width: 46px;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #0d111a;
+  color: #c5cde1;
+}
+.track-filter button:hover {
+  background: #222032;
+}
+.track-filter button[aria-pressed="true"] {
+  background: #9021c5;
+  color: white;
+}
+.market-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-bottom: 19px;
 }
 .market-controls button {
   min-height: 32px;
@@ -399,10 +419,6 @@ body:has(.markets-page)::before {
 }
 .market-controls button:hover {
   background: #222032;
-}
-.underlying-controls button[aria-pressed="true"] {
-  background: #9021c5;
-  color: white;
 }
 .market-state-controls button[aria-pressed="true"] {
   background: #542078;
@@ -657,10 +673,6 @@ a.market-price:hover {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
-  }
-  .underlying-controls {
-    align-self: start;
-    max-width: 100%;
   }
   .market-utilities {
     justify-content: space-between;

@@ -12,6 +12,7 @@ export {
     usePortfolio,
     usePriceHistory,
     useQuote,
+    useTracks,
     useVault,
     useWallet,
     type UseWallet,

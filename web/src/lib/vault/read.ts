@@ -62,9 +62,10 @@ export async function readVaultExposure(client = createChainClient(), config = g
         const ids = Array.from({ length: Math.min(40, Number(count) - start + 1) }, (_, i) => start + i);
         const infos = await client.multicall({ contracts: ids.map(id => ({ address: config.predictionHook, abi: predictionHookAbi, functionName: "marketInfo", args: [BigInt(id)] } as const)), blockNumber: block.number, multicallAddress: config.multicall3, allowFailure: false });
         infos.forEach((info, i) => {
-            const crypto = info.oracle.toLowerCase() === config.underlyingOracle.toLowerCase();
+            const asset = config.oracleAssets[info.oracle.toLowerCase()];
+            const crypto = asset !== undefined;
             const strike = Math.exp(Number(info.lnStrikeWad) / 1e18);
-            markets.push({ id: ids[i], name: crypto ? `ETH > $${strike.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `Market #${ids[i]}`, category: crypto ? "Crypto" : "Other", bucket: info.bucket, liability: marketLiability(info), status: info.status, expiry: Number(info.expiry) });
+            markets.push({ id: ids[i], name: crypto ? `${asset} > $${strike.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : `Market #${ids[i]}`, category: crypto ? "Crypto" : "Other", bucket: info.bucket, liability: marketLiability(info), status: info.status, expiry: Number(info.expiry) });
         });
     }
     const active = markets.reduce((sum, market) => sum + market.bucket, 0n);

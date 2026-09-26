@@ -13,6 +13,9 @@ import { mockAddress, mockHash, rand01, randNormal } from "./rng";
 
 export const MOCK_CONFIG = {
     seed: 2685,
+    asset: "ETH",
+    ticker: "ETH1M",
+    track: "1m",
     /** a new market every minute */
     interval: 60,
     /** each lasts two minutes */
@@ -209,7 +212,7 @@ export class MockChain {
                 expiry,
                 createdAt,
                 invalid: rand01(C.seed, id, 77) < C.invalidRate,
-                tokenName: tokenName(strike, expiry),
+                tokenName: tokenName(strike, expiry, C.ticker),
             };
             this.statics.set(id, s);
         }
@@ -366,8 +369,11 @@ export class MockChain {
             windowStart: windowStartOf(tm),
             createdAt: s.createdAt,
             tokenName: s.tokenName,
-            upTicker: tokenTicker("up"),
-            downTicker: tokenTicker("down"),
+            upTicker: tokenTicker("up", C.ticker),
+            downTicker: tokenTicker("down", C.ticker),
+            asset: C.asset,
+            track: C.track,
+            oracleSpot: null,
             quote,
             upChance,
             volume,

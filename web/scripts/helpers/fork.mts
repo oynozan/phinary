@@ -59,7 +59,7 @@ export async function startFixture(options: { marketSource?: 'isolated' | 'sched
         assert.equal((await client.waitForTransactionReceipt({ hash: deposit })).status, 'success');
         if (options.marketSource === 'scheduler') {
             // Exercise the deployed scheduler and real oracle. No impersonation or code replacement.
-            const scheduler = config.marketScheduler;
+            const scheduler = config.marketScheduler ?? config.marketSchedulers[0];
             assert.ok(scheduler, 'Deployment must define MarketScheduler');
             const abi = parseAbi(['function open() returns (uint256)', 'function nextOpenTime() view returns (uint256)']);
             const next = await client.readContract({ address: scheduler, abi, functionName: 'nextOpenTime' });

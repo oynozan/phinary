@@ -5,12 +5,12 @@ import { tokenTicker } from "@/lib/format";
 import type { Side } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type Asset = { kind: "usdc" } | { kind: "shares" } | { kind: "outcome"; side: Side };
+export type Asset = { kind: "usdc" } | { kind: "shares" } | { kind: "outcome"; side: Side; ticker: string };
 
 function labelOf(asset: Asset) {
     if (asset.kind === "usdc") return COLLATERAL_SYMBOL;
     if (asset.kind === "shares") return "Shares";
-    return tokenTicker(asset.side);
+    return tokenTicker(asset.side, asset.ticker);
 }
 
 /** Token pill like atomic.cash's asset selector: plain ticker, outcome tokens lead with a ▲ / ▼ */

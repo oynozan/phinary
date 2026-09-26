@@ -17,7 +17,7 @@ import {
   formatPrice,
 } from "@/lib/format";
 import { isTradable, type MarketTab } from "@/lib/phase";
-import { underlyingOf, type UnderlyingRegistry } from "@/lib/markets/explorer";
+import type { UnderlyingRegistry } from "@/lib/markets/explorer";
 import type { Market } from "@/lib/types";
 import { LiveSparkline } from "./live-sparkline";
 import {
@@ -108,12 +108,10 @@ export function MarketTable({
   markets,
   tab,
   registry,
-  ethSpot,
 }: {
   markets: Market[];
   tab: MarketTab;
   registry: UnderlyingRegistry;
-  ethSpot?: number;
 }) {
   return (
     <>
@@ -140,14 +138,7 @@ export function MarketTable({
                 {tab === "live" ? (
                   <>
                     <TableCell>
-                      <SpotPrice
-                        market={m}
-                        ethSpot={
-                          underlyingOf(m, registry).symbol === "ETH"
-                            ? ethSpot
-                            : undefined
-                        }
-                      />
+                      <SpotPrice market={m} />
                     </TableCell>
                     <TableCell>
                       <ChanceHistory market={m} />
@@ -170,14 +161,7 @@ export function MarketTable({
                 ) : tab === "upcoming" ? (
                   <>
                     <TableCell>
-                      <SpotPrice
-                        market={m}
-                        ethSpot={
-                          underlyingOf(m, registry).symbol === "ETH"
-                            ? ethSpot
-                            : undefined
-                        }
-                      />
+                      <SpotPrice market={m} />
                     </TableCell>
                     <TableCell>
                       <MarketDeadline market={m} />
@@ -262,14 +246,7 @@ export function MarketTable({
                 <>
                   <span>
                     <small>Spot Price</small>
-                    <SpotPrice
-                      market={m}
-                      ethSpot={
-                        underlyingOf(m, registry).symbol === "ETH"
-                          ? ethSpot
-                          : undefined
-                      }
-                    />
+                    <SpotPrice market={m} />
                   </span>
                   <span>
                     <small>Expires At</small>

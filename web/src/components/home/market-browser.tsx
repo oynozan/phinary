@@ -7,24 +7,26 @@ import {
   type ExplorerFilters,
   type UnderlyingRegistry,
 } from "@/lib/markets/explorer";
+import type { MarketSnapshot } from "@/lib/onchain/read-markets";
 import type { Market } from "@/lib/types";
-import { MarketControls } from "./market-controls";
+import { MarketControls, TrackFilter } from "./market-controls";
 import { MarketTable } from "./market-table";
 const PAGE = 12;
 export function MarketBrowser({
   markets,
+  tracks,
   registry,
-  ethSpot,
   error,
 }: {
   markets: Market[] | undefined;
+  tracks: MarketSnapshot["tracks"] | undefined;
   registry: UnderlyingRegistry;
-  ethSpot?: number;
   error: boolean;
 }) {
   const [filters, setFilters] = useState<ExplorerFilters>({
     tab: "live",
-    underlying: "all",
+    underlying: "ETH",
+    track: "1m",
     search: "",
     sort: "deadline",
   });
@@ -40,17 +42,30 @@ export function MarketBrowser({
         registry,
       )
     : undefined;
-  const assets = [...new Set(Object.values(registry).map((a) => a.symbol))];
+  const assets = [...new Set(tracks?.map((t) => t.asset) ?? [filters.underlying])];
+  const durations = [
+    ...new Set(
+      tracks
+        ? [...tracks].sort((a, b) => a.period - b.period).map((t) => t.label)
+        : [filters.track ?? "1m"],
+    ),
+  ];
+  const change = (next: ExplorerFilters) => {
+    setFilters(next);
+    setLimit(PAGE);
+  };
   return (
     <section aria-label="Market explorer">
-      <MarketControls
+      <TrackFilter
         filters={filters}
         assets={assets}
+        durations={durations}
+        onChange={change}
+      />
+      <MarketControls
+        filters={filters}
         volumeAvailable={volumeAvailable}
-        onChange={(next) => {
-          setFilters(next);
-          setLimit(PAGE);
-        }}
+        onChange={change}
       />
       {error ? (
         <div className="market-empty" role="status">
@@ -69,19 +84,16 @@ export function MarketBrowser({
       ) : list.length === 0 ? (
         <div className="market-empty" role="status">
           <p>
-            {filters.search || filters.underlying !== "all"
-              ? "No markets match your filters."
+            {filters.search
+              ? "No markets match your search."
               : `No ${filters.tab} markets${filters.tab === "resolved" ? " yet" : ""}.`}
           </p>
-          {(filters.search || filters.underlying !== "all") && (
+          {filters.search && (
             <button
               type="button"
-              onClick={() => {
-                setFilters({ ...filters, search: "", underlying: "all" });
-                setLimit(PAGE);
-              }}
+              onClick={() => change({ ...filters, search: "" })}
             >
-              Clear filters
+              Clear search
             </button>
           )}
         </div>
@@ -90,7 +102,6 @@ export function MarketBrowser({
           markets={list.slice(0, limit)}
           tab={filters.tab}
           registry={registry}
-          ethSpot={ethSpot}
         />
       )}
       {list && list.length > 0 && (

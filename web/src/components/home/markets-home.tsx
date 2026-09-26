@@ -1,22 +1,16 @@
 "use client";
 import { LockKeyhole, Droplets, Zap } from "lucide-react";
 import { QueryError } from "@/components/market/query-error";
-import { MARKET_LIMIT } from "@/lib/onchain/read-markets";
-import { getConnectionConfig } from "@/lib/onchain/config";
-import { useEthPrice, useMarkets } from "@/lib/data";
+import { useMarkets, useTracks } from "@/lib/data";
 import type { UnderlyingRegistry } from "@/lib/markets/explorer";
 import { FeaturedMarket, pickFeatured } from "./featured-market";
 import { MarketBrowser } from "./market-browser";
 
 export function MarketsHome() {
   const { data: markets, error } = useMarkets();
-  const eth = useEthPrice();
-  const registry: UnderlyingRegistry = {
-    [getConnectionConfig().underlyingOracle.toLowerCase()]: {
-      symbol: "ETH",
-      name: "Ethereum",
-    },
-  };
+  const { data: tracks } = useTracks();
+  // Every market carries its own asset, so no oracle needs a fallback name
+  const registry: UnderlyingRegistry = {};
   return (
     <div className="markets-page">
       <div className="markets-container">
@@ -55,7 +49,6 @@ export function MarketsHome() {
             <FeaturedMarket
               market={markets ? pickFeatured(markets) : undefined}
               registry={registry}
-              ethSpot={eth.data?.price}
             />
           )}
         </div>
@@ -66,13 +59,13 @@ export function MarketsHome() {
           </div>
           <span className="network-note">
             <i />
-            Unichain Sepolia · Latest {MARKET_LIMIT} markets
+            Unichain Sepolia
           </span>
         </div>
         <MarketBrowser
           markets={markets}
+          tracks={tracks}
           registry={registry}
-          ethSpot={eth.data?.price}
           error={!!error}
         />
       </div>

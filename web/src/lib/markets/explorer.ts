@@ -10,13 +10,20 @@ export type MarketSort = "deadline" | "volume";
 export interface ExplorerFilters {
   tab: MarketTab;
   underlying: string;
+  /** Track period label such as "1m", "all" or missing matches every track */
+  track?: string;
   search: string;
   sort: MarketSort;
 }
+const ASSET_NAMES: Record<string, string> = { ETH: "Ethereum", SOL: "Solana" };
+/** The market's own asset from its track or oracle, then the registry, never a silent ETH */
 export function underlyingOf(
-  market: Pick<Market, "oracle">,
-  registry: UnderlyingRegistry,
+  market: Pick<Market, "oracle"> & Partial<Pick<Market, "asset">>,
+  registry: UnderlyingRegistry = {},
 ): Underlying {
+  if (market.asset) {
+    return { symbol: market.asset, name: ASSET_NAMES[market.asset] ?? market.asset };
+  }
   return (
     registry[market.oracle.toLowerCase()] ?? {
       symbol: "Unknown",
@@ -36,7 +43,7 @@ const time = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
   timeZone: "UTC",
 });
-export function questionOf(m: Market, registry: UnderlyingRegistry): string {
+export function questionOf(m: Market, registry: UnderlyingRegistry = {}): string {
   return `${underlyingOf(m, registry).symbol} > ${usd.format(m.strike)} at ${time.format(m.expiry * 1000)}?`;
 }
 export function hasVolume(markets: Market[]): boolean {
@@ -54,6 +61,7 @@ export function selectMarkets(
         tabOf(m.phase) === filters.tab &&
         (filters.underlying === "all" ||
           underlyingOf(m, registry).symbol === filters.underlying) &&
+        (!filters.track || filters.track === "all" || m.track === filters.track) &&
         (!query ||
           `${m.id} ${questionOf(m, registry)} ${underlyingOf(m, registry).name}`
             .toLowerCase()

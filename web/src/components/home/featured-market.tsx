@@ -30,11 +30,9 @@ export function pickFeatured(markets: Market[]): Market | null {
 export function FeaturedMarket({
   market,
   registry,
-  ethSpot,
 }: {
   market: Market | null | undefined;
   registry: UnderlyingRegistry;
-  ethSpot?: number;
 }) {
   if (market === undefined)
     return (
@@ -53,16 +51,14 @@ export function FeaturedMarket({
     return (
       <div className="featured-market featured-empty">No markets available</div>
     );
-  return <FeaturedCard market={market} registry={registry} ethSpot={ethSpot} />;
+  return <FeaturedCard market={market} registry={registry} />;
 }
 function FeaturedCard({
   market: m,
   registry,
-  ethSpot,
 }: {
   market: Market;
   registry: UnderlyingRegistry;
-  ethSpot?: number;
 }) {
   const history = usePriceHistory(m.id);
   const asset = underlyingOf(m, registry);
@@ -112,10 +108,7 @@ function FeaturedCard({
         <div>
           <span>{asset.symbol} Spot</span>
           <strong>
-            <SpotPrice
-              market={m}
-              ethSpot={asset.symbol === "ETH" ? ethSpot : undefined}
-            />
+            <SpotPrice market={m} />
           </strong>
         </div>
         <div>

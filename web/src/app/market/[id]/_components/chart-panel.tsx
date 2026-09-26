@@ -37,7 +37,7 @@ export function ChartPanel({ market }: { market: Market }) {
         </div>
         {history.isLoading ? <Skeleton className="detail-chart-empty" /> : history.error || !last ? <div className="detail-chart-empty"><p>{history.error?.message === "Not connected yet" ? "History unavailable" : history.error ? "Unable to load price history" : "No price history yet"}</p><span>Live quotes appear in the market overview.</span></div> : <>
             <span className="sr-only">{probability ? "UP probability" : "Underlying price"} history in UTC. Latest: {probability ? formatPercent(last.mid) : formatPrice(last.eth)}.</span>
-            <ChartContainer config={{ value: { label: probability ? "Chance UP" : "ETH price", color: "#d773ff" } }} className="detail-chart-canvas">
+            <ChartContainer config={{ value: { label: probability ? "Chance UP" : `${underlying(market)} price`, color: "#d773ff" } }} className="detail-chart-canvas">
                 <AreaChart data={points} margin={{ top: 12, right: 16, left: 0, bottom: 4 }} accessibilityLayer>
                     <defs><linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#be37ee" stopOpacity={0.28} /><stop offset="100%" stopColor="#be37ee" stopOpacity={0.01} /></linearGradient></defs>
                     <CartesianGrid stroke="#252a38" vertical={false} />

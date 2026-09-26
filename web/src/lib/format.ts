@@ -1,4 +1,4 @@
-import { DISPLAY_TIMEZONE, UNDERLYING_SYMBOL } from "@/config/brand";
+import { DISPLAY_TIMEZONE } from "@/config/brand";
 import type { Side } from "@/lib/types";
 
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -82,19 +82,19 @@ export function shortAddress(address: string, head = 4, tail = 4): string {
     return `${address.slice(0, head + 2)}…${address.slice(-tail)}`;
 }
 
-/** "ETH > $2,684.53 at 00:48?" */
-export function marketQuestion(strike: number, expiry: number): string {
-    return `${UNDERLYING_SYMBOL} > ${formatPrice(strike)} at ${formatTime(expiry)}?`;
+/** "SOL > $142.10 at 00:48?" for the market's own asset */
+export function marketQuestion(strike: number, expiry: number, asset: string): string {
+    return `${asset} > ${formatPrice(strike)} at ${formatTime(expiry)}?`;
 }
 
-/** On-chain ERC20 name shared by both sides: "ETH > $2684.53 26 Sep 00:48" (no thousands separator) */
-export function tokenName(strike: number, expiry: number): string {
-    return `${UNDERLYING_SYMBOL} > $${strike.toFixed(2)} ${formatDay(expiry)} ${formatTime(expiry)}`;
+/** On-chain ERC20 name shared by both sides: "ETH1M > $2684.53 26 Sep 00:48" (no thousands separator) */
+export function tokenName(strike: number, expiry: number, ticker: string): string {
+    return `${ticker} > $${strike.toFixed(2)} ${formatDay(expiry)} ${formatTime(expiry)}`;
 }
 
-/** ETHUP / ETHDOWN */
-export function tokenTicker(side: Side): string {
-    return `${UNDERLYING_SYMBOL}${side === "up" ? "UP" : "DOWN"}`;
+/** ETH1MUP / ETH1MDOWN for the ticker "ETH1M" */
+export function tokenTicker(side: Side, ticker: string): string {
+    return `${ticker}${side === "up" ? "UP" : "DOWN"}`;
 }
 
 export function sideLabel(side: Side): string {

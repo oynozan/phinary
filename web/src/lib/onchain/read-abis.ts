@@ -8,6 +8,7 @@ export const underlyingOracleAbi = parseAbi([
 export const schedulerReadAbi = parseAbi([
     "function hook() view returns (address)",
     "function oracle() view returns (address)",
+    "function gatekeeper() view returns (address)",
     "function canOpen() view returns (bool)",
     "function nextOpenTime() view returns (uint256)",
 ]);
